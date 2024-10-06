@@ -84,7 +84,7 @@ local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
 local FIXED_FPS = 60
 
 local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
-local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = true --- Flags if fired projectile should wrap around arena.
+local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
 
 local LASER_FIRE_TIMER_LIMIT = 0.5
 local LASER_PROJECTILE_SPEED = 500
@@ -201,8 +201,8 @@ function love.load()
     is_debug_hud_enabled = false --- Toggled by keys event.
     player_fire_cooldown_timer = 0
 
-    player_radius = 30
-    laser_capacity = 30
+    player_radius = 32
+    laser_capacity = 32
     laser_fire_timer = 0
     laser_index = 1 -- circular buffer index
     laser_radius = 5
@@ -799,8 +799,7 @@ function love.draw()
                         - (0.328 * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
                 end
 
-                local is_plus_sprite = true
-
+                local is_plus_sprite = false
                 LG.setColor(Color.player_entity_firing_edge_dark)
                 -- if is_plus_sprite then
                 --     draw_plus_icon(player_edge_x, player_edge_y, player_trigger_radius)
@@ -808,20 +807,55 @@ function love.draw()
                 LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
                 -- end
 
-                -- Draw player player fired projectiles
-                LG.setColor(Color.player_entity_firing_projectile)
-                for i = 1, #curr_state.lasers_x do
-                    if curr_state.lasers_is_active[i] == Status.active then
+                local is_trail_enabled = false
+                if is_trail_enabled then
+                    local trail_length = 5 -- No. of past positions to draw as a trail
+                    for i = 1, #curr_state.lasers_x do
                         local pos_x = curr_state.lasers_x[i]
                         local pos_y = curr_state.lasers_y[i]
+
                         if prev_state.lasers_is_active[i] == Status.active then
                             pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
                             pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
                         end
+
+                        -- THIS MAY ERR, if prev trail is nil
+                        for t = trail_length, 1, -1 do
+                            local trail_factor = t / trail_length
+                            local trail_x = lerp(prev_state.lasers_x[i], pos_x, trail_factor)
+                            local trail_y = lerp(prev_state.lasers_y[i], pos_y, trail_factor)
+                            LG.setColor(
+                                Color.player_entity_firing_projectile[1],
+                                Color.player_entity_firing_projectile[2],
+                                Color.player_entity_firing_projectile[3],
+                                trail_factor
+                            ) -- Fading effect
+                            draw_plus_icon(trail_x, trail_y, laser_radius * trail_factor, 3)
+                        end
+
                         if is_plus_sprite then
                             draw_plus_icon(pos_x, pos_y, laser_radius * PHI, 3)
                         else
                             LG.circle('fill', pos_x, pos_y, laser_radius)
+                        end
+                    end
+                else
+                    -- Draw player player fired projectiles
+                    LG.setColor(Color.player_entity_firing_projectile)
+                    for i = 1, #curr_state.lasers_x do
+                        if curr_state.lasers_is_active[i] == Status.active then
+                            local pos_x = curr_state.lasers_x[i]
+                            local pos_y = curr_state.lasers_y[i]
+                            if prev_state.lasers_is_active[i] == Status.active then
+                                pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
+                                pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
+                            end
+
+                            if is_plus_sprite then
+                                draw_plus_icon(pos_x, pos_y, laser_radius * PHI, 3)
+                            else
+                                LG.circle('fill', pos_x, pos_y, laser_radius)
+                            end
                         end
                     end
                 end
@@ -883,6 +917,12 @@ function love.draw()
                                         * (1 + alpha * juice_frequency * lerp(1, juice_frequency_damper, alpha))
                                     LG.setColor(Color.creature_healing)
                                     LG.circle('fill', curr_x, curr_y, radius_)
+                                    LG.setColor(1, 1, 1)
+                                    for dy = -1, 1 do
+                                        for dx = -1, 1 do
+                                            draw_plus_icon(curr_x + dx, curr_y + dy, radius_)
+                                        end
+                                    end
                                 end
                             end
                         end
