@@ -1,12 +1,12 @@
 # sytlua.toml
 
-column_width = 100
+column_width = 120
 line_endings = "Unix"
 indent_type = "Spaces"
 indent_width = 4
 quote_style = "AutoPreferSingle"
 call_parentheses = "None"
-collapse_simple_statement = "Always" # Choices: `Never`, `FunctionOnly`, `ConditionalOnly`, `Always`
+collapse_simple_statement = "Never" # Choices: `Never`, `FunctionOnly`, `ConditionalOnly`, `Always`
 
 [sort_requires]
 enabled = true
