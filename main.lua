@@ -708,10 +708,30 @@ function love.draw()
 
                 -- Draw player player firing trigger • (circle)
                 local player_trigger_radius =
-                    lerp(player_firing_edge_max_radius - 4, player_firing_edge_max_radius - 2, alpha)
-                LG.setColor(Color.player_entity_firing_edge_dark)
+                    lerp(player_firing_edge_max_radius - 4, player_firing_edge_max_radius - 3, alpha)
                 local player_edge_x = player_x + math.cos(player_angle) * player_firing_edge_max_radius
                 local player_edge_y = player_y + math.sin(player_angle) * player_firing_edge_max_radius
+                do -- @juice ─ simulate the twinkle in eye to go opposite to player's direction
+                    local inertia_x = 0
+                    local inertia_y = 0
+                    if love.keyboard.isDown('up', 'w') then
+                        inertia_x = curr_state.player_vel_x
+                            + math.cos(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                        inertia_y = curr_state.player_vel_y
+                            + math.sin(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                    end
+                    if love.keyboard.isDown('down', 's') then
+                        inertia_x = curr_state.player_vel_x
+                            - math.cos(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                        inertia_y = curr_state.player_vel_y
+                            - math.sin(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                    end
+                    inertia_x = curr_state.player_vel_x * AIR_RESISTANCE
+                    inertia_y = curr_state.player_vel_y * AIR_RESISTANCE
+                    player_edge_x = player_edge_x - (0.328 * player_firing_edge_max_radius) * (inertia_x * game_timer_dt)
+                    player_edge_y = player_edge_y - (0.328 * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
+                end
+                LG.setColor(Color.player_entity_firing_edge_dark)
                 LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
 
                 -- Draw player player fired projectiles
