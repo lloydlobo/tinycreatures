@@ -71,20 +71,19 @@ local Color = {
 
 local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
 local FIXED_FPS = 60
+local INITIAL_LARGE_CREATURES = 3
 local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
-local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
+local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = true --- Flags if fired projectile should wrap around arena.
+local LASER_FIRE_TIMER_LIMIT = 0.5
+local LASER_PROJECTILE_SPEED = 500
+local MAX_CREATURES = 32 --- adjust as you please
 local PLAYER_ACCELERATION = 100
 local PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = 0.618
 local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- Note: 6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.
 local PLAYER_TURN_SPEED = 10 * 0.5
-local LASER_FIRE_TIMER_LIMIT = 0.5
-local LASER_PROJECTILE_SPEED = 500
 
 local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
 local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
-
-local MAX_CREATURES = 100 --- adjust as you please
-local INITIAL_LARGE_CREATURES = 3
 
 --
 -- Variables
@@ -244,9 +243,9 @@ function love.load()
     }
 
     do
-        local creature_scale = 1
+        local creature_scale = 0.618
         creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
-            { speed = 120, radius = math.ceil(15 * creature_scale) },
+            { speed = 100, radius = math.ceil(15 * creature_scale) },
             { speed = 70, radius = math.ceil(30 * creature_scale) },
             { speed = 50, radius = math.ceil(50 * creature_scale) },
             { speed = 20, radius = math.ceil(80 * creature_scale) },
@@ -463,22 +462,24 @@ function update_player_entity_projectiles(dt)
                 y = cs.creatures_y[creature_index],
                 radius = creature_evolution_stages[curr_stage].radius,
             }
-            if is_intersect_circles { a = laser_circle, b = creature_circle } then -- TODO: I think this stage value should be updated.....
+            if is_intersect_circles { a = creature_circle, b = laser_circle } then -- TODO: I think this stage value should be updated.....
+                cs.lasers_is_active[laser_index] = Status.inactive -- deactivate projectile if hits creature
+                screenshake.duration = 0.15 -- got'em!
+                cs.creatures_is_active[creature_index] = Status.inactive -- deactivate current creature stage if hits creature
+
+                -- Split the creature into two smaller ones.
                 if curr_stage > 1 then
-                    do
-                        screenshake.duration = 0.15 -- got'em!
-                        cs.creatures_is_active[creature_index] = Status.inactive -- deactivate current creature stage if hits creature
-                        cs.lasers_is_active[laser_index] = Status.inactive -- deactivate projectile if hits creature
-                    end
-                    -- Split the creature into two smaller ones.
-                    local new_stage = curr_stage - 1 -- note: Initiall stage is #creature_evolution_stages.
+                    local new_stage = curr_stage - 1 -- note: initial stage is `#creature_evolution_stages`
                     cs.creatures_evolution_stage[creature_index] = new_stage
-                    for _ = 1, 2 do
+                    for i = 1, 2 do
                         local new_creature_index = find_inactive_creature_index()
                         if new_creature_index then
                             spawn_new_creature(new_creature_index, creature_index, new_stage)
-                        else -- skip if we can't spawn anymore
-                            break
+                        else
+                            if debug.is_trace_entities then
+                                print('Failed to spawn more creatures.\n', 'curr_stage:', curr_stage, 'i:', i)
+                            end
+                            break -- skip if we can't spawn anymore
                         end
                     end
                 end
