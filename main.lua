@@ -46,14 +46,14 @@ local LG = love.graphics
 
 --- @enum Status
 local Status = {
-    inactive = 0,
+    none = 0,
     active = 1,
 }
 
 -- curr_state.creatures_is_spawn[] ???
 
 local Health = {
-    sick = -1,
+    none = -1,
     healing = 0, --- Creature did spawn, and saved and now inactive but healing.
     healthy = 1,
 }
@@ -69,8 +69,8 @@ local ControlKey = {
 local Color = {
     background = { 0.8, 0.8, 0.8 },
     creature_healed = { 0.85, 0.85, 0.85 },
-    creature_healing = { 0.55, 0.7, 0.4 },
-    creature_infected = { 0.8, 0.1, 0.3 },
+    creature_healing = { 0.95, 0.4, 0.6 },
+    creature_infected = { 0.75, 0.1, 0.3 },
     player_entity = { 0.3, 0.3, 0.3 },
     player_entity_firing_edge_dark = { 0.7, 0.7, 0.7 },
     player_entity_firing_edge_darker = { 0.6, 0.6, 0.6 },
@@ -303,7 +303,7 @@ function love.load()
 
         for i = 1, laser_capacity do
             curr_state.lasers_angle[i] = 0
-            curr_state.lasers_is_active[i] = Status.inactive
+            curr_state.lasers_is_active[i] = Status.none
             curr_state.lasers_time_left[i] = LASER_FIRE_TIMER_LIMIT
             curr_state.lasers_x[i] = 0
             curr_state.lasers_y[i] = 0
@@ -318,7 +318,7 @@ function love.load()
         local largest_creature_stage = #creature_evolution_stages
         for i = 1, TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
             curr_state.creatures_angle[i] = 0
-            curr_state.creatures_status[i] = Status.inactive
+            curr_state.creatures_status[i] = Status.none
             curr_state.creatures_health[i] = 0 -- default 0 value
             curr_state.creatures_evolution_stage[i] = largest_creature_stage
             curr_state.creatures_x[i] = 0
@@ -447,7 +447,7 @@ function update_player_entity_projectiles(dt)
         if cs.lasers_is_active[laser_index] == Status.active then
             cs.lasers_time_left[laser_index] = cs.lasers_time_left[laser_index] - dt
             if cs.lasers_time_left[laser_index] <= 0 then -- Deactivate if animation ends
-                cs.lasers_is_active[laser_index] = Status.inactive
+                cs.lasers_is_active[laser_index] = Status.none
             else
                 local angle = cs.lasers_angle[laser_index]
                 cs.lasers_x[laser_index] = cs.lasers_x[laser_index] + math.cos(angle) * LASER_PROJECTILE_SPEED * dt
@@ -461,7 +461,7 @@ function update_player_entity_projectiles(dt)
                     or cs.lasers_y[laser_index] < 0
                     or cs.lasers_y[laser_index] >= arena_h
                 then
-                    cs.lasers_is_active[laser_index] = Status.inactive
+                    cs.lasers_is_active[laser_index] = Status.none
                 end
             end
         end
@@ -495,10 +495,10 @@ function update_player_entity_projectiles(dt)
             }
             if is_intersect_circles { a = creature_circle, b = laser_circle } then -- TODO: I think this stage value should be updated.....
                 do
-                    cs.lasers_is_active[laser_index] = Status.inactive -- deactivate projectile if hits creature
+                    cs.lasers_is_active[laser_index] = Status.none -- deactivate projectile if hits creature
                     screenshake.duration = 0.15 -- got'em!
 
-                    cs.creatures_status[creature_index] = Status.inactive -- deactivate current creature stage if hits creature
+                    cs.creatures_status[creature_index] = Status.none -- deactivate current creature stage if hits creature
                     cs.creatures_health[creature_index] = Health.healing
                 end
 
@@ -529,7 +529,7 @@ end
 
 function find_inactive_creature_index()
     for i = 1, TOTAL_CREATURES_CAPACITY do
-        if curr_state.creatures_status[i] == Status.inactive then
+        if curr_state.creatures_status[i] == Status.none then
             return i
         end
     end
@@ -577,10 +577,18 @@ function update_creatures(dt)
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
     local alpha = dt_accum * FIXED_DT
     for i = 1, TOTAL_CREATURES_CAPACITY do
+        if debug.is_test then
+            -- if cs.creatures_health[i] > Health.healing then
+            --     assert(cs.creatures_status[i] == Status.none)
+            -- end
+        end
         if not (cs.creatures_status[i] == Status.active) then
             local health = cs.creatures_health[i]
-            if health >= Health.healing and health <= Health.healthy then
-                cs.creatures_health[i] = health + alpha -- note: using dt will make it feel too linear
+            if health >= Health.healing and health < Health.healthy then
+                cs.creatures_health[i] = health + (alpha + game_timer_dt) -- note: using dt will make it feel too linear
+            end
+            if health >= Health.healthy then -- Creature rescued. The End.
+                cs.creatures_health[i] = Health.none -- note: using dt will make it feel too linear
             end
             goto continue
         end
@@ -790,8 +798,15 @@ function love.draw()
                     player_edge_y = player_edge_y
                         - (0.328 * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
                 end
+
+                local is_plus_sprite = true
+
                 LG.setColor(Color.player_entity_firing_edge_dark)
+                -- if is_plus_sprite then
+                --     draw_plus_icon(player_edge_x, player_edge_y, player_trigger_radius)
+                -- else
                 LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
+                -- end
 
                 -- Draw player player fired projectiles
                 LG.setColor(Color.player_entity_firing_projectile)
@@ -803,7 +818,11 @@ function love.draw()
                             pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
                             pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
                         end
-                        LG.circle('fill', pos_x, pos_y, laser_radius)
+                        if is_plus_sprite then
+                            draw_plus_icon(pos_x, pos_y, laser_radius * PHI, 3)
+                        else
+                            LG.circle('fill', pos_x, pos_y, laser_radius)
+                        end
                     end
                 end
 
@@ -853,7 +872,7 @@ function love.draw()
                             local health = curr_state.creatures_health[i]
                             if
 
-                                curr_state.creatures_status[i] == Status.inactive
+                                curr_state.creatures_status[i] == Status.none
                                 and health > Health.healing
                                 and health <= Health.healthy
                             then
@@ -883,4 +902,13 @@ function love.draw()
     if is_debug_hud_enabled then
         draw_debug_hud()
     end
+end
+
+function draw_plus_icon(x_, y_, size_, linewidth)
+    local half_size = size_ * 0.5
+    -- horizontal
+    LG.setLineWidth(linewidth or 2)
+    LG.line(x_ - half_size, y_, x_ + half_size, y_)
+    -- vertical
+    LG.line(x_, y_ - half_size, x_, y_ + half_size)
 end
