@@ -86,7 +86,7 @@ local FIXED_FPS = 60
 local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
 local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
 
-local LASER_FIRE_TIMER_LIMIT = 0.5
+local LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2
 local LASER_PROJECTILE_SPEED = 500
 
 local PHI = 1.618
@@ -95,9 +95,11 @@ local PI = math.pi
 local PI_INV = 1 / math.pi
 
 local PLAYER_ACCELERATION = 100
+PLAYER_ACCELERATION = PLAYER_ACCELERATION * 2
+
 local PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = 0.618
 local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- Note: 6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.
-local PLAYER_TURN_SPEED = 10 * 0.5
+local DEFAULT_PLAYER_TURN_SPEED = 10 * 0.5
 
 local INITIAL_LARGE_CREATURES = 3
 --- HACK: Settling for a lower value, to avoid dealing with individual counters
@@ -114,6 +116,7 @@ local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
 --
 
 local dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
+
 local debug = { --- Debugging Flags.
     is_development = true,
     is_test = true,
@@ -195,16 +198,9 @@ function love.load()
     arena_w = gw
     arena_h = gh
 
-    game_timer_t = 0.0
-    game_timer_dt = 0.0
-
-    is_debug_hud_enabled = false --- Toggled by keys event.
-    player_fire_cooldown_timer = 0
-
     player_radius = 32
     laser_capacity = 32
-    laser_fire_timer = 0
-    laser_index = 1 -- circular buffer index
+
     laser_radius = 5
 
     -- active_creatures = 0
@@ -229,10 +225,18 @@ function love.load()
         shaders.post_processing.godsray.light_position = is_default and { 0.5, 0.5 } or { 0.125, 0.125 }
         shaders.post_processing.godsray.samples = is_default and 70 or 8
     end
+    if true then
+        shaders.post_processing.vignette.radius = 0.8 + 0.4
+        shaders.post_processing.vignette.softness = 0.5 + 0.2
+        shaders.post_processing.vignette.opacity = 0.5 + 0.1
+        shaders.post_processing.vignette.color = Color.background
+    end
 
-    shaders.post_processing.scanlines.opacity = 1 * 0.618
-    shaders.post_processing.scanlines.thickness = 1 * 0.5 * 0.0618
-    shaders.post_processing.scanlines.width = 2
+    if true then
+        shaders.post_processing.scanlines.opacity = 1 * 0.618
+        shaders.post_processing.scanlines.thickness = 1 * 0.5 * 0.0618
+        shaders.post_processing.scanlines.width = 2
+    end
 
     prev_state = { --- @type GameState
         creatures_angle = {},
@@ -282,8 +286,8 @@ function love.load()
     }
 
     do
-        local creature_scale = PHI_INV
-        local speed_multiplier = PHI_INV
+        local creature_scale = 1
+        local speed_multiplier = 1
         creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
             { speed = 100 * speed_multiplier, radius = math.ceil(15 * creature_scale) },
             { speed = 70 * speed_multiplier, radius = math.ceil(30 * creature_scale) },
@@ -301,6 +305,14 @@ function love.load()
     end
 
     function reset_game()
+        game_timer_t = 0.0
+        game_timer_dt = 0.0
+        player_fire_cooldown_timer = 0
+        laser_fire_timer = 0
+        laser_index = 1 -- circular buffer index
+        is_debug_hud_enabled = false --- Toggled by keys event.
+        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED
+
         curr_state.player_rot_angle = 0
         curr_state.player_vel_x = 0
         curr_state.player_vel_y = 0
@@ -319,7 +331,7 @@ function love.load()
             curr_state.lasers_x[i] = 0
             curr_state.lasers_y[i] = 0
         end
-        laser_fire_timer = 0
+        -- laser_fire_timer = 0
         laser_index = 1 -- reset circular buffer index
 
         -- Test me:
@@ -421,24 +433,36 @@ function handle_player_input(dt)
     local cs = curr_state
 
     if love.keyboard.isDown('right', 'd') then
-        cs.player_rot_angle = cs.player_rot_angle + PLAYER_TURN_SPEED * dt
+        cs.player_rot_angle = cs.player_rot_angle + player_turn_speed * dt
     end
     if love.keyboard.isDown('left', 'a') then
-        cs.player_rot_angle = cs.player_rot_angle - PLAYER_TURN_SPEED * dt
+        cs.player_rot_angle = cs.player_rot_angle - player_turn_speed * dt
     end
     cs.player_rot_angle = cs.player_rot_angle % (2 * math.pi) -- wrap player angle each 360°
-
     if love.keyboard.isDown('up', 'w') then
         cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
         cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
     end
-    if love.keyboard.isDown('down', 's') then
-        cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
-        cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+    local is_reverse_enabled = false
+    if is_reverse_enabled then
+        if love.keyboard.isDown('down', 's') then
+            cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+            cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+        end
     end
 
     if love.keyboard.isDown 'space' then
         fire_player_projectile()
+    end
+    if love.keyboard.isDown('lshift', 'rshift') then
+        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED * PHI
+        if love.math.random() < 0.05 then
+            laser_fire_timer = 0
+        else
+            laser_fire_timer = game_timer_dt
+        end
+    else
+        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED
     end
 end
 
@@ -752,8 +776,15 @@ function love.draw()
                 LG.origin()
 
                 LG.translate(x * arena_w, y * arena_h)
-                if screenshake.duration > 0 then --
+
+                -- Add Visual Effects (TODO: Make it optional, and sensory warning perhaps?)
+                if screenshake.duration > 0 then
                     LG.translate(screenshake.offset_x, screenshake.offset_y)
+
+                    do
+                        LG.setColor { 1, 1, 1, 0.025 }
+                        LG.rectangle('fill', 0, 0, arena_w, arena_h)
+                    end
                 end
 
                 local juice_frequency = 1 + math.sin(FIXED_FPS * game_timer_dt)
