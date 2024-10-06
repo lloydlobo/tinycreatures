@@ -83,13 +83,16 @@ local LASER_PROJECTILE_SPEED = 500
 local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
 local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
 
+local MAX_CREATURES = 100 --- adjust as you please
+local INITIAL_LARGE_CREATURES = 3
+
 --
 -- Variables
 --
 
 local dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
 local debug = { --- Debugging Flags.
-    is_development = false,
+    is_development = true,
     is_test = true,
     is_trace_entities = false,
 }
@@ -241,7 +244,7 @@ function love.load()
     }
 
     do
-        local creature_scale = 0.5
+        local creature_scale = 1
         creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
             { speed = 120, radius = math.ceil(15 * creature_scale) },
             { speed = 70, radius = math.ceil(30 * creature_scale) },
@@ -280,13 +283,25 @@ function love.load()
         laser_fire_timer = 0
         laser_index = 1 -- reset circular buffer index
 
-        -- FIXME: pointer?
-        curr_state.creatures_x = { 100, arena_w - 100, arena_w / 2 }
-        curr_state.creatures_y = { 100, 100, arena_h - 10 }
-        for i = 1, #curr_state.creatures_x do
+        -- Test me:
+        -- curr_state.creatures_x = { 100, arena_w - 100, arena_w / 2 }
+        -- curr_state.creatures_y = { 100, 100, arena_h - 10 }
+
+        local largest_creature_stage = #creature_evolution_stages
+        for i = 1, MAX_CREATURES do -- Pre-allocate all creature's including stage combinations
+            curr_state.creatures_angle[i] = 0
+            curr_state.creatures_is_active[i] = Status.inactive
+            curr_state.creatures_evolution_stage[i] = largest_creature_stage
+            curr_state.creatures_x[i] = 0
+            curr_state.creatures_y[i] = 0
+        end
+
+        for i = 1, INITIAL_LARGE_CREATURES do -- Activate initial creatures.
             curr_state.creatures_angle[i] = love.math.random() * (2 * math.pi)
             curr_state.creatures_is_active[i] = Status.active
-            curr_state.creatures_evolution_stage[i] = #creature_evolution_stages
+            curr_state.creatures_evolution_stage[i] = largest_creature_stage -- Start at smallest stage
+            curr_state.creatures_x[i] = 0
+            curr_state.creatures_y[i] = 0
         end
 
         copy_game_state(prev_state, curr_state)
@@ -426,24 +441,23 @@ function update_player_entity_projectiles(dt)
     -- #endregion
 
     -- #region Handle laser collisions.
-    --
-    -- Side effects: Iterate this over another place? doesn't this amount to
-    -- wasted cycles??????
     local laser_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     for laser_index = 1, #cs.lasers_x do
-        local is_active_laser = (cs.lasers_is_active[laser_index] == Status.active)
-        if not is_active_laser then
+        if not (cs.lasers_is_active[laser_index] == Status.active) then
             goto continue_not_is_active_laser
         end
-        -- TODO: Breaking creatures and spawing child like creature...
-        laser_circle = { x = cs.lasers_x[laser_index], y = cs.lasers_y[laser_index], radius = laser_radius }
-        for creature_index = 1, #cs.creatures_x do
-            local is_active_creature = cs.creatures_is_active[creature_index] == Status.active
-            if not is_active_creature then
+        laser_circle = {
+            x = cs.lasers_x[laser_index],
+            y = cs.lasers_y[laser_index],
+            radius = laser_radius,
+        }
+        for creature_index = 1, MAX_CREATURES do
+            if not (cs.creatures_is_active[creature_index] == Status.active) then
                 goto continue_not_is_active_creature
             end
-            local curr_stage = cs.creatures_evolution_stage[creature_index] --- @type integer
+            local curr_stage = cs.creatures_evolution_stage[creature_index]
+            assert(curr_stage >= 1 and curr_stage <= #creature_evolution_stages, curr_stage)
             creature_circle = {
                 x = cs.creatures_x[creature_index],
                 y = cs.creatures_y[creature_index],
@@ -451,18 +465,24 @@ function update_player_entity_projectiles(dt)
             }
             if is_intersect_circles { a = laser_circle, b = creature_circle } then -- TODO: I think this stage value should be updated.....
                 if curr_stage > 1 then
-                    local angle1 = love.math.random() * (2 * math.pi)
-                    local angle2 = (angle1 - math.pi) % (2 * math.pi)
-                    cs.creatures_is_active[creature_index] = Status.inactive -- Deactivate current creature stage if hits creature
-                    if curr_stage ~= nil and curr_stage > 2 then
-                        local next_stage = curr_stage - 1
-                        if next_stage ~= nil and next_stage > 1 then
-                            cs.creatures_evolution_stage[creature_index] = next_stage -- Mutate
+                    do
+                        screenshake.duration = 0.15 -- got'em!
+                        cs.creatures_is_active[creature_index] = Status.inactive -- deactivate current creature stage if hits creature
+                        cs.lasers_is_active[laser_index] = Status.inactive -- deactivate projectile if hits creature
+                    end
+                    -- Split the creature into two smaller ones.
+                    local new_stage = curr_stage - 1 -- note: Initiall stage is #creature_evolution_stages.
+                    cs.creatures_evolution_stage[creature_index] = new_stage
+                    for _ = 1, 2 do
+                        local new_creature_index = find_inactive_creature_index()
+                        if new_creature_index then
+                            spawn_new_creature(new_creature_index, creature_index, new_stage)
+                        else -- skip if we can't spawn anymore
+                            break
                         end
                     end
                 end
-                cs.lasers_is_active[laser_index] = Status.inactive -- Deactivate projectile if hits creature
-                screenshake.duration = 0.15 -- Default value.
+                break -- this projectile has served it's purpose
             end
             ::continue_not_is_active_creature::
         end
@@ -471,11 +491,41 @@ function update_player_entity_projectiles(dt)
     -- #endregion
 end
 
+function find_inactive_creature_index()
+    for i = 1, MAX_CREATURES do
+        if curr_state.creatures_is_active[i] == Status.inactive then
+            return i
+        end
+    end
+    return nil
+end
+
+function spawn_new_creature(new_index, parent_index, new_stage)
+    local cs = curr_state
+    local angle1 = love.math.random() * (2 * math.pi)
+    local angle2 = (angle1 - math.pi) % (2 * math.pi)
+    local alpha = dt_accum * FIXED_DT_INV
+    local angle_offset = lerp(angle1, angle2, alpha)
+    cs.creatures_angle[new_index] = cs.creatures_angle[parent_index] + angle_offset
+    cs.creatures_evolution_stage[new_index] = new_stage
+    cs.creatures_is_active[new_index] = Status.active
+    cs.creatures_x[new_index] = cs.creatures_x[parent_index]
+    cs.creatures_y[new_index] = cs.creatures_y[parent_index]
+
+    -- Avoid overlap among new creatures.
+    local offset = creature_evolution_stages[new_stage].radius * 0.5
+    cs.creatures_x[new_index] = cs.creatures_x[new_index] + love.math.random(-offset, offset)
+    cs.creatures_y[new_index] = cs.creatures_y[new_index] + love.math.random(-offset, offset)
+end
+
 function update_creatures(dt)
     local cs = curr_state
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
-    for i = 1, #cs.creatures_x do
+    for i = 1, MAX_CREATURES do
+        if not (cs.creatures_is_active[i] == Status.active) then
+            goto continue
+        end
         local angle = cs.creatures_angle[i] --- @type number
         local creature_stage_id = cs.creatures_evolution_stage[i] --- @type integer
         if debug.is_test then
@@ -492,9 +542,12 @@ function update_creatures(dt)
             reset_game()
             return
         end
+
+        ::continue::
     end
+
     local active_creature_count = 0
-    for i = 1, #cs.creatures_x do
+    for i = 1, MAX_CREATURES do
         if cs.creatures_is_active[i] == Status.active then -- increment
             active_creature_count = active_creature_count + 1
         end
@@ -506,7 +559,7 @@ function update_creatures(dt)
 end
 
 function update_game(dt) ---@param dt number # Fixed delta time.
-    if debug.is_development and debug.is_trace_entities then
+    if debug.is_trace_entities then
         print('before', #prev_state.creatures_is_active, #curr_state.creatures_is_active)
     end
 
@@ -515,7 +568,7 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     update_player_entity_projectiles(dt)
     update_creatures(dt)
 
-    if debug.is_development and debug.is_trace_entities then
+    if debug.is_trace_entities then
         print('after', #prev_state.creatures_is_active, #curr_state.creatures_is_active)
     end
 end
@@ -675,6 +728,7 @@ function love.draw()
                 end
 
                 -- Draw creatures
+                local should_interpolate = false -- FIXME: Changing states, causes glitches
                 LG.setColor(Color.creature)
                 for i = 1, #curr_state.creatures_x do
                     if curr_state.creatures_is_active[i] == Status.active then
@@ -688,7 +742,7 @@ function love.draw()
                             math.abs(curr_x - prev_x) <= (arena_w - 2 * creature_radius)
                             and math.abs(curr_y - prev_y) <= (arena_h - 2 * creature_radius)
                         )
-                        if can_interpolate then
+                        if should_interpolate and can_interpolate then
                             curr_x = lerp(prev_x, curr_x, alpha)
                             curr_y = lerp(prev_y, curr_y, alpha)
                         end
