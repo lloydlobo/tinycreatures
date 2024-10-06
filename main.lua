@@ -12,16 +12,16 @@ local LG = love.graphics
 --- @field creatures_is_active Status[]
 --- @field creatures_x number[]
 --- @field creatures_y number[]
---- @field player_angle number # 0
---- @field player_speed_x number # 0
---- @field player_speed_y number # 0
+--- @field player_rot_angle number # 0
+--- @field player_velocity_x number # 0
+--- @field player_velocity_y number # 0
 --- @field player_x number # 0|400
 --- @field player_y number # 0|300
---- @field treats_angle number[]
---- @field treats_is_active Status[]
---- @field treats_time_left number[]
---- @field treats_x number[]
---- @field treats_y number[]
+--- @field lasers_angle number[]
+--- @field lasers_is_active Status[]
+--- @field lasers_time_left number[]
+--- @field lasers_x number[]
+--- @field lasers_y number[]
 
 --- @class Shader
 --- @field post_processing table
@@ -45,8 +45,8 @@ local LG = love.graphics
 
 --- @enum Status
 local Status = {
-    inactive = 0,
     active = 1,
+    inactive = 0,
 }
 
 --- @enum ControlKey
@@ -63,35 +63,31 @@ local Color = {
     player_entity = { 0.3, 0.3, 0.3 },
     player_entity_firing_edge_dark = { 0.7, 0.7, 0.7 },
     player_entity_firing_edge_darker = { 0.6, 0.6, 0.6 },
-    player_entity_firing_projectile = { 0.85, 0.6, 0.15 }, -- cheetos/chimken
+    player_entity_firing_projectile = { 0.4, 0.8, 0.4 },
 }
 
---- Debugging Flags.
-local debug = {
-    is_development = true,
-    is_trace_entities = false,
-}
-
---
--- Constants
---
-
+local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
 local FIXED_FPS = 60
-local AIR_RESISTANCE = 0.98 -- factor between 0 and 1
-local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
-local FIXED_DT_INV = 1 / FIXED_DT --- avoid dividing each frame
 local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
-local IS_PROJECTILE_WRAPPING_ARENA = false --- Flags if fired projectile should wrap around arena.
+local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
 local PLAYER_ACCELERATION = 100
+local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- Note: 6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.
 local PLAYER_TURN_SPEED = 10 * 0.5
-local TREAT_PROJECTILE_SPEED = 500
+local laser_FIRE_TIMER_LIMIT = 0.5
+local laser_PROJECTILE_SPEED = 500
+
+local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
+local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
 
 --
 -- Variables
 --
 
---- Accumulator keeps track of time passed between frames.
-local dt_accum = 0.0
+local dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
+local debug = { --- Debugging Flags.
+    is_development = true,
+    is_trace_entities = false,
+}
 
 --- @type fun(a: number, b: number, t: number): number
 function lerp(a, b, t)
@@ -107,39 +103,33 @@ function assert_consistent_state()
     local ps = prev_state
 
     assert(#ps.creatures_angle == #cs.creatures_angle)
-    assert(
-        pcall(
-            assert,
-            #ps.creatures_is_active == #cs.creatures_is_active,
-            #ps.creatures_is_active .. ' ' .. #cs.creatures_is_active
-        )
-    )
+    assert(#ps.creatures_is_active == #cs.creatures_is_active)
     assert(#ps.creatures_evolution_stage == #cs.creatures_evolution_stage)
     assert(#ps.creatures_x == #cs.creatures_x)
     assert(#ps.creatures_y == #cs.creatures_y)
-    assert(#ps.treats_angle == #cs.treats_angle)
-    assert(#ps.treats_is_active == #cs.treats_is_active)
-    assert(#ps.treats_time_left == #cs.treats_time_left)
-    assert(#ps.treats_x == #cs.treats_x)
-    assert(#ps.treats_y == #cs.treats_y)
+    assert(#ps.lasers_angle == #cs.lasers_angle)
+    assert(#ps.lasers_is_active == #cs.lasers_is_active)
+    assert(#ps.lasers_time_left == #cs.lasers_time_left)
+    assert(#ps.lasers_x == #cs.lasers_x)
+    assert(#ps.lasers_y == #cs.lasers_y)
 end
 
 function sync_prev_state()
     local cs = curr_state
     local ps = prev_state
 
-    ps.player_angle = cs.player_angle
-    ps.player_speed_x = cs.player_speed_x
-    ps.player_speed_y = cs.player_speed_y
+    ps.player_rot_angle = cs.player_rot_angle
+    ps.player_velocity_x = cs.player_velocity_x
+    ps.player_velocity_y = cs.player_velocity_y
     ps.player_x = cs.player_x
     ps.player_y = cs.player_y
 
-    for i = 1, #cs.treats_x do
-        ps.treats_angle[i] = cs.treats_angle[i]
-        ps.treats_is_active[i] = cs.treats_is_active[i]
-        ps.treats_time_left[i] = cs.treats_time_left[i]
-        ps.treats_x[i] = cs.treats_x[i]
-        ps.treats_y[i] = cs.treats_y[i]
+    for i = 1, #cs.lasers_x do
+        ps.lasers_angle[i] = cs.lasers_angle[i]
+        ps.lasers_is_active[i] = cs.lasers_is_active[i]
+        ps.lasers_time_left[i] = cs.lasers_time_left[i]
+        ps.lasers_x[i] = cs.lasers_x[i]
+        ps.lasers_y[i] = cs.lasers_y[i]
     end
 
     for i = 1, #cs.creatures_x do
@@ -174,17 +164,17 @@ function love.load()
     game_timer_t = 0.0
     game_timer_dt = 0.0
 
-    treat_capacity = 30
-    treat_fire_timer = 0
-    treat_fire_timer_limit = 0.5
+    is_debug_hud_enabled = false --- Toggled by keys event.
     player_fire_cooldown_timer = 0
-    player_fire_cooldown_timer_limit = 6 --- 6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0
-    treat_index = 1 -- circular buffer index
-    treat_radius = 5
+
     player_radius = 30
-    player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
-    is_hud_enabled = false
+    laser_capacity = 30
+    laser_fire_timer = 0
+    laser_index = 1 -- circular buffer index
+    laser_radius = 5
+
     -- active_creatures = 0
+    player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
 
     local fx = moonshine.effects
 
@@ -205,16 +195,16 @@ function love.load()
         creatures_is_active = {},
         creatures_x = {},
         creatures_y = {},
-        player_angle = 0,
-        player_speed_x = 0,
-        player_speed_y = 0,
+        player_rot_angle = 0,
+        player_velocity_x = 0,
+        player_velocity_y = 0,
         player_x = 0,
         player_y = 0,
-        treats_angle = {},
-        treats_is_active = {},
-        treats_time_left = {},
-        treats_x = {},
-        treats_y = {},
+        lasers_angle = {},
+        lasers_is_active = {},
+        lasers_time_left = {},
+        lasers_x = {},
+        lasers_y = {},
     }
 
     curr_state = { --- @type GameState
@@ -223,16 +213,16 @@ function love.load()
         creatures_is_active = {},
         creatures_x = {},
         creatures_y = {},
-        player_angle = 0,
-        player_speed_x = 0,
-        player_speed_y = 0,
+        player_rot_angle = 0,
+        player_velocity_x = 0,
+        player_velocity_y = 0,
         player_x = 0,
         player_y = 0,
-        treats_angle = {},
-        treats_is_active = {},
-        treats_time_left = {},
-        treats_x = {},
-        treats_y = {},
+        lasers_angle = {},
+        lasers_is_active = {},
+        lasers_time_left = {},
+        lasers_x = {},
+        lasers_y = {},
     }
 
     screenshake = { --- @type ScreenShake
@@ -255,26 +245,26 @@ function love.load()
     end
 
     function reset_game()
-        curr_state.player_angle = 0
-        curr_state.player_speed_x = 0
-        curr_state.player_speed_y = 0
+        curr_state.player_rot_angle = 0
+        curr_state.player_velocity_x = 0
+        curr_state.player_velocity_y = 0
         curr_state.player_x = arena_w * 0.5
         curr_state.player_y = arena_h * 0.5
-        prev_state.player_angle = 0
-        prev_state.player_speed_x = 0
-        prev_state.player_speed_y = 0
+        prev_state.player_rot_angle = 0
+        prev_state.player_velocity_x = 0
+        prev_state.player_velocity_y = 0
         prev_state.player_x = arena_w * 0.5
         prev_state.player_y = arena_h * 0.5
 
-        for i = 1, treat_capacity do
-            curr_state.treats_angle[i] = 0
-            curr_state.treats_is_active[i] = Status.inactive
-            curr_state.treats_time_left[i] = treat_fire_timer_limit
-            curr_state.treats_x[i] = 0
-            curr_state.treats_y[i] = 0
+        for i = 1, laser_capacity do
+            curr_state.lasers_angle[i] = 0
+            curr_state.lasers_is_active[i] = Status.inactive
+            curr_state.lasers_time_left[i] = laser_FIRE_TIMER_LIMIT
+            curr_state.lasers_x[i] = 0
+            curr_state.lasers_y[i] = 0
         end
-        treat_fire_timer = 0
-        treat_index = 1 -- reset circular buffer index
+        laser_fire_timer = 0
+        laser_index = 1 -- reset circular buffer index
 
         -- FIXME: pointer?
         curr_state.creatures_x = { 100, arena_w - 100, arena_w / 2 }
@@ -298,7 +288,7 @@ function love.keypressed(key, _, _)
     if key == 'escape' or key == ControlKey.force_quit_game then
         love.event.push 'quit'
     elseif key == ControlKey.toggle_hud then
-        is_hud_enabled = not is_hud_enabled
+        is_debug_hud_enabled = not is_debug_hud_enabled
     end
 end
 
@@ -338,20 +328,20 @@ local function is_intersect_circles(ab)
 end
 
 function fire_player_projectile() --- Fire projectile from players's position.
-    if treat_fire_timer <= 0 then
+    if laser_fire_timer <= 0 then
         local cs = curr_state
 
-        cs.treats_angle[treat_index] = cs.player_angle
-        cs.treats_is_active[treat_index] = Status.active
-        cs.treats_time_left[treat_index] = 4
-        cs.treats_x[treat_index] = cs.player_x + math.cos(cs.player_angle) * player_radius
-        cs.treats_y[treat_index] = cs.player_y + math.sin(cs.player_angle) * player_radius
+        cs.lasers_angle[laser_index] = cs.player_rot_angle
+        cs.lasers_is_active[laser_index] = Status.active
+        cs.lasers_time_left[laser_index] = 4
+        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
+        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
 
-        -- treat_index tracks circular reusable buffer.
-        treat_index = treat_index % treat_capacity + 1
+        -- laser_index tracks circular reusable buffer.
+        laser_index = laser_index % laser_capacity + 1
 
         -- Reset timer to default.
-        treat_fire_timer = treat_fire_timer_limit
+        laser_fire_timer = laser_FIRE_TIMER_LIMIT
     end
 end
 
@@ -359,20 +349,24 @@ function handle_player_input(dt)
     local cs = curr_state
 
     if love.keyboard.isDown 'right' or love.keyboard.isDown 'd' then
-        cs.player_angle = cs.player_angle + PLAYER_TURN_SPEED * dt
+        cs.player_rot_angle = cs.player_rot_angle + PLAYER_TURN_SPEED * dt
     end
     if love.keyboard.isDown 'left' or love.keyboard.isDown 'a' then
-        cs.player_angle = cs.player_angle - PLAYER_TURN_SPEED * dt
+        cs.player_rot_angle = cs.player_rot_angle - PLAYER_TURN_SPEED * dt
     end
-    cs.player_angle = cs.player_angle % (2 * math.pi) -- wrap player angle each 360°
+    cs.player_rot_angle = cs.player_rot_angle % (2 * math.pi) -- wrap player angle each 360°
 
     if love.keyboard.isDown 'up' or love.keyboard.isDown 'w' then
-        cs.player_speed_x = cs.player_speed_x + math.cos(cs.player_angle) * PLAYER_ACCELERATION * dt
-        cs.player_speed_y = cs.player_speed_y + math.sin(cs.player_angle) * PLAYER_ACCELERATION * dt
+        cs.player_velocity_x = cs.player_velocity_x
+            + math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+        cs.player_velocity_y = cs.player_velocity_y
+            + math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
     end
     if love.keyboard.isDown 'down' or love.keyboard.isDown 's' then
-        cs.player_speed_x = cs.player_speed_x - math.cos(cs.player_angle) * PLAYER_ACCELERATION * dt
-        cs.player_speed_y = cs.player_speed_y - math.sin(cs.player_angle) * PLAYER_ACCELERATION * dt
+        cs.player_velocity_x = cs.player_velocity_x
+            - math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+        cs.player_velocity_y = cs.player_velocity_y
+            - math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
     end
 
     if love.keyboard.isDown 'space' then fire_player_projectile() end
@@ -382,49 +376,49 @@ end
 function update_player_entity(dt)
     local cs = curr_state
 
-    cs.player_speed_x = cs.player_speed_x * AIR_RESISTANCE
-    cs.player_speed_y = cs.player_speed_y * AIR_RESISTANCE
+    cs.player_velocity_x = cs.player_velocity_x * AIR_RESISTANCE
+    cs.player_velocity_y = cs.player_velocity_y * AIR_RESISTANCE
 
-    cs.player_x = (cs.player_x + cs.player_speed_x * dt) % arena_w
-    cs.player_y = (cs.player_y + cs.player_speed_y * dt) % arena_h
+    cs.player_x = (cs.player_x + cs.player_velocity_x * dt) % arena_w
+    cs.player_y = (cs.player_y + cs.player_velocity_y * dt) % arena_h
 end
 
 function update_player_entity_projectiles(dt)
     local cs = curr_state
 
-    local treat_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
+    local laser_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
 
-    for treat_index = 1, #cs.treats_x do
-        cs.treats_time_left[treat_index] = cs.treats_time_left[treat_index] - dt
+    for laser_index = 1, #cs.lasers_x do
+        cs.lasers_time_left[laser_index] = cs.lasers_time_left[laser_index] - dt
 
-        local is_kill_anim = (cs.treats_time_left[treat_index] <= 0)
+        local is_kill_anim = (cs.lasers_time_left[laser_index] <= 0)
         if is_kill_anim then -- Deactivate if animation ends
-            cs.treats_is_active[treat_index] = Status.inactive
+            cs.lasers_is_active[laser_index] = Status.inactive
         else
-            local b_angle = cs.treats_angle[treat_index]
-            cs.treats_x[treat_index] = cs.treats_x[treat_index]
-                + math.cos(b_angle) * TREAT_PROJECTILE_SPEED * dt
-            cs.treats_y[treat_index] = cs.treats_y[treat_index]
-                + math.sin(b_angle) * TREAT_PROJECTILE_SPEED * dt
-            if IS_PROJECTILE_WRAPPING_ARENA then
-                cs.treats_x[treat_index] = cs.treats_x[treat_index] % arena_w
-                cs.treats_y[treat_index] = cs.treats_y[treat_index] % arena_h
+            local b_angle = cs.lasers_angle[laser_index]
+            cs.lasers_x[laser_index] = cs.lasers_x[laser_index]
+                + math.cos(b_angle) * laser_PROJECTILE_SPEED * dt
+            cs.lasers_y[laser_index] = cs.lasers_y[laser_index]
+                + math.sin(b_angle) * laser_PROJECTILE_SPEED * dt
+            if IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA then
+                cs.lasers_x[laser_index] = cs.lasers_x[laser_index] % arena_w
+                cs.lasers_y[laser_index] = cs.lasers_y[laser_index] % arena_h
             else -- Deactivate if it goes off screen
-                local is_offscreen = cs.treats_x[treat_index] < 0
-                    or cs.treats_x[treat_index] >= arena_w
-                    or cs.treats_y[treat_index] < 0
-                    or cs.treats_y[treat_index] >= arena_h
-                if is_offscreen then cs.treats_is_active[treat_index] = Status.inactive end
+                local is_offscreen = cs.lasers_x[laser_index] < 0
+                    or cs.lasers_x[laser_index] >= arena_w
+                    or cs.lasers_y[laser_index] < 0
+                    or cs.lasers_y[laser_index] >= arena_h
+                if is_offscreen then cs.lasers_is_active[laser_index] = Status.inactive end
             end -- end of actual fire_projectile logic
 
             -- Side effects:
             -- why not iterate this over another place?
             -- doesn't this amount to wasted cycles?
-            treat_circle = {
-                x = cs.treats_x[treat_index],
-                y = cs.treats_y[treat_index],
-                radius = treat_radius,
+            laser_circle = {
+                x = cs.lasers_x[laser_index],
+                y = cs.lasers_y[laser_index],
+                radius = laser_radius,
             }
 
             for creature_index = 1, #cs.creatures_x do
@@ -438,7 +432,7 @@ function update_player_entity_projectiles(dt)
 
                     -- Deactivate projectile if hits creature
                     -- Deactivate current creature stage if hits creature
-                    if is_intersect_circles { a = treat_circle, b = creature_circle } then
+                    if is_intersect_circles { a = laser_circle, b = creature_circle } then
                         if a_stage > 1 then -- i think the stage value should be updated
                             -- TODO: Breaking creatures and spawing child like
                             -- creature... add is_dormant/active flag to avoid
@@ -457,7 +451,7 @@ function update_player_entity_projectiles(dt)
                             end
                         end
 
-                        cs.treats_is_active[treat_index] = Status.inactive
+                        cs.lasers_is_active[laser_index] = Status.inactive
 
                         screenshake.duration = 0.15
                     end
@@ -465,7 +459,7 @@ function update_player_entity_projectiles(dt)
             end
         end
     end
-    treat_fire_timer = treat_fire_timer - dt -- reload time limiter
+    laser_fire_timer = laser_fire_timer - dt -- reload time limiter
 end
 
 function update_creatures(dt)
@@ -517,11 +511,32 @@ function update_game(dt)
     end
 end
 
+function draw_hud()
+    local pad_x = 8 -- horizontal
+    local pad_y = 8 -- vertical
+    local hud_w = 128
+    local hud_h = 128
+    local pos_x = arena_w - hud_w
+    local pos_y = 0
+
+    LG.setColor(0.3, 0.1, 0.1)
+
+    LG.print(
+        table.concat({
+            string.format('%.4s', game_timer_t),
+        }, '\n'),
+        1 * pos_x,
+        1 * pos_y
+    )
+
+    -- HACK: To avoid leaking debug hud text color into post-processing shader.
+    LG.setColor(1, 1, 1)
+end
 function draw_debug_hud()
     local cs = curr_state
 
-    local v_pad = 8
-    local h_pad = 8
+    local pad_x = 8
+    local pad_y = 8
     local pos_x = 0
     local pos_y = 0
 
@@ -543,9 +558,9 @@ function draw_debug_hud()
         table.concat({
             'creatures.active: ' .. active_counter,
             'creatures.count: ' .. #cs.creatures_x,
-            'player.angle: ' .. cs.player_angle,
-            'player.speed_x: ' .. cs.player_speed_x,
-            'player.speed_y: ' .. cs.player_speed_y,
+            'player.angle: ' .. cs.player_rot_angle,
+            'player.speed_x: ' .. cs.player_velocity_x,
+            'player.speed_y: ' .. cs.player_velocity_y,
             'player.x: ' .. cs.player_x,
             'player.y: ' .. cs.player_y,
             'stats.canvases: ' .. stats.canvases,
@@ -558,10 +573,10 @@ function draw_debug_hud()
             'stats.texturememory: ' .. stats.texturememory,
             'timer.dt: ' .. dt,
             'timer.fps: ' .. fps,
-            'treats.count: ' .. #cs.treats_x,
+            'lasers.count: ' .. #cs.lasers_x,
         }, '\n'),
-        pos_x + h_pad,
-        pos_y + v_pad
+        pos_x + pad_x,
+        pos_y + pad_y
     )
 
     -- HACK: To avoid leaking debug hud text color into post-processing shader.
@@ -569,7 +584,7 @@ function draw_debug_hud()
 end
 
 function love.draw()
-    -- assert_consistent_state()
+    assert_consistent_state()
 
     shaders.post_processing(function()
         -- So that objects that are partially off the edge of the screen can be seen on the other side,
@@ -594,7 +609,8 @@ function love.draw()
                 -- Draw player player
                 local iris_to_eye_ratio = 0.618
 
-                local player_angle = lerp(prev_state.player_angle, curr_state.player_angle, alpha)
+                local player_angle =
+                    lerp(prev_state.player_rot_angle, curr_state.player_rot_angle, alpha)
                 local player_x = lerp(prev_state.player_x, curr_state.player_x, alpha)
                 local player_y = lerp(prev_state.player_y, curr_state.player_y, alpha)
                 local juice_frequency = (1 + math.sin(FIXED_FPS * game_timer_dt))
@@ -602,27 +618,19 @@ function love.draw()
                 local is_interpolate_player = true
                 if is_interpolate_player then
                     local player_speed_x = lerp(
-                        prev_state.player_speed_x,
-                        curr_state.player_speed_x * AIR_RESISTANCE,
+                        prev_state.player_velocity_x,
+                        curr_state.player_velocity_x * AIR_RESISTANCE,
                         alpha
                     )
                     local player_speed_y = lerp(
-                        prev_state.player_speed_y,
-                        curr_state.player_speed_y * AIR_RESISTANCE,
+                        prev_state.player_velocity_y,
+                        curr_state.player_velocity_y * AIR_RESISTANCE,
                         alpha
                     )
-                    LG.setColor(Color.player_entity_firing_edge_darker)
                     player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
                     player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
-
-                    -- local radius_factor = 0.0328 * player_radius + 0.328 * math.sin(FIXED_FPS * game_timer_dt) -- @juice
-                    -- LG.circle('fill', player_x, player_y, player_radius * radius_factor)
-                    LG.circle(
-                        'fill',
-                        player_x,
-                        player_y,
-                        (player_radius * (1 + 0 * iris_to_eye_ratio)) --* juice_frequency
-                    )
+                    LG.setColor(Color.player_entity_firing_edge_darker)
+                    LG.circle('fill', player_x, player_y, player_radius)
                 end
 
                 -- Draw player inner iris * (iris)
@@ -654,15 +662,15 @@ function love.draw()
 
                 -- Draw player player fired projectiles
                 LG.setColor(Color.player_entity_firing_projectile)
-                for i = 1, #curr_state.treats_x do
-                    if curr_state.treats_is_active[i] == Status.active then
-                        local pos_x = curr_state.treats_x[i]
-                        local pos_y = curr_state.treats_y[i]
-                        if prev_state.treats_is_active[i] == Status.active then
-                            pos_x = lerp(prev_state.treats_x[i], pos_x, alpha)
-                            pos_y = lerp(prev_state.treats_y[i], pos_y, alpha)
+                for i = 1, #curr_state.lasers_x do
+                    if curr_state.lasers_is_active[i] == Status.active then
+                        local pos_x = curr_state.lasers_x[i]
+                        local pos_y = curr_state.lasers_y[i]
+                        if prev_state.lasers_is_active[i] == Status.active then
+                            pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
+                            pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
                         end
-                        LG.circle('fill', pos_x, pos_y, treat_radius)
+                        LG.circle('fill', pos_x, pos_y, laser_radius)
                     end
                 end
 
@@ -695,10 +703,11 @@ function love.draw()
         -- Reverse any previous calls to LG.rotate, LG.scale, LG.shear or LG.translate.
         -- It returns the current transformation state to its defaults.
         LG.origin()
+        draw_hud()
         --
         --#endregion ORIGIN
         --
     end)
 
-    if is_hud_enabled then draw_debug_hud() end
+    if is_debug_hud_enabled then draw_debug_hud() end
 end
