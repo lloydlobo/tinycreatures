@@ -61,7 +61,8 @@ local Color = {
     creature = { 0.8, 0.1, 0.3 },
     debug_hud_text = { 0.8, 0.7, 0.0 },
     player_entity = { 0.3, 0.3, 0.3 },
-    player_entity_firing_edge = { 0.6, 0.6, 0.6 },
+    player_entity_firing_edge_dark = { 0.7, 0.7, 0.7 },
+    player_entity_firing_edge_darker = { 0.6, 0.6, 0.6 },
     player_entity_firing_projectile = { 0.85, 0.6, 0.15 }, -- cheetos/chimken
 }
 
@@ -75,14 +76,15 @@ local debug = {
 -- Constants
 --
 
-local air_resistance = 0.98 -- factor between 0 and 1
-local fixed_dt = 1 / 60 --- Ensures consistent game logic updates regardless of frame rate fluctuations.
-local fixed_dt_inv = 1 / fixed_dt --- avoid dividing each frame
-local is_grug_brain = false --- Whether to complicate life and the codebase.
-local is_projectile_wrap_arena = false --- Flags if fired projectile should wrap around arena.
-local player_acceleration = 100
-local player_turn_speed = 10 * 0.5
-local treat_projectile_speed = 500
+local FIXED_FPS = 60
+local AIR_RESISTANCE = 0.98 -- factor between 0 and 1
+local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
+local FIXED_DT_INV = 1 / FIXED_DT --- avoid dividing each frame
+local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
+local IS_PROJECTILE_WRAPPING_ARENA = false --- Flags if fired projectile should wrap around arena.
+local PLAYER_ACCELERATION = 100
+local PLAYER_TURN_SPEED = 10 * 0.5
+local TREAT_PROJECTILE_SPEED = 500
 
 --
 -- Variables
@@ -180,7 +182,7 @@ function love.load()
     treat_index = 1 -- circular buffer index
     treat_radius = 5
     player_radius = 30
-    player_firing_edge_radius = math.ceil(player_radius * 0.618) --- Trigger distance from center of player.
+    player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
     is_hud_enabled = false
     -- active_creatures = 0
 
@@ -319,10 +321,10 @@ function love.update(dt)
         end
     end
     dt_accum = dt_accum + dt
-    while dt_accum >= fixed_dt do
+    while dt_accum >= FIXED_DT do
         sync_prev_state()
-        update_game(fixed_dt)
-        dt_accum = dt_accum - fixed_dt
+        update_game(FIXED_DT)
+        dt_accum = dt_accum - FIXED_DT
     end
 end
 
@@ -357,20 +359,20 @@ function handle_player_input(dt)
     local cs = curr_state
 
     if love.keyboard.isDown 'right' or love.keyboard.isDown 'd' then
-        cs.player_angle = cs.player_angle + player_turn_speed * dt
+        cs.player_angle = cs.player_angle + PLAYER_TURN_SPEED * dt
     end
     if love.keyboard.isDown 'left' or love.keyboard.isDown 'a' then
-        cs.player_angle = cs.player_angle - player_turn_speed * dt
+        cs.player_angle = cs.player_angle - PLAYER_TURN_SPEED * dt
     end
     cs.player_angle = cs.player_angle % (2 * math.pi) -- wrap player angle each 360°
 
     if love.keyboard.isDown 'up' or love.keyboard.isDown 'w' then
-        cs.player_speed_x = cs.player_speed_x + math.cos(cs.player_angle) * player_acceleration * dt
-        cs.player_speed_y = cs.player_speed_y + math.sin(cs.player_angle) * player_acceleration * dt
+        cs.player_speed_x = cs.player_speed_x + math.cos(cs.player_angle) * PLAYER_ACCELERATION * dt
+        cs.player_speed_y = cs.player_speed_y + math.sin(cs.player_angle) * PLAYER_ACCELERATION * dt
     end
     if love.keyboard.isDown 'down' or love.keyboard.isDown 's' then
-        cs.player_speed_x = cs.player_speed_x - math.cos(cs.player_angle) * player_acceleration * dt
-        cs.player_speed_y = cs.player_speed_y - math.sin(cs.player_angle) * player_acceleration * dt
+        cs.player_speed_x = cs.player_speed_x - math.cos(cs.player_angle) * PLAYER_ACCELERATION * dt
+        cs.player_speed_y = cs.player_speed_y - math.sin(cs.player_angle) * PLAYER_ACCELERATION * dt
     end
 
     if love.keyboard.isDown 'space' then fire_player_projectile() end
@@ -380,8 +382,8 @@ end
 function update_player_entity(dt)
     local cs = curr_state
 
-    cs.player_speed_x = cs.player_speed_x * air_resistance
-    cs.player_speed_y = cs.player_speed_y * air_resistance
+    cs.player_speed_x = cs.player_speed_x * AIR_RESISTANCE
+    cs.player_speed_y = cs.player_speed_y * AIR_RESISTANCE
 
     cs.player_x = (cs.player_x + cs.player_speed_x * dt) % arena_w
     cs.player_y = (cs.player_y + cs.player_speed_y * dt) % arena_h
@@ -402,10 +404,10 @@ function update_player_entity_projectiles(dt)
         else
             local b_angle = cs.treats_angle[treat_index]
             cs.treats_x[treat_index] = cs.treats_x[treat_index]
-                + math.cos(b_angle) * treat_projectile_speed * dt
+                + math.cos(b_angle) * TREAT_PROJECTILE_SPEED * dt
             cs.treats_y[treat_index] = cs.treats_y[treat_index]
-                + math.sin(b_angle) * treat_projectile_speed * dt
-            if is_projectile_wrap_arena then
+                + math.sin(b_angle) * TREAT_PROJECTILE_SPEED * dt
+            if IS_PROJECTILE_WRAPPING_ARENA then
                 cs.treats_x[treat_index] = cs.treats_x[treat_index] % arena_w
                 cs.treats_y[treat_index] = cs.treats_y[treat_index] % arena_h
             else -- Deactivate if it goes off screen
@@ -575,7 +577,7 @@ function love.draw()
         -- position around the screen and in the center.
         for y = -1, 1 do -- Draw off-screen object partially wrap around without glitch
             for x = -1, 1 do
-                local alpha = dt_accum * fixed_dt_inv
+                local alpha = dt_accum * FIXED_DT_INV
 
                 --
                 --#region ORIGIN
@@ -590,36 +592,65 @@ function love.draw()
                 end
 
                 -- Draw player player
+                local iris_to_eye_ratio = 0.618
+
                 local player_angle = lerp(prev_state.player_angle, curr_state.player_angle, alpha)
                 local player_x = lerp(prev_state.player_x, curr_state.player_x, alpha)
                 local player_y = lerp(prev_state.player_y, curr_state.player_y, alpha)
+                local juice_frequency = (1 + math.sin(FIXED_FPS * game_timer_dt))
+
                 local is_interpolate_player = true
-                if is_grug_brain or is_interpolate_player then
+                if is_interpolate_player then
                     local player_speed_x = lerp(
                         prev_state.player_speed_x,
-                        curr_state.player_speed_x * air_resistance,
+                        curr_state.player_speed_x * AIR_RESISTANCE,
                         alpha
                     )
                     local player_speed_y = lerp(
                         prev_state.player_speed_y,
-                        curr_state.player_speed_y * air_resistance,
+                        curr_state.player_speed_y * AIR_RESISTANCE,
                         alpha
                     )
+                    LG.setColor(Color.player_entity_firing_edge_darker)
                     player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
                     player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
-                    LG.setColor(Color.player_entity_firing_edge)
-                    local radius_factor = 1.5
-                        * (math.sin(lerp(alpha, fixed_dt / game_timer_dt, alpha)))
-                    LG.circle('fill', player_x, player_y, player_radius * radius_factor)
-                end
-                LG.setColor(Color.player_entity)
-                LG.circle('fill', player_x, player_y, player_radius)
 
-                -- Draw player player firing trigger
-                LG.setColor(Color.player_entity_firing_edge)
-                local player_edge_x = player_x + math.cos(player_angle) * player_firing_edge_radius
-                local player_edge_y = player_y + math.sin(player_angle) * player_firing_edge_radius
-                LG.circle('fill', player_edge_x, player_edge_y, lerp(6, 5, alpha))
+                    -- local radius_factor = 0.0328 * player_radius + 0.328 * math.sin(FIXED_FPS * game_timer_dt) -- @juice
+                    -- LG.circle('fill', player_x, player_y, player_radius * radius_factor)
+                    LG.circle(
+                        'fill',
+                        player_x,
+                        player_y,
+                        (player_radius * (1 + 0 * iris_to_eye_ratio)) --* juice_frequency
+                    )
+                end
+
+                -- Draw player inner iris * (iris)
+                local juice_damper = lerp(0.0625, 0.125, alpha)
+                LG.setColor(Color.player_entity)
+                LG.circle(
+                    'fill',
+                    player_x,
+                    player_y,
+                    (player_radius * iris_to_eye_ratio) * (1 + juice_frequency * juice_damper)
+                )
+
+                -- Draw player player firing trigger • (circle)
+                LG.setColor(Color.player_entity_firing_edge_dark)
+                local player_edge_x = player_x
+                    + math.cos(player_angle) * player_firing_edge_max_radius
+                local player_edge_y = player_y
+                    + math.sin(player_angle) * player_firing_edge_max_radius
+                LG.circle(
+                    'fill',
+                    player_edge_x,
+                    player_edge_y,
+                    lerp(
+                        player_firing_edge_max_radius - 4,
+                        player_firing_edge_max_radius - 2,
+                        alpha
+                    )
+                )
 
                 -- Draw player player fired projectiles
                 LG.setColor(Color.player_entity_firing_projectile)
