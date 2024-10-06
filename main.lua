@@ -429,6 +429,21 @@ function fire_player_projectile() --- Fire projectile from players's position.
     end
 end
 
+function dash_player_entity(dt)
+    local dash_multiplier = PHI
+
+    local cs = curr_state
+    local prev_vel_x = cs.player_vel_x
+    local prev_vel_y = cs.player_vel_y
+    cs.player_vel_x = cs.player_vel_x * dash_multiplier
+    cs.player_vel_y = cs.player_vel_y * dash_multiplier
+
+    update_player_entity(dt) -- remember to update once
+
+    cs.player_vel_x = prev_vel_x
+    cs.player_vel_y = prev_vel_y
+end
+
 function handle_player_input(dt)
     local cs = curr_state
 
@@ -439,6 +454,7 @@ function handle_player_input(dt)
         cs.player_rot_angle = cs.player_rot_angle - player_turn_speed * dt
     end
     cs.player_rot_angle = cs.player_rot_angle % (2 * math.pi) -- wrap player angle each 360°
+
     if love.keyboard.isDown('up', 'w') then
         cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
         cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
@@ -451,9 +467,14 @@ function handle_player_input(dt)
         end
     end
 
+    if love.keyboard.isDown 'x' then
+        dash_player_entity(dt)
+    end
+
     if love.keyboard.isDown 'space' then
         fire_player_projectile()
     end
+
     if love.keyboard.isDown('lshift', 'rshift') then
         player_turn_speed = DEFAULT_PLAYER_TURN_SPEED * PHI
         if love.math.random() < 0.05 then
