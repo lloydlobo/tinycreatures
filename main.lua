@@ -217,8 +217,19 @@ function love.load()
             .chain(fx.chromasep)
             -- .chain(fx.crt)
             .chain(fx.scanlines)
-            .chain(fx.vignette),
+            .chain(fx.vignette)
+            .chain(fx.godsray),
     }
+    if true then
+        local is_default = false
+        shaders.post_processing.godsray.exposure = is_default and 0.25 or 0.05
+        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.95
+        shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
+        shaders.post_processing.godsray.weight = is_default and 0.50 or 0.90
+        shaders.post_processing.godsray.light_position = is_default and { 0.5, 0.5 } or { 0.125, 0.125 }
+        shaders.post_processing.godsray.samples = is_default and 70 or 8
+    end
+
     shaders.post_processing.scanlines.opacity = 1 * 0.618
     shaders.post_processing.scanlines.thickness = 1 * 0.5 * 0.0618
     shaders.post_processing.scanlines.width = 2
