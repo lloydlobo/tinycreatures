@@ -38,11 +38,11 @@ function M.simulate_creature_follows_player(dt, creature_index)
 end
 
 --- NOTE: Does not mutate position.
-function M.simulate_creatures_swarm_behavior(dt)
+function M.simulate_creatures_swarm_behavior(dt,total)
     local alpha = dt_accum * config.FIXED_DT_INV
 
     local cs = curr_state
-    for creature_index = 1, config.TOTAL_CREATURES_CAPACITY do
+    for creature_index = 1, total do
         if cs.creatures_is_active[creature_index] == common.Status.active then
             local group_center_x = 0
             local group_center_y = 0
@@ -56,7 +56,7 @@ function M.simulate_creatures_swarm_behavior(dt)
             -- use dt here?
             local creature_group_factor = 0.4 --- @type number|integer # TEMPORARY solution
 
-            for other_creature_index = 1, config.TOTAL_CREATURES_CAPACITY do
+            for other_creature_index = 1, total do
                 if cs.creatures_is_active[other_creature_index] == common.Status.active then
                     local other_creature_x = cs.creatures_x[other_creature_index]
                     local other_creature_y = cs.creatures_y[other_creature_index]

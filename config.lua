@@ -29,13 +29,12 @@ M = {
 
     AIR_RESISTANCE = 0.98, -- Resistance factor between 0 and 1.
     FIXED_FPS = 60,
-    INITIAL_LARGE_CREATURES = 2 ^ 3,
     LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2 * 1,
     LASER_PROJECTILE_SPEED = 2 ^ 9, -- 512
+    MAX_GAME_LEVELS = 4,
     MAX_LASER_CAPACITY = 2 ^ 5,
     PLAYER_ACCELERATION = 100 * 2,
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6, --- TODO: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
-    MAX_GAME_LEVELS = 4,
 
     --
     -- Variables
@@ -56,15 +55,9 @@ M.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = M.PHI_INV
 -- Derived Configurations
 --
 
-M.FIXED_DT = 1 /
-    M.FIXED_FPS                        --- Ensures consistent game logic updates regardless of frame rate fluctuations.
+M.FIXED_DT = 1 / M.FIXED_FPS           --- Consistent update frame rate fluctuations.
 M.FIXED_DT_INV = 1 / (1 / M.FIXED_FPS) --- avoid dividing each frame
 
-
----@type integer # This count excludes the initial ancestor count.
-M.EXPECTED_FINAL_HEALED_CREATURE_COUNT = (M.INITIAL_LARGE_CREATURES ^ 2) - M.INITIAL_LARGE_CREATURES
----@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
-M.TOTAL_CREATURES_CAPACITY = 2 * (M.INITIAL_LARGE_CREATURES ^ 2)
 
 
 return M

@@ -23,6 +23,18 @@ local LG        = love.graphics
 local PHI       = config.PHI
 local lerp      = common.lerp
 
+
+local CONSTANT_INITIAL_LARGE_CREATURES = 2 ^ 0 --- THIS IS USED BY `game_level` to mutate `INITIAL_LARGE_CREATURES`
+-- THESE ARE MUTATED AFTER EACH LEVEL::: I CAN'T BOTHER CHANGING CASE AS OF
+-- NOW... WILL DO WHEN TIME PERMITS
+do
+    INITIAL_LARGE_CREATURES              = 2 ^ 0
+    ---@type integer # This count excludes the initial ancestor count.
+    EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
+    ---@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
+    TOTAL_CREATURES_CAPACITY             = 2 * (INITIAL_LARGE_CREATURES ^ 2)
+end
+
 --
 --
 -- Types & Definitions
@@ -183,7 +195,7 @@ function dash_player_entity(dt)
 end
 
 function find_inactive_creature_index()
-    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+    for i = 1, TOTAL_CREATURES_CAPACITY do
         if curr_state.creatures_is_active[i] == common.Status.not_active then
             return i
         end
@@ -222,7 +234,7 @@ end
 
 function count_active_creatures()
     local counter = 0
-    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+    for i = 1, TOTAL_CREATURES_CAPACITY do
         if curr_state.creatures_is_active[i] == common.Status.active then
             counter = counter + 1
         end
@@ -328,7 +340,7 @@ function update_player_entity_projectiles(dt)
             y = cs.lasers_y[laser_index],
             radius = laser_radius,
         }
-        for creature_index = 1, config.TOTAL_CREATURES_CAPACITY do
+        for creature_index = 1, TOTAL_CREATURES_CAPACITY do
             if not (cs.creatures_is_active[creature_index] == common.Status.active) then
                 goto continue_not_is_active_creature
             end
@@ -391,7 +403,7 @@ function update_creatures(dt)
 
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
-    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+    for i = 1, TOTAL_CREATURES_CAPACITY do
         if config.debug.is_test then
             if cs.creatures_health[i] == common.HealthTransitions.healthy then
                 assert(cs.creatures_is_active[i] == common.Status.not_active)
@@ -443,11 +455,12 @@ function update_creatures(dt)
     -- PLAYER WON
     if count_active_creatures() == 0 then -- victory
         pcall(assert,
-            config.EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
-            config.EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
+            EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
+            EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
         )
 
         sound_upgrade:play()
+        game_level = game_level + 1
         reset_game()
         return
     end
@@ -755,7 +768,7 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input(dt)
     update_player_entity(dt)
     update_player_entity_projectiles(dt)
-    simulate.simulate_creatures_swarm_behavior(dt)
+    simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY)
     update_creatures(dt)
 end
 
@@ -929,6 +942,15 @@ function love.load()
     end
 
     function reset_game()
+        do     -- MUTATE GLOBAL VARS
+            INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
+            do -- AUTO-UPDATE
+                ---@type integer # This count excludes the initial ancestor count.
+                EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
+                ---@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
+                TOTAL_CREATURES_CAPACITY             = 2 * (INITIAL_LARGE_CREATURES ^ 2)
+            end
+        end
         laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
         game_timer_dt = 0.0
         game_timer_t = 0.0
@@ -964,7 +986,7 @@ function love.load()
         -- curr_state.creatures_y = { 100, 100, arena_h - 10 }
 
         local largest_creature_stage = #creature_evolution_stages
-        for i = 1, config.TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
+        for i = 1, TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
             curr_state.creatures_angle[i] = 0
             curr_state.creatures_evolution_stage[i] = largest_creature_stage
             curr_state.creatures_health[i] = 0 -- default 0 value
@@ -975,7 +997,7 @@ function love.load()
             curr_state.creatures_vel_y[i] = 0
         end
 
-        for i = 1, config.INITIAL_LARGE_CREATURES do                         -- Activate initial creatures.
+        for i = 1, INITIAL_LARGE_CREATURES do                                -- Activate initial creatures.
             curr_state.creatures_angle[i] = love.math.random() * (2 * math.pi)
             curr_state.creatures_evolution_stage[i] = largest_creature_stage -- Start at smallest stage
             curr_state.creatures_health[i] = -1                              -- -1 to 0 to 1.... like dash timer, or fade timer ( -1 to 0 to 1 )
@@ -994,6 +1016,7 @@ function love.load()
     end
 
     reset_game()
+
     LG.setBackgroundColor(common.Color.background)
 end
 
