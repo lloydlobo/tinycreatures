@@ -88,6 +88,7 @@ local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projecti
 
 local LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2
 local LASER_PROJECTILE_SPEED = 500
+local MAX_LASER_CAPACITY = 256
 
 local PHI = 1.618
 local PHI_INV = 0.618
@@ -148,7 +149,7 @@ function assert_consistent_state()
     assert(#ps.lasers_x == #cs.lasers_x)
     assert(#ps.lasers_y == #cs.lasers_y)
 
-    assert(#cs.lasers_x == laser_capacity)
+    assert(#cs.lasers_x == MAX_LASER_CAPACITY)
 end
 
 function sync_prev_state()
@@ -198,8 +199,13 @@ function love.load()
     arena_w = gw
     arena_h = gh
 
+    -- TODO
+    do
+        local pointing_laser_scope_length = math.min(arena_w / 2, arena_h / 2)
+        print(pointing_laser_scope_length)
+    end
+
     player_radius = 32
-    laser_capacity = 32
 
     laser_radius = 5
 
@@ -324,7 +330,7 @@ function love.load()
         prev_state.player_x = arena_w * 0.5
         prev_state.player_y = arena_h * 0.5
 
-        for i = 1, laser_capacity do
+        for i = 1, MAX_LASER_CAPACITY do
             curr_state.lasers_angle[i] = 0
             curr_state.lasers_is_active[i] = Status.none
             curr_state.lasers_time_left[i] = LASER_FIRE_TIMER_LIMIT
@@ -424,7 +430,7 @@ function fire_player_projectile() --- Fire projectile from players's position.
         cs.lasers_time_left[laser_index] = 4
         cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
         cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
-        laser_index = (laser_index % laser_capacity) + 1 -- Laser_index tracks circular reusable buffer.
+        laser_index = (laser_index % MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
         laser_fire_timer = LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
     end
 end
@@ -459,7 +465,7 @@ function handle_player_input(dt)
         cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
         cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
     end
-    local is_reverse_enabled = false
+    local is_reverse_enabled = true
     if is_reverse_enabled then
         if love.keyboard.isDown('down', 's') then
             cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
@@ -475,7 +481,7 @@ function handle_player_input(dt)
         fire_player_projectile()
     end
 
-    if love.keyboard.isDown('lshift', 'rshift') then
+    if love.keyboard.isDown('lshift', 'rshift') then --- enhance attributes while spinning like a top
         player_turn_speed = DEFAULT_PLAYER_TURN_SPEED * PHI
         if love.math.random() < 0.05 then
             laser_fire_timer = 0
@@ -798,12 +804,12 @@ function love.draw()
 
                 LG.translate(x * arena_w, y * arena_h)
 
-                -- Add Visual Effects (TODO: Make it optional, and sensory warning perhaps?)
+                -- Add Visual Effects. (TODO: Make it optional, and sensory warning perhaps?)
                 if screenshake.duration > 0 then
                     LG.translate(screenshake.offset_x, screenshake.offset_y)
 
                     do
-                        LG.setColor { 1, 1, 1, 0.025 }
+                        LG.setColor { 1, 1, 1, 0.045 }
                         LG.rectangle('fill', 0, 0, arena_w, arena_h)
                     end
                 end
