@@ -499,9 +499,11 @@ function handle_player_input(dt)
     end
     local is_reverse_enabled = true
     if is_reverse_enabled then
+        local reverse_acceleration_factor = 0.9
+        local reverese_acceleration = PLAYER_ACCELERATION * reverse_acceleration_factor
         if love.keyboard.isDown('down', 's') then
-            cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
-            cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+            cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * reverese_acceleration * dt
+            cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * reverese_acceleration * dt
         end
     end
 
@@ -658,8 +660,9 @@ end
 
 --- NOTE: Does not mutate position.
 function simulate_creatures_swarm_behavior(dt)
-    local cs = curr_state
+    local alpha = dt_accum * FIXED_DT_INV
 
+    local cs = curr_state
     for creature_index = 1, TOTAL_CREATURES_CAPACITY do
         if cs.creatures_is_active[creature_index] == Status.active then
             local group_center_x = 0
@@ -678,6 +681,8 @@ function simulate_creatures_swarm_behavior(dt)
                 if cs.creatures_is_active[other_creature_index] == Status.active then
                     local other_creature_x = cs.creatures_x[other_creature_index]
                     local other_creature_y = cs.creatures_y[other_creature_index]
+                    local other_creature_stage_id = cs.creatures_evolution_stage[other_creature_index] --- @type integer
+                    local other_creature_stage = creature_evolution_stages[other_creature_stage_id] --- @type Stage
 
                     local dist = nil
                     if
@@ -713,7 +718,12 @@ function simulate_creatures_swarm_behavior(dt)
                         local curr_vel_y = cs.creatures_vel_y[creature_index]
                         local factor = love.math.random() < 0.5 and dt or creature_group_factor
                         do -- TEMPORARY OVERIDE
-                            factor = 100
+                            factor = 100 --- this seems to clump them at the corners
+                            factor = lerp(other_creature_stage.radius, creature_stage.radius, PHI_INV) -- somewhat like gravitational pull
+                            local is_level_difficulty_hard = false
+                            if is_level_difficulty_hard then
+                                factor = lerp(100, factor, alpha) -- somewhat like gravitational pull
+                            end
                         end
 
                         local next_vel_x = curr_vel_x + (group_center_x - creature_y) * factor
@@ -757,7 +767,7 @@ function update_creatures(dt)
     local cs = curr_state
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
-    local alpha = dt_accum * FIXED_DT
+    local werid_alpha = dt_accum * FIXED_DT
 
     for i = 1, TOTAL_CREATURES_CAPACITY do
         if debug.is_test then
@@ -768,7 +778,7 @@ function update_creatures(dt)
         if not (cs.creatures_is_active[i] == Status.active) then
             local health = cs.creatures_health[i]
             if health >= Health.healing and health < Health.healthy then
-                cs.creatures_health[i] = health + (alpha + game_timer_dt) -- note: using dt will make it feel too linear
+                cs.creatures_health[i] = health + (werid_alpha + game_timer_dt) -- note: using dt will make it feel too linear
             end
             if health >= Health.healthy then -- Creature rescued. The End.
                 cs.creatures_health[i] = Health.none -- note: using dt will make it feel too linear
@@ -783,8 +793,8 @@ function update_creatures(dt)
         end
 
         local stage = creature_evolution_stages[creature_stage_id] --- @type Stage
-        local speed_x = lerp(stage.speed, cs.creatures_vel_x[i], alpha)
-        local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], alpha)
+        local speed_x = lerp(stage.speed, cs.creatures_vel_x[i], werid_alpha)
+        local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], werid_alpha)
         local x = (cs.creatures_x[i] + math.cos(angle) * speed_x * dt) % arena_w --- @type number
         local y = (cs.creatures_y[i] + math.sin(angle) * speed_y * dt) % arena_h --- @type number
 
