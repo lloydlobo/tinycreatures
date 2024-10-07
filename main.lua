@@ -1,34 +1,46 @@
 ---@diagnostic disable: lowercase-global, undefined-global, duplicate-set-field
 
--- $ find -name '*.lua' | entr -crs 'date; love .; echo exit status $?'
+--[[
 
--- Ludum Dare 56: Tiny Creatures
+Ludum Dare 56: Tiny Creatures
+    See https://ldjam.com/events/ludum-dare/56/$403597
 
---- Ported initially from https://berbasoft.com/simplegametutorials/love/asteroids/
+Starter setup ported initially from https://berbasoft.com/simplegametutorials/love/asteroids/
+
+Development
+    $ find -name '*.lua' | entr -crs 'date; love .; echo exit status $?'
+
+--]]
 
 local moonshine = require 'lib.moonshine'
 
-local LG = love.graphics
+local config    = require 'config'
+local common    = require 'common'
+local simulate  = require 'simulate'
+local lerp      = common.lerp
+local PHI       = config.PHI
+
+local LG        = love.graphics
 
 --- @class GameState
---- @field creatures_vel_x number[]
---- @field creatures_vel_y number[]
 --- @field creatures_angle number[]
 --- @field creatures_evolution_stage integer[]
+--- @field creatures_health HealthTransitions[] # Transitions from `-1 to 0` and `0..1`.
 --- @field creatures_is_active Status[]
---- @field creatures_health integer[]
+--- @field creatures_vel_x number[]
+--- @field creatures_vel_y number[]
 --- @field creatures_x number[]
 --- @field creatures_y number[]
---- @field player_rot_angle number # 0
---- @field player_vel_x number # 0
---- @field player_vel_y number # 0
---- @field player_x number # 0|400
---- @field player_y number # 0|300
 --- @field lasers_angle number[]
 --- @field lasers_is_active Status[]
 --- @field lasers_time_left number[]
 --- @field lasers_x number[]
 --- @field lasers_y number[]
+--- @field player_rot_angle number # 0
+--- @field player_vel_x number # 0
+--- @field player_vel_y number # 0
+--- @field player_x number # 0|400
+--- @field player_y number # 0|300
 
 --- @class Shader
 --- @field post_processing table
@@ -50,123 +62,6 @@ local LG = love.graphics
 --- @field wait number # 0
 --- See also: https://sheepolution.com/learn/book/22
 
---- @enum Status
-local Status = {
-    not_active = 0,
-    active = 1,
-}
-
--- curr_state.creatures_is_spawn[] ???
-
-local Health = {
-    none = -1,
-    healing = 0, --- Creature did spawn, and saved and now inactive but healing.
-    healthy = 1,
-}
-
---- @enum ControlKey
-local ControlKey = {
-    escape_key = 'escape',
-    force_quit_game = 'q',
-    toggle_hud = 'h',
-}
-
---- @enum CreatureStageColor
---- Based on creature_evolution_stages `Stage[]` where the size decreases as
---- stage progresses.
-local CreatureStageColor = {
-    { 0.75, 0.1,  0.3 },
-    { 0.70, 0.2,  0.3 },
-    { 0.70, 0.3,  0.4 },
-    { 0.52, 0.45, 0.45 },
-}
---- @enum Color
-local Color = {
-    background = { 0.8, 0.8, 0.8 },
-    creature_healed = { 0.85, 0.85, 0.85 },
-    creature_healing = { 0.95, 0.4, 0.6 },
-    creature_infected = { 0.75, 0.1, 0.3 },
-    creature_infected_rgba = { 0.75, 0.1, 0.3, 0.5 },
-    player_entity = { 0.3, 0.3, 0.3 },
-    player_entity_firing_edge_dark = { 0.7, 0.7, 0.7 },
-    player_entity_firing_edge_darker = { 0.6, 0.6, 0.6 },
-    player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
-    text_darker = { 0.4, 0.4, 0.4 },
-    text_darkest = { 0.3, 0.3, 0.3 },
-    text_debug_hud = { 0.8, 0.7, 0.0 },
-}
-
---- @enum ScreenFlashAlphaLevel
-local ScreenFlashAlphaLevel = {
-    high = .25, --- note: high level needs a fade out timer
-    medium = .1,
-    low = .045,
-}
-
---
--- Math constants
---
-
-local PHI = 1.618
-local PHI_INV = 0.618
-local PI = math.pi
-local PI_INV = 1 / math.pi
-
---
--- FLAGS
---
-
-local IS_GRUG_BRAIN = false                          --- Whether to complicate life and the codebase.
-local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
-local IS_GAME_SLOW = false
-
---
--- Configurations
---
-
-local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
-local DEFAULT_PLAYER_TURN_SPEED = 10 * PHI_INV
-local FIXED_FPS = 60
-local INITIAL_LARGE_CREATURES = 2 ^ 3
-local LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2 * 1
-local LASER_PROJECTILE_SPEED = 2 ^ 9 -- 512
-local MAX_LASER_CAPACITY = 2 ^ 5
-local PLAYER_ACCELERATION = 100 * 2
-local PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = PHI_INV
-local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- TODO: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
-
---
--- Derived Configurations
---
-
-local FIXED_DT = 1 / FIXED_FPS           --- Ensures consistent game logic updates regardless of frame rate fluctuations.
-local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
-
----@type integer # This count excludes the initial ancestor count.
-local EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
----@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
-local TOTAL_CREATURES_CAPACITY = 2 * (INITIAL_LARGE_CREATURES ^ 2)
-
---
--- Variables
---
-
-local dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
-
-local debug = {      --- Debugging Flags.
-    is_development = true,
-    is_test = true,
-    is_trace_entities = true,
-}
-
---- @type fun(a: number, b: number, t: number): number
-function lerp(a, b, t)
-    if not (a ~= nil and b ~= nil and t ~= nil) then
-        error(string.format('Invalid lerp arguments { a = "%s", b = "%s", c = "%s" }.', a, b, t), 3)
-    end
-
-    return ((1 - t) * a) + (t * b)
-end
 
 function assert_consistent_state()
     local cs = curr_state
@@ -184,7 +79,7 @@ function assert_consistent_state()
     assert(#ps.lasers_x == #cs.lasers_x)
     assert(#ps.lasers_y == #cs.lasers_y)
 
-    assert(#cs.lasers_x == MAX_LASER_CAPACITY)
+    assert(#cs.lasers_x == config.MAX_LASER_CAPACITY)
 end
 
 function sync_prev_state()
@@ -259,12 +154,12 @@ function fire_player_projectile() --- Fire projectile from players's position.
     if laser_fire_timer <= 0 then
         local cs = curr_state
         cs.lasers_angle[laser_index] = cs.player_rot_angle
-        cs.lasers_is_active[laser_index] = Status.active
+        cs.lasers_is_active[laser_index] = common.Status.active
         cs.lasers_time_left[laser_index] = 4
         cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
         cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
-        laser_index = (laser_index % MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
-        laser_fire_timer = LASER_FIRE_TIMER_LIMIT            -- Reset timer to default.
+        laser_index = (laser_index % config.MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
+        laser_fire_timer = config.LASER_FIRE_TIMER_LIMIT            -- Reset timer to default.
     end
 end
 
@@ -295,13 +190,13 @@ function handle_player_input(dt)
     cs.player_rot_angle = cs.player_rot_angle % (2 * math.pi) -- wrap player angle each 360°
 
     if love.keyboard.isDown('up', 'w') then
-        cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
-        cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * PLAYER_ACCELERATION * dt
+        cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
+        cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
     end
     local is_reverse_enabled = true
     if is_reverse_enabled then
         local reverse_acceleration_factor = 0.9
-        local reverese_acceleration = PLAYER_ACCELERATION * reverse_acceleration_factor
+        local reverese_acceleration = config.PLAYER_ACCELERATION * reverse_acceleration_factor
         if love.keyboard.isDown('down', 's') then
             cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * reverese_acceleration * dt
             cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * reverese_acceleration * dt
@@ -317,39 +212,43 @@ function handle_player_input(dt)
     end
 
     if love.keyboard.isDown('lshift', 'rshift') then --- enhance attributes while spinning like a top
-        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED * PHI
+        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED * PHI
         if love.math.random() < 0.05 then
             laser_fire_timer = 0
         else
             laser_fire_timer = game_timer_dt
         end
     else
-        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED
+        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED
     end
 end
 
 -- Use dt for position updates, because movement is time-dependent
 function update_player_entity(dt)
     local cs = curr_state
-    cs.player_vel_x = cs.player_vel_x * AIR_RESISTANCE
-    cs.player_vel_y = cs.player_vel_y * AIR_RESISTANCE
+    cs.player_vel_x = cs.player_vel_x * config.AIR_RESISTANCE
+    cs.player_vel_y = cs.player_vel_y * config.AIR_RESISTANCE
     cs.player_x = (cs.player_x + cs.player_vel_x * dt) % arena_w
     cs.player_y = (cs.player_y + cs.player_vel_y * dt) % arena_h
 end
 
 function update_player_entity_projectiles(dt)
     local cs = curr_state
+
     -- #region Update laser positions.
+    --
     for laser_index = 1, #cs.lasers_x do
-        if cs.lasers_is_active[laser_index] == Status.active then
+        if cs.lasers_is_active[laser_index] == common.Status.active then
             cs.lasers_time_left[laser_index] = cs.lasers_time_left[laser_index] - dt
             if cs.lasers_time_left[laser_index] <= 0 then -- Deactivate if animation ends
-                cs.lasers_is_active[laser_index] = Status.not_active
+                cs.lasers_is_active[laser_index] = common.Status.not_active
             else
                 local angle = cs.lasers_angle[laser_index]
-                cs.lasers_x[laser_index] = cs.lasers_x[laser_index] + math.cos(angle) * LASER_PROJECTILE_SPEED * dt
-                cs.lasers_y[laser_index] = cs.lasers_y[laser_index] + math.sin(angle) * LASER_PROJECTILE_SPEED * dt
-                if IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA then
+                cs.lasers_x[laser_index] = cs.lasers_x[laser_index] +
+                math.cos(angle) * config.LASER_PROJECTILE_SPEED * dt
+                cs.lasers_y[laser_index] = cs.lasers_y[laser_index] +
+                math.sin(angle) * config.LASER_PROJECTILE_SPEED * dt
+                if config.IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA then
                     cs.lasers_x[laser_index] = cs.lasers_x[laser_index] % arena_w
                     cs.lasers_y[laser_index] = cs.lasers_y[laser_index] % arena_h
                 elseif --[[Deactivate if it goes off screen]]
@@ -358,20 +257,21 @@ function update_player_entity_projectiles(dt)
                     or cs.lasers_y[laser_index] < 0
                     or cs.lasers_y[laser_index] >= arena_h
                 then
-                    cs.lasers_is_active[laser_index] = Status.not_active
+                    cs.lasers_is_active[laser_index] = common.Status.not_active
                 end
             end
         end
     end
-    -- Update fire cooldown timer.
-    laser_fire_timer = laser_fire_timer - dt
+    laser_fire_timer = laser_fire_timer - dt -- Update fire cooldown timer.
+    --
     -- #endregion
 
     -- #region Handle laser collisions.
+    --
     local laser_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     for laser_index = 1, #cs.lasers_x do
-        if not (cs.lasers_is_active[laser_index] == Status.active) then
+        if not (cs.lasers_is_active[laser_index] == common.Status.active) then
             goto continue_not_is_active_laser
         end
         laser_circle = {
@@ -379,57 +279,75 @@ function update_player_entity_projectiles(dt)
             y = cs.lasers_y[laser_index],
             radius = laser_radius,
         }
-        for creature_index = 1, TOTAL_CREATURES_CAPACITY do
-            if not (cs.creatures_is_active[creature_index] == Status.active) then
+        for creature_index = 1, config.TOTAL_CREATURES_CAPACITY do
+            if not (cs.creatures_is_active[creature_index] == common.Status.active) then
                 goto continue_not_is_active_creature
             end
-            local curr_stage = cs.creatures_evolution_stage[creature_index]
-            assert(curr_stage >= 1 and curr_stage <= #creature_evolution_stages, curr_stage)
+
+            local curr_stage_id = cs.creatures_evolution_stage[creature_index]
+            assert(
+                curr_stage_id >= 1 and
+                curr_stage_id <= #creature_evolution_stages, curr_stage_id
+            )
             creature_circle = {
                 x = cs.creatures_x[creature_index],
                 y = cs.creatures_y[creature_index],
-                radius = creature_evolution_stages[curr_stage].radius,
+                radius = creature_evolution_stages[curr_stage_id].radius,
             }
-            if is_intersect_circles { a = creature_circle, b = laser_circle } then -- TODO: I think this stage value should be updated.....
-                do
-                    cs.lasers_is_active[laser_index] = Status
-                        .not_active             -- deactivate projectile if hits creature
-                    screenshake.duration = 0.15 -- got'em!
 
-                    laser_intersect_creature_counter = laser_intersect_creature_counter + 1
-                    cs.creatures_is_active[creature_index] = Status
-                        .not_active -- deactivate current creature stage if hits creature
-                    cs.creatures_health[creature_index] = Health.healing
-                end
+            if is_intersect_circles { a = creature_circle, b = laser_circle } then
+                -- Emit VFX
+                screenshake.duration = 0.15 -- got'em!
+
+                -- Deactivate projectile if touch creature.
+                cs.lasers_is_active[laser_index] = common.Status.not_active
+                laser_intersect_creature_counter = laser_intersect_creature_counter + 1
+
+                -- Deactivate current creature stage if touch creature.
+                cs.creatures_is_active[creature_index] = common.Status.not_active
+                cs.creatures_health[creature_index] = common.HealthTransitions.healing
 
                 -- Split the creature into two smaller ones.
-                if curr_stage > 1 then
-                    local new_stage = curr_stage - 1 -- note: initial stage is `#creature_evolution_stages`
-                    cs.creatures_evolution_stage[creature_index] = new_stage
+                if curr_stage_id > 1 then
+                    local new_stage_id = curr_stage_id - 1 -- note: initial stage is `#creature_evolution_stages`
+                    cs.creatures_evolution_stage[creature_index] = new_stage_id
                     for i = 1, 2 do
                         local new_creature_index = find_inactive_creature_index()
                         if new_creature_index then
-                            spawn_new_creature(new_creature_index, creature_index, new_stage)
+                            spawn_new_creature(new_creature_index, creature_index, new_stage_id)
                         else
-                            if debug.is_trace_entities then
-                                print('Failed to spawn more creatures.\n', 'curr_stage:', curr_stage, 'i:', i)
+                            if config.debug.is_trace_entities then
+                                print('Failed to spawn more creatures.\n', 'curr_stage_id:', curr_stage_id, 'i:', i)
                             end
-                            break -- skip if we can't spawn anymore
+                            -- Yeet outta this loop if we can't spawn anymore.
+                            break
                         end
                     end
                 end
-                break -- this projectile has served it's purpose
+                -- This projectile has served it's purpose.
+                break
             end
             ::continue_not_is_active_creature::
         end
         ::continue_not_is_active_laser::
     end
+    --
     -- #endregion
 end
 
 function find_inactive_creature_index()
-    for i = 1, TOTAL_CREATURES_CAPACITY do
-        if curr_state.creatures_is_active[i] == Status.not_active then
+    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+        if curr_state.creatures_is_active[i] == common.Status.not_active then
+            return i
+        end
+    end
+
+    return nil
+end
+
+function find_inactive_creature_index_except(index)
+    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+        if curr_state.creatures_is_active[i] == common.Status.not_active and i ~= index then
             return i
         end
     end
@@ -439,8 +357,8 @@ end
 
 function count_active_creatures()
     local counter = 0
-    for i = 1, TOTAL_CREATURES_CAPACITY do
-        if curr_state.creatures_is_active[i] == Status.active then
+    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+        if curr_state.creatures_is_active[i] == common.Status.active then
             counter = counter + 1
         end
     end
@@ -448,12 +366,47 @@ function count_active_creatures()
     return counter
 end
 
-function spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
-    -- assert(new_stage <= #creature_evolution_stages) --
-    --
-    do
-        -- spawn_new_creature(new_index, parent_index, new_stage)
+function spawn_new_creature(new_index, parent_index, new_stage, offset)
+    local cs = curr_state
+    local angle1 = love.math.random() * (2 * math.pi)
+    local angle2 = (angle1 - math.pi) % (2 * math.pi)
+    local alpha = dt_accum * config.FIXED_DT_INV
+    local angle_offset = lerp(angle1, angle2, alpha)
+    local parent_angle = cs.creatures_angle[parent_index]
+
+    if cs.creatures_is_active[new_index] == common.Status.active then
+        error('expected to not be active')
     end
+
+    cs.creatures_angle[new_index] = parent_angle + angle_offset
+    cs.creatures_evolution_stage[new_index] = new_stage
+    cs.creatures_is_active[new_index] = common.Status.active
+    cs.creatures_x[new_index] = cs.creatures_x[parent_index]
+    cs.creatures_y[new_index] = cs.creatures_y[parent_index]
+
+    -- Avoid overlap among new creatures.
+    offset = offset or creature_evolution_stages[new_stage].radius * 0.5
+    cs.creatures_x[new_index] = cs.creatures_x[new_index] + love.math.random(-offset, offset)
+    cs.creatures_y[new_index] = cs.creatures_y[new_index] + love.math.random(-offset, offset)
+end
+
+function spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
+    if config.debug.is_test then
+        print('new_stage', new_stage)
+        assert(new_stage >= 1)
+        assert(new_stage < #creature_evolution_stages)
+        assert(
+            new_stage ~= curr_state.creatures_evolution_stage[parent_index1] and
+            new_stage ~= curr_state.creatures_evolution_stage[parent_index2]
+        )
+    end
+
+    spawn_new_creature( --
+        new_index,
+        ((love.math.random() < .5) and parent_index1 or parent_index2),
+        new_stage,
+        100 -- TEMPORARY: offset
+    )
 end
 
 --- @type fun(t: { x1: number, y1: number, x2: number, y2: number }): number
@@ -461,173 +414,94 @@ function manhattan_distance(t)
     return math.abs(t.x1 - t.x2) + math.abs(t.y1 - t.y2)
 end
 
---- NOTE: Does not mutate position.
-function simulate_creatures_swarm_behavior(dt)
-    local alpha = dt_accum * FIXED_DT_INV
-
+--- Check if two creatures are close enough to start fusion.
+function check_creature_is_close_enough(index1, index2, fuse_distance)
     local cs = curr_state
-    for creature_index = 1, TOTAL_CREATURES_CAPACITY do
-        if cs.creatures_is_active[creature_index] == Status.active then
-            local group_center_x = 0
-            local group_center_y = 0
-            local count = 0
-            local creature_stage_id = cs.creatures_evolution_stage[creature_index] --- @type integer
-            local creature_stage = creature_evolution_stages[creature_stage_id]    --- @type Stage
-            -- local creature_swarm_range = creature_stage.radius --- @type integer # TEMPORARY solution
-            local creature_x = cs.creatures_x[creature_index]
-            local creature_y = cs.creatures_y[creature_index]
+    local distance = manhattan_distance {
+        x1 = cs.creatures_x[index1],
+        y1 = cs.creatures_y[index1],
+        x2 = cs.creatures_x[index2],
+        y2 = cs.creatures_y[index2],
+    }
 
-            -- use dt here?
-            local creature_group_factor = 0.4 --- @type number|integer # TEMPORARY solution
+    local stage_id_1 = cs.creatures_evolution_stage[index1]
+    local stage_id_2 = cs.creatures_evolution_stage[index2]
+    local stage_1 = creature_evolution_stages[stage_id_1]
+    local stage_2 = creature_evolution_stages[stage_id_2]
 
-            for other_creature_index = 1, TOTAL_CREATURES_CAPACITY do
-                if cs.creatures_is_active[other_creature_index] == Status.active then
-                    local other_creature_x = cs.creatures_x[other_creature_index]
-                    local other_creature_y = cs.creatures_y[other_creature_index]
-                    local other_creature_stage_id = cs.creatures_evolution_stage[other_creature_index] --- @type integer
-                    local other_creature_stage = creature_evolution_stages[other_creature_stage_id]    --- @type Stage
-
-                    local dist = nil
-                    if
-                        creature_x ~= nil
-                        and creature_y ~= nil
-                        and other_creature_x ~= nil
-                        and other_creature_y ~= nil
-                    then
-                        dist = manhattan_distance {
-                            x1 = creature_x,
-                            y1 = creature_y,
-                            x2 = other_creature_x,
-                            y2 = other_creature_y,
-                        }
-                    end
-
-                    if creature_index ~= other_creature_index and dist ~= nil and (dist <= creature_swarm_range) then
-                        group_center_x = group_center_x + cs.creatures_x[other_creature_index]
-                        group_center_y = group_center_y + cs.creatures_y[other_creature_index]
-                        count = count + 1
-                        do
-                            local __is_log_enabled = false
-                            if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
-                                print(dist, creature_swarm_range, creature_index, other_creature_index, count)
-                            end
-                        end
-                    end
-                    local __is_swarm_damped = dist >= (2 * creature_swarm_range) -- temporary
-                    if count > 0 and __is_swarm_damped then
-                        group_center_x = group_center_x / count
-                        group_center_y = group_center_y / count
-                        local curr_vel_x = cs.creatures_vel_x[creature_index]
-                        local curr_vel_y = cs.creatures_vel_y[creature_index]
-                        local factor = love.math.random() < 0.5 and dt or creature_group_factor
-                        do                                                                             -- TEMPORARY OVERIDE
-                            factor = 100                                                               --- this seems to clump them at the corners
-                            factor = lerp(other_creature_stage.radius, creature_stage.radius, PHI_INV) -- somewhat like gravitational pull
-                            local is_level_difficulty_hard = false
-                            if is_level_difficulty_hard then
-                                factor = lerp(100, factor, alpha) -- somewhat like gravitational pull
-                            end
-                        end
-
-                        local next_vel_x = curr_vel_x + (group_center_x - creature_y) * factor
-                        local next_vel_y = curr_vel_y + (group_center_y - creature_y) * factor
-                        do
-                            local __is_log_enabled = false
-                            if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
-                                print('range', creature_swarm_range, 'dist', dist)
-                                print(curr_vel_x, ' -> ', next_vel_x, curr_vel_y, ' -> ', next_vel_y)
-                            end
-                        end
-                        -- HACK: Update and clamp new speed to base speed for each respective stage.
-                        cs.creatures_vel_x[creature_index] = lerp(creature_stage.speed, next_vel_x, 0.8)
-                        cs.creatures_vel_y[creature_index] = lerp(creature_stage.speed, next_vel_y, 0.8)
-                    end
-                end
-            end
-        end
-    end
-end
-
-function spawn_new_creature(new_index, parent_index, new_stage)
-    local cs = curr_state
-    local angle1 = love.math.random() * (2 * math.pi)
-    local angle2 = (angle1 - math.pi) % (2 * math.pi)
-    local alpha = dt_accum * FIXED_DT_INV
-    local angle_offset = lerp(angle1, angle2, alpha)
-    cs.creatures_angle[new_index] = cs.creatures_angle[parent_index] + angle_offset
-    cs.creatures_evolution_stage[new_index] = new_stage
-    cs.creatures_is_active[new_index] = Status.active
-    cs.creatures_x[new_index] = cs.creatures_x[parent_index]
-    cs.creatures_y[new_index] = cs.creatures_y[parent_index]
-
-    -- Avoid overlap among new creatures.
-    local offset = creature_evolution_stages[new_stage].radius * 0.5
-    cs.creatures_x[new_index] = cs.creatures_x[new_index] + love.math.random(-offset, offset)
-    cs.creatures_y[new_index] = cs.creatures_y[new_index] + love.math.random(-offset, offset)
+    return distance < (stage_1.radius + stage_2.radius + fuse_distance)
 end
 
 function update_creatures(dt)
+    -- FIXME: HOW TO FIX THIS ANOMALY?
+    local weird_alpha = dt_accum * config.FIXED_DT -- SHOULD BE FIXED_DT_INV
+
     local cs = curr_state
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
-    local werid_alpha = dt_accum * FIXED_DT
 
-    for i = 1, TOTAL_CREATURES_CAPACITY do
-        if debug.is_test then
-            -- if cs.creatures_health[i] > Health.healing then
-            --     assert(cs.creatures_status[i] == Status.none)
-            -- end
-        end
-        if not (cs.creatures_is_active[i] == Status.active) then
-            local health = cs.creatures_health[i]
-            if health >= Health.healing and health < Health.healthy then
-                cs.creatures_health[i] = health +
-                    (werid_alpha + game_timer_dt) -- note: using dt will make it feel too linear
+    for i = 1, config.TOTAL_CREATURES_CAPACITY do
+        if config.debug.is_test then
+            if cs.creatures_health[i] == common.HealthTransitions.healthy then
+                assert(cs.creatures_is_active[i] == common.Status.not_active)
             end
-            if health >= Health.healthy then      -- Creature rescued. The End.
-                cs.creatures_health[i] = Health
-                    .none                         -- note: using dt will make it feel too linear
+        end
+        if not (cs.creatures_is_active[i] == common.Status.active) then
+            local health = cs.creatures_health[i]
+            if health >= common.HealthTransitions.healing and health < common.HealthTransitions.healthy then
+                cs.creatures_health[i] = health + dt           -- increament counter
+            end
+            if health >= common.HealthTransitions.healthy then -- Creature rescued. The End.
+                cs.creatures_health[i] = common.HealthTransitions
+                    .none                                      -- note: using dt will make it feel too linear
             end
             goto continue
         end
-        local angle = cs.creatures_angle[i]                       --- @type number
-        local creature_stage_id = cs.creatures_evolution_stage[i] --- @type integer
 
-        if debug.is_test then
-            assert(creature_stage_id >= 1 and creature_stage_id <= #creature_evolution_stages)
+        -- Update active creature
+        if IS_CREATURE_FOLLOW_PLAYER then
+            simulate.simulate_creature_follows_player(dt, i)
         end
 
+        local creature_stage_id = cs.creatures_evolution_stage[i] --- @type integer
+        if config.debug.is_test then
+            assert(creature_stage_id >= 1 and creature_stage_id <= #creature_evolution_stages)
+        end
         local stage = creature_evolution_stages[creature_stage_id] --- @type Stage
-        local speed_x = lerp(stage.speed, cs.creatures_vel_x[i], werid_alpha)
-        local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], werid_alpha)
+        local angle = cs.creatures_angle[i]                        --- @type number
+
+        local speed_x = lerp(stage.speed, cs.creatures_vel_x[i], weird_alpha)
+        local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], weird_alpha)
+
         local x = (cs.creatures_x[i] + math.cos(angle) * speed_x * dt) % arena_w --- @type number
         local y = (cs.creatures_y[i] + math.sin(angle) * speed_y * dt) % arena_h --- @type number
-
-        -- Update new location.
         cs.creatures_x[i] = x
         cs.creatures_y[i] = y
 
         creature_circle = { x = x, y = y, radius = stage.radius }
 
+
         if is_intersect_circles { a = player_circle, b = creature_circle } then -- defeat
             screenshake.duration = 0.15
-            reset_game()
-            return
+            if not config.IS_PLAYER_INVULNERABLE then                           -- HACK while prototyping... can slow player down though???
+                reset_game()
+                return
+            end
         end
 
         ::continue::
     end
 
     -- local active_creature_count = 0
-    -- for i = 1, TOTAL_CREATURES_CAPACITY do
-    --     if cs.creatures_status[i] == Status.active then -- increment
+    -- for i = 1, config.TOTAL_CREATURES_CAPACITY do
+    --     if cs.creatures_status[i] == common.Status.active then -- increment
     --         active_creature_count = active_creature_count + 1
     --     end
     -- end
     if count_active_creatures() == 0 then -- victory
-        assert(
-            EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
-            EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
+        pcall(assert,
+            config.EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
+            config.EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
         )
         reset_game()
         return
@@ -638,7 +512,7 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input(dt)
     update_player_entity(dt)
     update_player_entity_projectiles(dt)
-    simulate_creatures_swarm_behavior(dt)
+    simulate.simulate_creatures_swarm_behavior(dt)
     update_creatures(dt)
 end
 
@@ -649,7 +523,7 @@ function draw_game(alpha)
 end
 
 function draw_player(alpha)
-    local juice_frequency = 1 + math.sin(FIXED_FPS * game_timer_dt)
+    local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
 
     -- Draw player player
@@ -660,19 +534,19 @@ function draw_player(alpha)
     local is_interpolate_player = true
     if is_interpolate_player then
         local player_speed_x =
-            lerp(prev_state.player_vel_x, curr_state.player_vel_x * AIR_RESISTANCE, alpha)
+            lerp(prev_state.player_vel_x, curr_state.player_vel_x * config.AIR_RESISTANCE, alpha)
         local player_speed_y =
-            lerp(prev_state.player_vel_y, curr_state.player_vel_y * AIR_RESISTANCE, alpha)
+            lerp(prev_state.player_vel_y, curr_state.player_vel_y * config.AIR_RESISTANCE, alpha)
         player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
         player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
-        LG.setColor(Color.player_entity_firing_edge_darker)
+        LG.setColor(common.Color.player_entity_firing_edge_darker)
         LG.circle('fill', player_x, player_y, player_radius)
     end
 
     -- Draw player inner iris * (iris)
-    local player_iris_radius = (player_radius * PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
+    local player_iris_radius = (player_radius * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
         * (1 + juice_frequency * juice_frequency_damper)
-    LG.setColor(Color.player_entity)
+    LG.setColor(common.Color.player_entity)
     LG.circle('fill', player_x, player_y, player_iris_radius)
 
     -- Draw player player firing trigger • (circle)
@@ -685,36 +559,36 @@ function draw_player(alpha)
         local inertia_y = 0
         if love.keyboard.isDown('up', 'w') then
             inertia_x = curr_state.player_vel_x
-                + math.cos(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                + math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
             inertia_y = curr_state.player_vel_y
-                + math.sin(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                + math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
         end
         if love.keyboard.isDown('down', 's') then
             inertia_x = curr_state.player_vel_x
-                - math.cos(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                - math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
             inertia_y = curr_state.player_vel_y
-                - math.sin(curr_state.player_rot_angle) * PLAYER_ACCELERATION * game_timer_dt
+                - math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
         end
-        inertia_x = curr_state.player_vel_x * AIR_RESISTANCE
-        inertia_y = curr_state.player_vel_y * AIR_RESISTANCE
+        inertia_x = curr_state.player_vel_x * config.AIR_RESISTANCE
+        inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
         player_edge_x = player_edge_x
             - (0.328 * player_firing_edge_max_radius) * (inertia_x * game_timer_dt)
         player_edge_y = player_edge_y
             - (0.328 * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
     end
 
-    LG.setColor(Color.player_entity_firing_edge_dark)
+    LG.setColor(common.Color.player_entity_firing_edge_dark)
     LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
 end
 
 function draw_projectiles(alpha)
     -- Draw player player fired projectiles
-    LG.setColor(Color.player_entity_firing_projectile)
+    LG.setColor(common.Color.player_entity_firing_projectile)
     for i = 1, #curr_state.lasers_x do
-        if curr_state.lasers_is_active[i] == Status.active then
+        if curr_state.lasers_is_active[i] == common.Status.active then
             local pos_x = curr_state.lasers_x[i]
             local pos_y = curr_state.lasers_y[i]
-            if prev_state.lasers_is_active[i] == Status.active then
+            if prev_state.lasers_is_active[i] == common.Status.active then
                 pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
             end
@@ -732,16 +606,16 @@ function draw_creatures(alpha)
     for i = 1, #curr_state.creatures_x do
         local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
 
-        if curr_state.creatures_is_active[i] == Status.active then
+        if curr_state.creatures_is_active[i] == common.Status.active then
             local curr_x = curr_state.creatures_x[i]
             local curr_y = curr_state.creatures_y[i]
             local creature_radius = evolution_stage.radius --- @type integer
 
             -- Draw swarm behavior glitch circumference effect (blur-haze) on this creature.
-            if IS_GAME_SLOW then -- note: better to use a wave shader for ripples
+            if config.IS_GAME_SLOW then -- note: better to use a wave shader for ripples
                 local tolerance = evolution_stage.speed
                 if math.abs(curr_state.creatures_vel_x[i] - prev_state.creatures_vel_x[i]) >= tolerance then
-                    LG.setColor(Color.creature_infected_rgba)
+                    LG.setColor(common.Color.creature_infected_rgba)
                     local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
                     local segment_distortion_amplitude = 2
                     local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
@@ -749,12 +623,12 @@ function draw_creatures(alpha)
                     local distorting_radius =
                         lerp(creature_radius - 1, creature_radius + 1 + segment_distortion, alpha)
                     LG.circle('line', curr_x, curr_y, distorting_radius, segments)
-                    LG.setColor(Color.creature_infected) --- HACK: RESET leaking color to post-processing shader
+                    LG.setColor(common.Color.creature_infected) --- HACK: RESET leaking color to post-processing shader
                 end
             end
 
             -- Draw this creature.
-            LG.setColor(Color.creature_infected)
+            LG.setColor(common.Color.creature_infected)
             LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
         else
             local curr_x = curr_state.creatures_x[i]
@@ -772,19 +646,20 @@ function draw_creatures(alpha)
             -- looks them up and then `spawn_new_creature` mutates them.
             if is_away_from_corner or is_not_moving then
                 local health = curr_state.creatures_health[i]
-                local is_healing = curr_state.creatures_is_active[i] == Status.not_active and health > Health.healing and
-                    health <= Health.healthy
+                local is_healing = curr_state.creatures_is_active[i] == common.Status.not_active and
+                    health > common.HealthTransitions.healing and
+                    health <= common.HealthTransitions.healthy
                 if is_healing then
-                    LG.setColor(Color.creature_healed)
+                    LG.setColor(common.Color.creature_healed)
                     LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
 
                     -- Draw final creature evolution on successful healing.
-                    if alpha < PHI_INV then
-                        local juice_frequency = 1 + math.sin(FIXED_FPS * game_timer_dt)
+                    if alpha < config.PHI_INV then
+                        local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
                         local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
                         local radius_factor = (1 + alpha * juice_frequency * lerp(1, juice_frequency_damper, alpha))
                         local radius = evolution_stage.radius * radius_factor
-                        LG.setColor(Color.creature_healing)
+                        LG.setColor(common.Color.creature_healing)
                         LG.circle('fill', curr_x, curr_y, radius)
 
                         -- Draw `+` icon indicating score increment.
@@ -797,39 +672,6 @@ function draw_creatures(alpha)
                     end
                 end
             end
-        end
-    end
-end
-
-function draw_projectile_trail()
-    local trail_length = 5 -- No. of past positions to draw as a trail
-    for i = 1, #curr_state.lasers_x do
-        local pos_x = curr_state.lasers_x[i]
-        local pos_y = curr_state.lasers_y[i]
-
-        if prev_state.lasers_is_active[i] == Status.active then
-            pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
-            pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
-        end
-
-        -- THIS MAY ERR, if prev trail is nil
-        for t = trail_length, 1, -1 do
-            local trail_factor = t / trail_length
-            local trail_x = lerp(prev_state.lasers_x[i], pos_x, trail_factor)
-            local trail_y = lerp(prev_state.lasers_y[i], pos_y, trail_factor)
-            LG.setColor(
-                Color.player_entity_firing_projectile[1],
-                Color.player_entity_firing_projectile[2],
-                Color.player_entity_firing_projectile[3],
-                trail_factor
-            ) -- Fading effect
-            draw_plus_icon(trail_x, trail_y, laser_radius * trail_factor, 3)
-        end
-
-        if is_plus_sprite then
-            draw_plus_icon(pos_x, pos_y, laser_radius * PHI, 3)
-        else
-            LG.circle('fill', pos_x, pos_y, laser_radius)
         end
     end
 end
@@ -855,12 +697,12 @@ function draw_hud()
 
     local active_counter = 0
     for _, value in ipairs(cs.creatures_is_active) do
-        if value == Status.active then
+        if value == common.Status.active then
             active_counter = active_counter + 1
         end
     end
     local fps = love.timer.getFPS()
-    LG.setColor(Color.text_darkest)
+    LG.setColor(common.Color.text_darkest)
     LG.print(
         table.concat({
             laser_intersect_creature_counter .. ' Score',
@@ -894,12 +736,12 @@ function draw_debug_hud()
 
     local active_counter = 0
     for _, value in ipairs(cs.creatures_is_active) do
-        if value == Status.active then
+        if value == common.Status.active then
             active_counter = active_counter + 1
         end
     end
 
-    LG.setColor(Color.text_debug_hud)
+    LG.setColor(common.Color.text_debug_hud)
     LG.print(
         table.concat({
             'creatures.active: ' .. active_counter,
@@ -932,6 +774,7 @@ end
 function love.load()
     LG.setDefaultFilter('linear', 'linear') -- smooth edges
 
+    dt_accum = 0.0                          --- Accumulator keeps track of time passed between frames.
     arena_h = gh
     arena_w = gw
     laser_radius = 5
@@ -961,7 +804,7 @@ function love.load()
         shaders.post_processing.vignette.radius = 0.8 + 0.4
         shaders.post_processing.vignette.softness = 0.5 + 0.2
         shaders.post_processing.vignette.opacity = 0.5 + 0.1
-        shaders.post_processing.vignette.color = Color.background
+        shaders.post_processing.vignette.color = common.Color.background
     end
     if true then
         shaders.post_processing.scanlines.opacity = 1 * 0.618
@@ -1013,7 +856,7 @@ function love.load()
     }
 
     screenshake = { --- @type ScreenShake
-        amount = 5 * 0.5 * PHI_INV,
+        amount = 5 * 0.5 * config.PHI_INV,
         duration = 0.0,
         offset_x = 0.0,
         offset_y = 0.0,
@@ -1050,7 +893,7 @@ function love.load()
         laser_fire_timer = 0
         laser_index = 1              -- circular buffer index
         player_fire_cooldown_timer = 0
-        player_turn_speed = DEFAULT_PLAYER_TURN_SPEED
+        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED
 
         curr_state.player_rot_angle = 0
         curr_state.player_vel_x = 0
@@ -1063,10 +906,10 @@ function love.load()
         prev_state.player_x = arena_w * 0.5
         prev_state.player_y = arena_h * 0.5
 
-        for i = 1, MAX_LASER_CAPACITY do
+        for i = 1, config.MAX_LASER_CAPACITY do
             curr_state.lasers_angle[i] = 0
-            curr_state.lasers_is_active[i] = Status.not_active
-            curr_state.lasers_time_left[i] = LASER_FIRE_TIMER_LIMIT
+            curr_state.lasers_is_active[i] = common.Status.not_active
+            curr_state.lasers_time_left[i] = config.LASER_FIRE_TIMER_LIMIT
             curr_state.lasers_x[i] = 0
             curr_state.lasers_y[i] = 0
         end
@@ -1078,22 +921,22 @@ function love.load()
         -- curr_state.creatures_y = { 100, 100, arena_h - 10 }
 
         local largest_creature_stage = #creature_evolution_stages
-        for i = 1, TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
+        for i = 1, config.TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
             curr_state.creatures_angle[i] = 0
             curr_state.creatures_evolution_stage[i] = largest_creature_stage
             curr_state.creatures_health[i] = 0 -- default 0 value
-            curr_state.creatures_is_active[i] = Status.not_active
+            curr_state.creatures_is_active[i] = common.Status.not_active
             curr_state.creatures_x[i] = 0
             curr_state.creatures_y[i] = 0
             curr_state.creatures_vel_x[i] = 0
             curr_state.creatures_vel_y[i] = 0
         end
 
-        for i = 1, INITIAL_LARGE_CREATURES do                                -- Activate initial creatures.
+        for i = 1, config.INITIAL_LARGE_CREATURES do                         -- Activate initial creatures.
             curr_state.creatures_angle[i] = love.math.random() * (2 * math.pi)
             curr_state.creatures_evolution_stage[i] = largest_creature_stage -- Start at smallest stage
             curr_state.creatures_health[i] = -1                              -- -1 to 0 to 1.... like dash timer, or fade timer ( -1 to 0 to 1 )
-            curr_state.creatures_is_active[i] = Status.active
+            curr_state.creatures_is_active[i] = common.Status.active
             curr_state.creatures_vel_x[i] = 0
             curr_state.creatures_vel_y[i] = 0
             curr_state.creatures_x[i] = 0
@@ -1102,13 +945,13 @@ function love.load()
 
         copy_game_state(prev_state, curr_state)
         sync_prev_state()
-        if debug.is_test then
+        if config.debug.is_test then
             assert_consistent_state()
         end
     end
 
     reset_game()
-    LG.setBackgroundColor(Color.background)
+    LG.setBackgroundColor(common.Color.background)
 end
 
 function love.update(dt)
@@ -1117,10 +960,10 @@ function love.update(dt)
 
     --#region Frame Rate Independence.
     dt_accum = dt_accum + dt
-    while dt_accum >= FIXED_DT do
+    while dt_accum >= config.FIXED_DT do
         sync_prev_state()
-        update_game(FIXED_DT)
-        dt_accum = dt_accum - FIXED_DT
+        update_game(config.FIXED_DT)
+        dt_accum = dt_accum - config.FIXED_DT
     end
     --#endregion
 
@@ -1128,9 +971,9 @@ function love.update(dt)
 end
 
 function love.draw()
-    local alpha = dt_accum * FIXED_DT_INV --- @type number
+    local alpha = dt_accum * config.FIXED_DT_INV --- @type number
 
-    if debug.is_test then
+    if config.debug.is_test then
         assert_consistent_state()
     end
 
@@ -1145,7 +988,7 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
 
                 if screenshake.duration > 0 then                             -- vfx
-                    LG.setColor { 1, 1, 1, ScreenFlashAlphaLevel.low }
+                    LG.setColor { 1, 1, 1, common.ScreenFlashAlphaLevel.low }
                     LG.rectangle('fill', 0, 0, arena_w, arena_h)             -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
                     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
                 end
@@ -1167,9 +1010,9 @@ function love.draw()
 end
 
 function love.keypressed(key, _, _)
-    if key == ControlKey.escape_key or key == ControlKey.force_quit_game then
+    if key == common.ControlKey.escape_key or key == common.ControlKey.force_quit_game then
         love.event.push 'quit'
-    elseif key == ControlKey.toggle_hud then
+    elseif key == common.ControlKey.toggle_hud then
         is_debug_hud_enabled = not is_debug_hud_enabled
     end
 end
