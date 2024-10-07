@@ -14,8 +14,8 @@ Development
 
 local moonshine = require 'lib.moonshine'
 
-local config    = require 'config'
 local common    = require 'common'
+local config    = require 'config'
 local simulate  = require 'simulate'
 
 local LG        = love.graphics
@@ -645,6 +645,7 @@ function draw_hud()
             active_counter .. ' Left',
             '',
             fps .. ' fps',
+            game_level .. ' level',
             string.format('%.4s', game_timer_t) .. ' elapsed',
         }, '\n'),
         1 * pos_x,
@@ -771,7 +772,10 @@ end
 --
 
 function love.load()
-    LG.setDefaultFilter('linear', 'linear')                                                                           -- smooth edges
+    LG.setDefaultFilter('linear', 'linear') -- smooth edges
+
+    arena_h = gh
+    arena_w = gw
 
     do                                                                                                                -- Music time
         sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
@@ -812,9 +816,9 @@ function love.load()
         love.audio.setVolume(config.debug.is_development and 0.5 or 1.0) --volume # number # 1.0 is max and 0.0 is off.
     end
 
+
+    game_level = 1
     dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
-    arena_h = gh
-    arena_w = gw
     laser_radius = 5
     player_radius = 32
 
@@ -928,6 +932,7 @@ function love.load()
         laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
         game_timer_dt = 0.0
         game_timer_t = 0.0
+
         is_debug_hud_enabled = false --- Toggled by keys event.
         laser_fire_timer = 0
         laser_index = 1              -- circular buffer index
@@ -1060,6 +1065,17 @@ function love.keypressed(key, _, _)
         love.event.push 'quit'
     elseif key == common.ControlKey.toggle_hud then
         is_debug_hud_enabled = not is_debug_hud_enabled
+    elseif key == common.ControlKey.reset_level then -- high priority
+        reset_game()
+    elseif key == common.ControlKey.next_level then
+        game_level = (game_level % config.MAX_GAME_LEVELS) + 1
+        reset_game()
+    elseif key == common.ControlKey.prev_level then
+        game_level = game_level - 1
+        if game_level <= 0 then
+            game_level = config.MAX_GAME_LEVELS
+        end
+        reset_game()
     end
 end
 

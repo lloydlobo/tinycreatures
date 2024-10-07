@@ -20,8 +20,12 @@ M.ControlKey = {
     escape_key = 'escape',
     fire = 'space',
     force_quit_game = 'q',
+    next_level = 'n',
+    prev_level = 'p',
+    reset_level = 'r',
     toggle_hud = 'h',
 }
+
 
 --- @enum CreatureStageColor
 --- Based on creature_evolution_stages `Stage[]` where the size decreases as
