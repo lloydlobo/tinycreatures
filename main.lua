@@ -654,16 +654,25 @@ function draw_hud()
     LG.setColor(common.Color.text_darkest)
     LG.print(
         table.concat({
-            laser_intersect_creature_counter .. ' Score',
-            active_counter .. ' Left',
-            '',
-            fps .. ' fps',
-            game_level .. ' level',
-            string.format('%.4s', game_timer_t) .. ' elapsed',
+            'Healed ' .. laser_intersect_creature_counter,
+            'Level ' .. game_level,
         }, '\n'),
-        1 * pos_x,
+        1 * pos_x + 32,
         1 * pos_y
     )
+    if config.debug.is_development then
+        LG.print(
+            table.concat({
+                'Infected ' .. active_counter,
+                'FPS ' .. fps,
+                string.format('%.5s', game_timer_t),
+            }, '\n'),
+
+            1 * pos_x,
+            1 * pos_y + hud_h
+        )
+    end
+
     -- HACK: To avoid leaking debug hud text color into post-processing shader.
     LG.setColor(1, 1, 1)
 end
@@ -844,7 +853,7 @@ function love.load()
             .chain(fx.chromasep)
             .chain(fx.scanlines)
             .chain(fx.vignette)
-            .chain(fx.crt)
+            -- .chain(fx.crt)
             .chain(fx.godsray),
     }
     if true then

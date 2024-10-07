@@ -31,7 +31,7 @@ M = {
     FIXED_FPS = 60,
     LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2 * 1,
     LASER_PROJECTILE_SPEED = 2 ^ 9, -- 512
-    MAX_GAME_LEVELS = 4,
+    MAX_GAME_LEVELS = 16,
     MAX_LASER_CAPACITY = 2 ^ 5,
     PLAYER_ACCELERATION = 100 * 2,
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6, --- TODO: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
@@ -41,9 +41,9 @@ M = {
     --
 
     debug = { --- Debugging Flags.
-        is_development = true,
-        is_test = true,
-        is_trace_entities = true,
+        is_development = false,
+        is_test = false,
+        is_trace_entities = false,
     },
 }
 --
