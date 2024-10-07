@@ -1,11 +1,8 @@
-local config = require('config')
-
-local common = require 'common'
-local lerp = common.lerp
-
 local M = {}
 
-
+local config = require('config')
+local common = require 'common'
+local lerp = common.lerp
 
 --- Calculate the vector from the creature to the player.
 --- Normalize the vector and multiply it by a speed factor.
@@ -73,7 +70,7 @@ function M.simulate_creatures_swarm_behavior(dt)
                         and other_creature_x ~= nil
                         and other_creature_y ~= nil
                     then
-                        dist = manhattan_distance {
+                        dist = common.manhattan_distance {
                             x1 = creature_x,
                             y1 = creature_y,
                             x2 = other_creature_x,
@@ -87,7 +84,7 @@ function M.simulate_creatures_swarm_behavior(dt)
                         count = count + 1
                         do
                             local __is_log_enabled = false
-                            if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
+                            if __is_log_enabled and config.debug.is_trace_entities and love.math.random() < 0.05 then
                                 print(dist, creature_swarm_range, creature_index, other_creature_index, count)
                             end
                         end
@@ -112,7 +109,7 @@ function M.simulate_creatures_swarm_behavior(dt)
                         local next_vel_y = curr_vel_y + (group_center_y - creature_y) * factor
                         do
                             local __is_log_enabled = false
-                            if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
+                            if __is_log_enabled and config.debug.is_trace_entities and love.math.random() < 0.05 then
                                 print('range', creature_swarm_range, 'dist', dist)
                                 print(curr_vel_x, ' -> ', next_vel_x, curr_vel_y, ' -> ', next_vel_y)
                             end
@@ -123,29 +120,31 @@ function M.simulate_creatures_swarm_behavior(dt)
                     end
 
 
-                    if creature_stage_id == other_creature_stage_id and
-                        creature_stage_id > 2 and
-                        creature_stage_id < #creature_evolution_stages then
-                        if check_creature_is_close_enough(creature_index, other_creature_index, creature_swarm_range) then
-                            -- function spawn_new_fused_creature_pair(new_index:
-                            -- any, parent_index1: any, parent_index2: any,
-                            -- new_stage: any)
+                    if config.IS_CREATURE_FUSION_ENABLED then
+                        if creature_stage_id == other_creature_stage_id and
+                            creature_stage_id > 2 and
+                            creature_stage_id < #creature_evolution_stages then
+                            if check_creature_is_close_enough(creature_index, other_creature_index, creature_swarm_range) then
+                                -- function spawn_new_fused_creature_pair(new_index:
+                                -- any, parent_index1: any, parent_index2: any,
+                                -- new_stage: any)
 
-                            local inactive_index = find_inactive_creature_index()
-                            if debug.is_trace_entities then
-                                print('inactive_index: ', inactive_index)
-                            end
-                            local is_able_to_fuse = inactive_index ~= nil
-                            if is_able_to_fuse then
-                                if love.math.random() < .5 then -- HACK: TO MAKE IT WORK SOMEHOW
-                                    do                          -- Safely turn the smaller pair off, before spawning the bigger one.
-                                        cs.creatures_is_active[creature_index] = common.Status.not_active
-                                        cs.creatures_is_active[other_creature_index] = common.Status.not_active
-                                    end
+                                local inactive_index = find_inactive_creature_index()
+                                if config.debug.is_trace_entities then
+                                    -- print('inactive_index: ', inactive_index)
                                 end
-                                spawn_new_fused_creature_pair(inactive_index, creature_index, other_creature_index,
-                                    creature_stage_id - 1
-                                )
+                                local is_able_to_fuse = inactive_index ~= nil
+                                if is_able_to_fuse then
+                                    if love.math.random() < .5 then -- HACK: TO MAKE IT WORK SOMEHOW
+                                        do                      -- Safely turn the smaller pair off, before spawning the bigger one.
+                                            cs.creatures_is_active[creature_index] = common.Status.not_active
+                                            cs.creatures_is_active[other_creature_index] = common.Status.not_active
+                                        end
+                                    end
+                                    spawn_new_fused_creature_pair(inactive_index, creature_index, other_creature_index,
+                                        creature_stage_id - 1
+                                    )
+                                end
                             end
                         end
                     end
@@ -153,6 +152,24 @@ function M.simulate_creatures_swarm_behavior(dt)
             end
         end
     end
+end
+
+function spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
+    if config.debug.is_test then
+        assert(new_stage >= 1)
+        assert(new_stage < #creature_evolution_stages)
+        assert(
+            new_stage ~= curr_state.creatures_evolution_stage[parent_index1] and
+            new_stage ~= curr_state.creatures_evolution_stage[parent_index2]
+        )
+    end
+
+    spawn_new_creature( --
+        new_index,
+        ((love.math.random() < .5) and parent_index1 or parent_index2),
+        new_stage,
+        100 -- TEMPORARY: offset
+    )
 end
 
 return M

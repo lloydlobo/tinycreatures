@@ -64,4 +64,9 @@ function M.lerp(a, b, t)
     return ((1 - t) * a) + (t * b)
 end
 
+--- @type fun(t: { x1: number, y1: number, x2: number, y2: number }): number
+function M.manhattan_distance(t)
+    return math.abs(t.x1 - t.x2) + math.abs(t.y1 - t.y2)
+end
+
 return M

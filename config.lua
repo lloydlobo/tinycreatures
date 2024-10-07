@@ -15,10 +15,12 @@ M = {
     -- FLAGS
     --
 
-    IS_CREATURE_FOLLOW_PLAYER = true,
+    IS_CREATURE_FOLLOW_PLAYER = false,
+    IS_CREATURE_FUSION_ENABLED = false,
+    IS_CREATURE_SWARM_ENABLED = false,
     IS_GAME_SLOW = false,
     IS_GRUG_BRAIN = true,                           --- Whether to complicate life and the codebase.
-    IS_PLAYER_INVULNERABLE = true,
+    IS_PLAYER_INVULNERABLE = false,
     IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false, --- Flags if fired projectile should wrap around arena.
 
     --
@@ -53,8 +55,9 @@ M.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = M.PHI_INV
 -- Derived Configurations
 --
 
-M.FIXED_DT = 1 / M.FIXED_FPS               --- Ensures consistent game logic updates regardless of frame rate fluctuations.
-M.FIXED_DT_INV = 1 / (1 / M.FIXED_FPS)     --- avoid dividing each frame
+M.FIXED_DT = 1 /
+    M.FIXED_FPS                        --- Ensures consistent game logic updates regardless of frame rate fluctuations.
+M.FIXED_DT_INV = 1 / (1 / M.FIXED_FPS) --- avoid dividing each frame
 
 
 ---@type integer # This count excludes the initial ancestor count.
