@@ -18,6 +18,7 @@ M.HealthTransitions = {
 --- @enum ControlKey
 M.ControlKey = {
     escape_key = 'escape',
+    fire = 'space',
     force_quit_game = 'q',
     toggle_hud = 'h',
 }

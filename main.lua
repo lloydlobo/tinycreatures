@@ -23,6 +23,11 @@ local LG        = love.graphics
 local PHI       = config.PHI
 local lerp      = common.lerp
 
+--
+--
+-- Types & Definitions
+--
+--
 
 --- @class GameState
 --- @field creatures_angle number[]
@@ -63,6 +68,12 @@ local lerp      = common.lerp
 --- @field offset_y number # 0
 --- @field wait number # 0
 --- See also: https://sheepolution.com/learn/book/22
+
+--
+--
+-- State Synchronizers
+--
+--
 
 function assert_consistent_state()
     local cs = curr_state
@@ -129,7 +140,7 @@ end
 
 --
 --
--- Update helpers
+-- Update Helpers
 --
 --
 
@@ -245,10 +256,9 @@ end
 
 --
 --
--- Updates handlers
+-- Update Handlers
 --
 --
-
 
 --- @param dt number # Actual delta time. Not same as `fixed_dt`.
 function update_screenshake(dt)
@@ -276,9 +286,7 @@ end
 
 function update_player_entity_projectiles(dt)
     local cs = curr_state
-
     -- #region Update laser positions.
-    --
     for laser_index = 1, #cs.lasers_x do
         if cs.lasers_is_active[laser_index] == common.Status.active then
             cs.lasers_time_left[laser_index] = cs.lasers_time_left[laser_index] - dt
@@ -305,11 +313,9 @@ function update_player_entity_projectiles(dt)
         end
     end
     laser_fire_timer = laser_fire_timer - dt -- Update fire cooldown timer.
-    --
     -- #endregion
 
     -- #region Handle laser collisions.
-    --
     local laser_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     for laser_index = 1, #cs.lasers_x do
@@ -325,30 +331,21 @@ function update_player_entity_projectiles(dt)
             if not (cs.creatures_is_active[creature_index] == common.Status.active) then
                 goto continue_not_is_active_creature
             end
-
             local curr_stage_id = cs.creatures_evolution_stage[creature_index]
-            assert(
-                curr_stage_id >= 1 and
-                curr_stage_id <= #creature_evolution_stages, curr_stage_id
-            )
+            assert(curr_stage_id >= 1 and curr_stage_id <= #creature_evolution_stages, curr_stage_id)
             creature_circle = {
                 x = cs.creatures_x[creature_index],
                 y = cs.creatures_y[creature_index],
                 radius = creature_evolution_stages[curr_stage_id].radius,
             }
-
             if is_intersect_circles { a = creature_circle, b = laser_circle } then
-                -- Emit VFX
                 screenshake.duration = 0.15 -- got'em!
-
                 -- Deactivate projectile if touch creature.
                 cs.lasers_is_active[laser_index] = common.Status.not_active
                 laser_intersect_creature_counter = laser_intersect_creature_counter + 1
-
                 -- Deactivate current creature stage if touch creature.
                 cs.creatures_is_active[creature_index] = common.Status.not_active
                 cs.creatures_health[creature_index] = common.HealthTransitions.healing
-
                 -- Split the creature into two smaller ones.
                 if curr_stage_id > 1 then
                     local new_stage_id = curr_stage_id - 1 -- note: initial stage is `#creature_evolution_stages`
@@ -361,19 +358,16 @@ function update_player_entity_projectiles(dt)
                             if config.debug.is_trace_entities then
                                 -- print('Failed to spawn more creatures.\n', 'curr_stage_id:', curr_stage_id, 'i:', i)
                             end
-                            -- Yeet outta this loop if we can't spawn anymore.
-                            break
+                            break -- Yeet outta this loop if we can't spawn anymore.
                         end
                     end
                 end
-                -- This projectile has served it's purpose.
-                break
+                break -- This projectile has served it's purpose.
             end
             ::continue_not_is_active_creature::
         end
         ::continue_not_is_active_laser::
     end
-    --
     -- #endregion
 end
 
@@ -382,9 +376,9 @@ function update_creatures(dt)
     local weird_alpha = dt_accum * config.FIXED_DT -- SHOULD BE FIXED_DT_INV
 
     local cs = curr_state
+
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
-
     for i = 1, config.TOTAL_CREATURES_CAPACITY do
         if config.debug.is_test then
             if cs.creatures_health[i] == common.HealthTransitions.healthy then
@@ -420,10 +414,13 @@ function update_creatures(dt)
         cs.creatures_x[i] = x
         cs.creatures_y[i] = y
 
+        -- Check for game over (player lost).
         creature_circle = { x = x, y = y, radius = stage.radius }
         if is_intersect_circles { a = player_circle, b = creature_circle } then -- defeat
+            sound_interference:play()
+
             screenshake.duration = 0.15
-            if not config.IS_PLAYER_INVULNERABLE then                           -- HACK while prototyping... can slow player down though???
+            if not config.IS_PLAYER_INVULNERABLE then -- HACK while prototyping... can slow player down though???
                 reset_game()
                 return
             end
@@ -431,11 +428,14 @@ function update_creatures(dt)
         ::continue::
     end
 
+    -- PLAYER WON
     if count_active_creatures() == 0 then -- victory
         pcall(assert,
             config.EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
             config.EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
         )
+
+        sound_upgrade:play()
         reset_game()
         return
     end
@@ -443,7 +443,7 @@ end
 
 --
 --
--- Rendering
+-- Drawing Renderer
 --
 --
 
@@ -566,7 +566,6 @@ function draw_creatures(alpha)
                 and curr_y >= 0 + corner_offset
                 and curr_y <= arena_h - corner_offset
             )
-
             -- Automatically disappear when the `find_inactive_creature_index`
             -- looks them up and then `spawn_new_creature` mutates them.
             if is_away_from_corner or is_not_moving then
@@ -611,10 +610,10 @@ function draw_plus_icon(x_, y_, size_, linewidth)
 end
 
 function draw_hud()
+    local hud_h = 128
+    local hud_w = 128
     local pad_x = 8 -- horizontal
     local pad_y = 8 -- vertical
-    local hud_w = 128
-    local hud_h = 128
     local pos_x = arena_w - hud_w
     local pos_y = 0
 
@@ -639,25 +638,23 @@ function draw_hud()
         1 * pos_x,
         1 * pos_y
     )
-
     -- HACK: To avoid leaking debug hud text color into post-processing shader.
     LG.setColor(1, 1, 1)
 end
 
 function draw_debug_hud()
-    local cs = curr_state
-
     local pad_x = 8
     local pad_y = 8
     local pos_x = 0
     local pos_y = 0
-
     LG.setColor(0, 0, 0, 0.7)
     LG.rectangle('fill', pos_x, pos_y, 222, arena_h)
 
     local stats = LG.getStats()
     local fps = love.timer.getFPS()
     local dt = love.timer.getDelta()
+
+    local cs = curr_state
 
     local active_counter = 0
     for _, value in ipairs(cs.creatures_is_active) do
@@ -721,12 +718,12 @@ function handle_player_input(dt)
         end
     end
 
-    if love.keyboard.isDown 'x' then
-        dash_player_entity(dt)
-    end
-
     if love.keyboard.isDown 'space' then
         fire_player_projectile()
+    end
+
+    if love.keyboard.isDown 'x' then
+        dash_player_entity(dt)
     end
 
     if love.keyboard.isDown('lshift', 'rshift') then --- enhance attributes while spinning like a top
@@ -762,9 +759,33 @@ end
 --
 
 function love.load()
-    LG.setDefaultFilter('linear', 'linear') -- smooth edges
+    LG.setDefaultFilter('linear', 'linear')                                                                    -- smooth edges
 
-    dt_accum = 0.0                          --- Accumulator keeps track of time passed between frames.
+    do                                                                                                         -- Music time
+        sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
+        sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static')           -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static')   -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+
+        sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static')                   --stream and loop background music
+        sound_pickup:setVolume(0.9)                                                                            -- 90% of ordinary volume
+        sound_pickup:setPitch(0.5)                                                                             -- one octave lower
+        sound_pickup:setVolume(0.7)
+        sound_pickup:play()                                                                                    -- PLAY AT GAME START once
+
+        -- Credits:
+        --   Lupus Nocte: http://link.epidemicsound.com/LUPUS
+        --   YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
+        music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') --stream and loop background music
+        music_bgm:setVolume(0.9)
+        music_bgm:setPitch(1.11)                                                                       -- one octave lower
+        music_bgm:setVolume(0.5)
+        --music_bgm:play()
+
+        -- Master volume
+        love.audio.setVolume(0.9) --volume # number # 1.0 is max and 0.0 is off.
+    end
+
+    dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
     arena_h = gh
     arena_w = gw
     laser_radius = 5
@@ -903,7 +924,6 @@ function love.load()
             curr_state.lasers_x[i] = 0
             curr_state.lasers_y[i] = 0
         end
-        -- laser_fire_timer = 0
         laser_index = 1 -- reset circular buffer index
 
         -- Test me:
@@ -945,6 +965,14 @@ function love.load()
 end
 
 function love.update(dt)
+    if not music_bgm:isPlaying() then
+        love.audio.play(music_bgm)
+    end
+    -- NOTE: love.audio is to be overriden by audio.lua, else this panics.
+    -- love.audio.update()
+    -----fade_start_time = fade_start_time + dt
+    -----if fade_start_time > total_fade_duration then fade_start_time = total_fade_duration end
+
     game_timer_t = game_timer_t + dt
     game_timer_dt = dt -- note: for easy global reference
 
@@ -1004,5 +1032,11 @@ function love.keypressed(key, _, _)
         love.event.push 'quit'
     elseif key == common.ControlKey.toggle_hud then
         is_debug_hud_enabled = not is_debug_hud_enabled
+    end
+end
+
+function love.keyreleased(key)
+    if key == 'space' then
+        sound_guns_turn_off:play()
     end
 end
