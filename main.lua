@@ -83,37 +83,45 @@ local Color = {
     text_debug_hud = { 0.8, 0.7, 0.0 },
 }
 
-local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
-local FIXED_FPS = 60
-
-local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
-local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
-
-local LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2
-local LASER_PROJECTILE_SPEED = 500
-local MAX_LASER_CAPACITY = 256
+--
+-- Math constants
+--
 
 local PHI = 1.618
 local PHI_INV = 0.618
 local PI = math.pi
 local PI_INV = 1 / math.pi
 
-local PLAYER_ACCELERATION = 100
-PLAYER_ACCELERATION = PLAYER_ACCELERATION * 2
+--
+-- FLAGS
+--
 
-local PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = 0.618
-local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- Note: 6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.
+local IS_GRUG_BRAIN = false --- Whether to complicate life and the codebase.
+local IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false --- Flags if fired projectile should wrap around arena.
+
+--
+-- Configurations
+--
+
+local AIR_RESISTANCE = 0.98 -- Resistance factor between 0 and 1.
 local DEFAULT_PLAYER_TURN_SPEED = 10 * 0.5 - 1
+local FIXED_FPS = 60
+local INITIAL_LARGE_CREATURES = 2 ^ 4
+local LASER_FIRE_TIMER_LIMIT = 0.5 * 0.2
+local LASER_PROJECTILE_SPEED = 500
+local MAX_LASER_CAPACITY = 256
+local PLAYER_ACCELERATION = 100
+local PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = 0.618
+local PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = 6 --- TODO: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
 
-local INITIAL_LARGE_CREATURES = 3
---- HACK: Settling for a lower value, to avoid dealing with individual counters
---- to animate healing. Due to increase of inactive healed creatures in arena.
-local MAX_CREATURES_IN_ARENA = 64 --- Allocated size is always less than capacity by ((power/multiple) of 2 or some constant).
-local TOTAL_CREATURES_CAPACITY = 128 --- Allocated capacity.
-local MAX_HEALED_BUT_INACTIVE_CREATURES = 5
+--
+-- Derived Configurations
+--
 
+local EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES ---@type integer # This count excludes the initial ancestor count.
 local FIXED_DT = 1 / FIXED_FPS --- Ensures consistent game logic updates regardless of frame rate fluctuations.
 local FIXED_DT_INV = 1 / (1 / FIXED_FPS) --- avoid dividing each frame
+local TOTAL_CREATURES_CAPACITY = (INITIAL_LARGE_CREATURES ^ 2) * 2 ---@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
 
 --
 -- Variables
@@ -318,20 +326,25 @@ function love.load()
         do -- @unimplemented
             creature_stages_index = #creature_evolution_stages -- start from the last item
         end
-        max_creature_mutation_count = 0
-        for i = 1, #creature_evolution_stages do
-            max_creature_mutation_count = max_creature_mutation_count + i
+        do -- FOR 4 stage creature type, 1 ancestor -> mutates into 10 entities including the ancestor.
+            -- So to have 40 count of entities, 4 ancestors are required...
+            -- So multiples of 10
+            max_creature_mutation_count = 0
+            for i = 1, #creature_evolution_stages do
+                max_creature_mutation_count = max_creature_mutation_count + i
+            end
+            assert(max_creature_mutation_count == 10)
         end
-        assert(max_creature_mutation_count == 10)
     end
 
     function reset_game()
-        game_timer_t = 0.0
+        laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
         game_timer_dt = 0.0
-        player_fire_cooldown_timer = 0
+        game_timer_t = 0.0
+        is_debug_hud_enabled = false --- Toggled by keys event.
         laser_fire_timer = 0
         laser_index = 1 -- circular buffer index
-        is_debug_hud_enabled = false --- Toggled by keys event.
+        player_fire_cooldown_timer = 0
         player_turn_speed = DEFAULT_PLAYER_TURN_SPEED
 
         curr_state.player_rot_angle = 0
@@ -579,6 +592,7 @@ function update_player_entity_projectiles(dt)
                     cs.lasers_is_active[laser_index] = Status.not_active -- deactivate projectile if hits creature
                     screenshake.duration = 0.15 -- got'em!
 
+                    laser_intersect_creature_counter = laser_intersect_creature_counter + 1
                     cs.creatures_is_active[creature_index] = Status.not_active -- deactivate current creature stage if hits creature
                     cs.creatures_health[creature_index] = Health.healing
                 end
@@ -679,25 +693,28 @@ function simulate_creatures_swarm_behavior(dt)
                             y2 = other_creature_y,
                         }
                     end
-                    do
-                        local __is_log_enabled = false
-                        if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
-                            print(dist, creature_swarm_range, creature_index, other_creature_index, count)
-                        end
-                    end
 
                     if creature_index ~= other_creature_index and dist ~= nil and (dist <= creature_swarm_range) then
                         group_center_x = group_center_x + cs.creatures_x[other_creature_index]
                         group_center_y = group_center_y + cs.creatures_y[other_creature_index]
                         count = count + 1
+                        do
+                            local __is_log_enabled = false
+                            if __is_log_enabled and debug.is_trace_entities and love.math.random() < 0.05 then
+                                print(dist, creature_swarm_range, creature_index, other_creature_index, count)
+                            end
+                        end
                     end
-                    local __is_swarm_damped = dist <= creature_swarm_range -- temporary
+                    local __is_swarm_damped = dist >= (2 * creature_swarm_range) -- temporary
                     if count > 0 and __is_swarm_damped then
                         group_center_x = group_center_x / count
                         group_center_y = group_center_y / count
                         local curr_vel_x = cs.creatures_vel_x[creature_index]
                         local curr_vel_y = cs.creatures_vel_y[creature_index]
                         local factor = love.math.random() < 0.5 and dt or creature_group_factor
+                        do -- TEMPORARY OVERIDE
+                            factor = 100
+                        end
 
                         local next_vel_x = curr_vel_x + (group_center_x - creature_y) * factor
                         local next_vel_y = curr_vel_y + (group_center_y - creature_y) * factor
@@ -719,11 +736,6 @@ function simulate_creatures_swarm_behavior(dt)
 end
 
 function spawn_new_creature(new_index, parent_index, new_stage)
-    if count_active_creatures() >= MAX_CREATURES_IN_ARENA then
-        print 'Count of creatures in arena exceeded limit'
-        return
-    end
-
     local cs = curr_state
     local angle1 = love.math.random() * (2 * math.pi)
     local angle2 = (angle1 - math.pi) % (2 * math.pi)
@@ -798,6 +810,10 @@ function update_creatures(dt)
     --     end
     -- end
     if count_active_creatures() == 0 then -- victory
+        assert(
+            EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
+            EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
+        )
         reset_game()
         return
     end
@@ -831,6 +847,7 @@ function draw_hud()
     LG.print(
         table.concat({
             active_counter .. ' remaining',
+            laser_intersect_creature_counter .. ' healed so far',
             string.format('%.4s', game_timer_t),
         }, '\n'),
         1 * pos_x,
