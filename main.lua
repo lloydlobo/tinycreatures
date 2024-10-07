@@ -163,6 +163,7 @@ function fire_player_projectile() --- Fire projectile from players's position.
         cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
         laser_index = (laser_index % config.MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
         laser_fire_timer = config.LASER_FIRE_TIMER_LIMIT            -- Reset timer to default.
+        sound_fire_projectile:play()                                -- Unconventional but works without distraction.
     end
 end
 
@@ -343,9 +344,20 @@ function update_player_entity_projectiles(dt)
                 -- Deactivate projectile if touch creature.
                 cs.lasers_is_active[laser_index] = common.Status.not_active
                 laser_intersect_creature_counter = laser_intersect_creature_counter + 1
+                if curr_stage_id == 1 then
+                    local choices = {
+                        sound_creature_healed_1,
+                        sound_creature_healed_2,
+
+                    }
+                    local choice_index = love.math.random(1, #choices)
+                    choices[choice_index]:play()
+                end
+
                 -- Deactivate current creature stage if touch creature.
                 cs.creatures_is_active[creature_index] = common.Status.not_active
                 cs.creatures_health[creature_index] = common.HealthTransitions.healing
+
                 -- Split the creature into two smaller ones.
                 if curr_stage_id > 1 then
                     local new_stage_id = curr_stage_id - 1 -- note: initial stage is `#creature_evolution_stages`
@@ -759,27 +771,42 @@ end
 --
 
 function love.load()
-    LG.setDefaultFilter('linear', 'linear')                                                                    -- smooth edges
+    LG.setDefaultFilter('linear', 'linear')                                                                           -- smooth edges
 
-    do                                                                                                         -- Music time
+    do                                                                                                                -- Music time
+        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_creature_healed_1:setPitch(1.15)
+        sound_creature_healed_1:setVolume(0.25)
+        sound_creature_healed_1:setRolloff(10000)
+        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_2.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_creature_healed_2:setPitch(1.15)
+        sound_creature_healed_2:setVolume(0.25)
+        sound_creature_healed_2:setRolloff(10000)
+
+
         sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
-        sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static')           -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
         sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static')   -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static')         -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_fire_projectile:setPitch(2.0)
+        sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static')           -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        -- sound_fire_projectile:setRolloff(80)
 
-        sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static')                   --stream and loop background music
-        sound_pickup:setVolume(0.9)                                                                            -- 90% of ordinary volume
-        sound_pickup:setPitch(0.5)                                                                             -- one octave lower
+        sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+
+        sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static')         --stream and loop background music
+        sound_pickup:setVolume(0.9)                                                                  -- 90% of ordinary volume
+        sound_pickup:setPitch(0.5)                                                                   -- one octave lower
         sound_pickup:setVolume(0.7)
-        sound_pickup:play()                                                                                    -- PLAY AT GAME START once
+        sound_pickup:play()                                                                          -- PLAY AT GAME START once
 
         -- Credits:
         --   Lupus Nocte: http://link.epidemicsound.com/LUPUS
         --   YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
         music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') --stream and loop background music
+        music_bgm:setFilter({ type = 'highpass', volume = 1, lowgain = 3 })
         music_bgm:setVolume(0.9)
-        music_bgm:setPitch(1.11)                                                                       -- one octave lower
-        music_bgm:setVolume(0.5)
-        --music_bgm:play()
+        music_bgm:setPitch(1.11) -- one octave lower
+        music_bgm:setVolume(0.7)
 
         -- Master volume
         love.audio.setVolume(0.9) --volume # number # 1.0 is max and 0.0 is off.
