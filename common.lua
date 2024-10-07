@@ -34,15 +34,17 @@ M.CreatureStageColor = {
 }
 --- @enum Color
 M.Color = {
-    background = { 0.8, 0.8, 0.8 },
+    --background = { 0.8, 0.8, 0.8 },
+    background = { 0.9, 0.9, 0.9 },
     creature_healed = { 0.85, 0.85, 0.85 },
     creature_healing = { 0.95, 0.4, 0.6 },
     creature_infected = { 0.75, 0.1, 0.3 },
     creature_infected_rgba = { 0.75, 0.1, 0.3, 0.5 },
     player_entity = { 0.3, 0.3, 0.3 },
-    player_entity_firing_edge_dark = { 0.7, 0.7, 0.7 },
-    player_entity_firing_edge_darker = { 0.6, 0.6, 0.6 },
-    player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
+    player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 },
+    player_entity_firing_edge_darker = { 0.7, 0.7, 0.7 },
+    --player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
+    player_entity_firing_projectile = { 155 / 255, 128 / 255, 190 / 255 }, -- lavender
     text_darker = { 0.4, 0.4, 0.4 },
     text_darkest = { 0.3, 0.3, 0.3 },
     text_debug_hud = { 0.8, 0.7, 0.0 },

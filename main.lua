@@ -809,7 +809,7 @@ function love.load()
         music_bgm:setVolume(0.7)
 
         -- Master volume
-        love.audio.setVolume(0.9) --volume # number # 1.0 is max and 0.0 is off.
+        love.audio.setVolume(config.debug.is_development and 0.5 or 1.0) --volume # number # 1.0 is max and 0.0 is off.
     end
 
     dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
@@ -827,6 +827,7 @@ function love.load()
             .chain(fx.chromasep)
             .chain(fx.scanlines)
             .chain(fx.vignette)
+            .chain(fx.crt)
             .chain(fx.godsray),
     }
     if true then
