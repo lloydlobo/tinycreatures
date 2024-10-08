@@ -366,7 +366,6 @@ function update_player_entity_projectiles(dt)
                     local choices = {
                         sound_creature_healed_1,
                         sound_creature_healed_2,
-
                     }
                     local choice_index = love.math.random(1, #choices)
                     choices[choice_index]:play()
@@ -481,7 +480,7 @@ function update_creatures(dt)
         )
 
         sound_upgrade:play()
-        game_level = game_level + 1
+        game_level = (game_level % config.MAX_GAME_LEVELS) + 1
         reset_game()
         return
     end
@@ -845,9 +844,9 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-    draw_player(alpha)
-    draw_projectiles(alpha)
     draw_creatures(alpha)
+    draw_projectiles(alpha)
+    draw_player(alpha)
 end
 
 --
@@ -863,12 +862,12 @@ function love.load()
     arena_w = gw
 
     do                                                                                                                -- Music time
-        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_creature_healed_1:setPitch(1.15)                                                                        -- tuned close to `music_bgm`'s key
+        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_creature_healed_1:setPitch(1.50)                                                                        -- tuned close to `music_bgm`'s key
         sound_creature_healed_1:setVolume(0.625)
 
-        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_2.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_creature_healed_2:setPitch(1.15)                                                                        -- tuned close to `music_bgm`'s key
+        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_creature_healed_2:setPitch(1.50)                                                                        -- tuned close to `music_bgm`'s key
         sound_creature_healed_2:setVolume(0.625)
 
         sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
@@ -877,9 +876,8 @@ function love.load()
         sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
         sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static')       -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_fire_projectile:setPitch(5.0)
-        sound_fire_projectile:setVolume(4.5)
-        sound_fire_projectile:setRolloff(40)
+        sound_fire_projectile:setPitch(1.15)
+        sound_fire_projectile:setVolume(1)
 
         sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
         sound_fire_combo_hit:setPitch(0.85)
@@ -946,14 +944,18 @@ function love.load()
     --- Public API.
     local graphics_config = {
         bloom_intensity = { enable = true, amount = 1.0 },
-        chromatic_abberation = { enable = true, mode = 'minimal' },
+        chromatic_abberation = { enable = true, mode = 'advanced' },
         curved_monitor = { enable = true, amount = 2.0 },
         lens_dirt = { enable = false },
         scanlines = { enable = true, mode = 'horizontal' },
     }
 
     if graphics_config.chromatic_abberation.enable then
-        local mode_settings = { minimal = { angle = 0, radius = 0 }, advanced = { angle = 90, radius = 5 } }
+        local mode_settings = {
+            default = { angle = 0, radius = 0 },
+            minimal = { angle = 0, radius = 0 },
+            advanced = { angle = 180, radius = 1.5 }
+        }
         local mode = graphics_config.chromatic_abberation.mode
         local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
         shaders.post_processing.chromasep.angle = settings.angle
@@ -961,7 +963,6 @@ function love.load()
     end
 
     if graphics_config.curved_monitor.enable then
-        local amount = graphics_config.curved_monitor.amount
         local mode_settings = {
             default = { distortion_factor = { 1.06, 1.065 }, feather = 0.02, scale_factor = 1 },
             minimal = { distortion_factor = { 1.0, 1.0 }, feather = 0.0, scale_factor = 1 },
@@ -969,6 +970,7 @@ function love.load()
         }
         local minimal = mode_settings.minimal
         local advanced = mode_settings.advanced
+        local amount = graphics_config.curved_monitor.amount
         shaders.post_processing.crt.distortionFactor = {
             lerp(minimal.distortion_factor[1], advanced.distortion_factor[1], amount),
             lerp(minimal.distortion_factor[2], advanced.distortion_factor[2], amount) }
