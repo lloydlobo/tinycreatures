@@ -861,9 +861,9 @@ function love.load()
     arena_h = gh
     arena_w = gw
 
-    do                                                                                                                -- Music time
+    do                                                                                                              -- Music time
         sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_creature_healed_1:setPitch(1.50)                                                                        -- tuned close to `music_bgm`'s key
+        sound_creature_healed_1:setPitch(1.50)                                                                      -- tuned close to `music_bgm`'s key
         sound_creature_healed_1:setVolume(0.625)
 
         sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
@@ -884,11 +884,11 @@ function love.load()
         sound_fire_combo_hit:setVolume(0.9)
 
         sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
-
-        sound_guns_turn_off:setEffect('bandpass')
-
+        sound_player_engine:setPitch(0.5)
+        sound_player_engine:setVolume(0.5)
         sound_player_engine:setFilter({ type = 'lowpass', volume = (3 * 1), highgain = -(3 * .5) })
-        sound_player_engine:setPitch(1.15)
+        sound_player_engine:setEffect('bandpass')
+        sound_player_engine:setVolume(1.5)
 
         sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
@@ -927,13 +927,17 @@ function love.load()
 
     local fx = moonshine.effects
     shaders = { --- @type Shader
-        post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
-            .chain(fx.chromasep)
+        post_processing = moonshine(arena_w, arena_h, fx.chromasep)
             .chain(fx.crt)
             .chain(fx.scanlines)
+            .chain(fx.colorgradesimple)
+            .chain(fx.filmgrain)
             .chain(fx.vignette)
-            .chain(fx.godsray),
+            .chain(fx.boxblur)
+            .chain(fx.godsray)
+        ,
     }
+    shaders.post_processing.boxblur.radius=0.25
 
     --- @class GraphicsConfig
     --- @field bloom_intensity { enable: boolean, amount: number }
@@ -945,16 +949,16 @@ function love.load()
     local graphics_config = {
         bloom_intensity = { enable = true, amount = 1.0 },
         chromatic_abberation = { enable = true, mode = 'advanced' },
-        curved_monitor = { enable = true, amount = 2.0 },
+        curved_monitor = { enable = false, amount = 2.0 },
         lens_dirt = { enable = false },
         scanlines = { enable = true, mode = 'horizontal' },
     }
 
     if graphics_config.chromatic_abberation.enable then
         local mode_settings = {
-            default = { angle = 0, radius = 0 },
-            minimal = { angle = 0, radius = 0 },
-            advanced = { angle = 180, radius = 1.5 }
+            default = { angle = 0, radius = 0.0 },
+            minimal = { angle = 0, radius = 0.5 },
+            advanced = { angle = 180, radius = 1.2 }
         }
         local mode = graphics_config.chromatic_abberation.mode
         local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
@@ -981,11 +985,11 @@ function love.load()
     if true then
         local is_default = false
         shaders.post_processing.godsray.exposure = is_default and 0.25 or 0.05
-        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.95
+        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.90
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
         shaders.post_processing.godsray.weight = is_default and 0.50 or 0.90
         shaders.post_processing.godsray.light_position = is_default and { 0.5, 0.5 } or { 0.125, 0.125 }
-        shaders.post_processing.godsray.samples = is_default and 70 or 8
+        shaders.post_processing.godsray.samples = is_default and 70 or 12
     end
     if true then
         shaders.post_processing.vignette.radius = 0.8 + 0.4

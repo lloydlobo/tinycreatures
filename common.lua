@@ -38,8 +38,8 @@ M.CreatureStageColor = {
 }
 --- @enum Color
 M.Color = {
-    --background = { 0.8, 0.8, 0.8 },
-    background = { 0.9, 0.9, 0.9 },
+    background = { 0.8, 0.8, 0.8 },
+    -- background = { 0.9, 0.9, 0.9 },
     creature_healed = { 0.85, 0.85, 0.85 },
     creature_healing = { 0.95, 0.4, 0.6 },
     creature_infected = { 0.75, 0.1, 0.3 },
