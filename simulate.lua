@@ -38,7 +38,7 @@ function M.simulate_creature_follows_player(dt, creature_index)
 end
 
 --- NOTE: Does not mutate position.
-function M.simulate_creatures_swarm_behavior(dt,total)
+function M.simulate_creatures_swarm_behavior(dt, total)
     local alpha = dt_accum * config.FIXED_DT_INV
 
     local cs = curr_state
@@ -136,12 +136,12 @@ function M.simulate_creatures_swarm_behavior(dt,total)
                                 local is_able_to_fuse = inactive_index ~= nil
                                 if is_able_to_fuse then
                                     if love.math.random() < .5 then -- HACK: TO MAKE IT WORK SOMEHOW
-                                        do                      -- Safely turn the smaller pair off, before spawning the bigger one.
+                                        do                          -- Safely turn the smaller pair off, before spawning the bigger one.
                                             cs.creatures_is_active[creature_index] = common.Status.not_active
                                             cs.creatures_is_active[other_creature_index] = common.Status.not_active
                                         end
                                     end
-                                    spawn_new_fused_creature_pair(inactive_index, creature_index, other_creature_index,
+                                    M.spawn_new_fused_creature_pair(inactive_index, creature_index, other_creature_index,
                                         creature_stage_id - 1
                                     )
                                 end
@@ -154,7 +154,7 @@ function M.simulate_creatures_swarm_behavior(dt,total)
     end
 end
 
-function spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
+function M.spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
     if config.debug.is_test then
         assert(new_stage >= 1)
         assert(new_stage < #creature_evolution_stages)

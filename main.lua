@@ -396,11 +396,13 @@ function update_player_entity_projectiles(dt)
 end
 
 function update_creatures(dt)
-    -- FIXME: HOW TO FIX THIS ANOMALY?
-    local weird_alpha = dt_accum * config.FIXED_DT -- SHOULD BE FIXED_DT_INV
+    if config.IS_CREATURE_SWARM_ENABLED then -- note: better to use a wave shader for ripples
+        simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY)
+    end
 
     local cs = curr_state
-
+    -- FIXME: HOW TO FIX THIS ANOMALY?
+    local weird_alpha = dt_accum * config.FIXED_DT -- SHOULD BE FIXED_DT_INV
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
     for i = 1, TOTAL_CREATURES_CAPACITY do
@@ -731,6 +733,9 @@ end
 function handle_player_input(dt)
     local cs = curr_state
 
+    --
+    -- FIXME: pressing right, up, and space together prevents turning right?
+    --
     if love.keyboard.isDown('right', 'd') then
         cs.player_rot_angle = cs.player_rot_angle + player_turn_speed * dt
     end
@@ -743,6 +748,7 @@ function handle_player_input(dt)
         cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
         cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
     end
+
     local is_reverse_enabled = true
     if is_reverse_enabled then
         local reverse_acceleration_factor = 0.9
@@ -777,7 +783,6 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input(dt)
     update_player_entity(dt)
     update_player_entity_projectiles(dt)
-    simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY)
     update_creatures(dt)
 end
 
@@ -813,16 +818,18 @@ function love.load()
         sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
         sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static')   -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
         sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static')         -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_fire_projectile:setPitch(2.0)
-        sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static')           -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        -- sound_fire_projectile:setRolloff(80)
+        sound_fire_projectile:setPitch(5.0)
+        sound_fire_projectile:setVolume(4.5)
+        sound_fire_projectile:setRolloff(40)
+
+        sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
         sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
         sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static')         --stream and loop background music
         sound_pickup:setVolume(0.9)                                                                  -- 90% of ordinary volume
         sound_pickup:setPitch(0.5)                                                                   -- one octave lower
-        sound_pickup:setVolume(0.7)
+        sound_pickup:setVolume(0.6)
         sound_pickup:play()                                                                          -- PLAY AT GAME START once
 
         -- Credits:
@@ -851,9 +858,9 @@ function love.load()
     shaders = { --- @type Shader
         post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
             .chain(fx.chromasep)
+            .chain(fx.crt)
             .chain(fx.scanlines)
             .chain(fx.vignette)
-            -- .chain(fx.crt)
             .chain(fx.godsray),
     }
     if true then
