@@ -931,11 +931,51 @@ function love.load()
     shaders = { --- @type Shader
         post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
             .chain(fx.chromasep)
-            --.chain(fx.crt)
+            .chain(fx.crt)
             .chain(fx.scanlines)
             .chain(fx.vignette)
             .chain(fx.godsray),
     }
+
+    --- @class GraphicsConfig
+    --- @field bloom_intensity { enable: boolean, amount: number }
+    --- @field chromatic_abberation {enable:boolean, mode: 'advanced'|'minimal'}
+    --- @field curved_monitor {enable:boolean, amount:number}
+    --- @field lens_dirt {enable:boolean}
+    --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
+    --- Public API.
+    local graphics_config = {
+        bloom_intensity = { enable = true, amount = 1.0 },
+        chromatic_abberation = { enable = true, mode = 'minimal' },
+        curved_monitor = { enable = true, amount = 2.0 },
+        lens_dirt = { enable = false },
+        scanlines = { enable = true, mode = 'horizontal' },
+    }
+
+    if graphics_config.chromatic_abberation.enable then
+        local mode_settings = { minimal = { angle = 0, radius = 0 }, advanced = { angle = 90, radius = 5 } }
+        local mode = graphics_config.chromatic_abberation.mode
+        local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
+        shaders.post_processing.chromasep.angle = settings.angle
+        shaders.post_processing.chromasep.radius = settings.radius
+    end
+
+    if graphics_config.curved_monitor.enable then
+        local amount = graphics_config.curved_monitor.amount
+        local mode_settings = {
+            default = { distortion_factor = { 1.06, 1.065 }, feather = 0.02, scale_factor = 1 },
+            minimal = { distortion_factor = { 1.0, 1.0 }, feather = 0.0, scale_factor = 1 },
+            advanced = { distortion_factor = { 0.92, 1.08 }, feather = 0.02, scale_factor = 0.99 },
+        }
+        local minimal = mode_settings.minimal
+        local advanced = mode_settings.advanced
+        shaders.post_processing.crt.distortionFactor = {
+            lerp(minimal.distortion_factor[1], advanced.distortion_factor[1], amount),
+            lerp(minimal.distortion_factor[2], advanced.distortion_factor[2], amount) }
+        shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
+        shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
+    end
+
     if true then
         local is_default = false
         shaders.post_processing.godsray.exposure = is_default and 0.25 or 0.05
@@ -952,6 +992,15 @@ function love.load()
         shaders.post_processing.vignette.color = common.Color.background
     end
     if true then
+        local defaults = { width = 2, phase = 0, thickness = 1, opacity = 1, color = { 0, 0, 0 } }
+        local opts = {
+            width = defaults.width,
+            phase = defaults.phase + config.PI,
+            thickness = defaults.thickness * (0.05 * PHI_INV),
+            opacity = defaults.opacity * PHI_INV,
+            color = { 0, 0, 0 }
+        }
+
         shaders.post_processing.scanlines.opacity = 1 * 0.618
         shaders.post_processing.scanlines.thickness = 1 * 0.5 * 0.0618
         shaders.post_processing.scanlines.width = 2
@@ -1119,10 +1168,6 @@ function love.update(dt)
             sound_atmosphere_tense_atmosphere:play()
         end
     end
-    -- NOTE: love.audio is to be overriden by audio.lua, else this panics.
-    -- love.audio.update()
-    -----fade_start_time = fade_start_time + dt
-    -----if fade_start_time > total_fade_duration then fade_start_time = total_fade_duration end
 
     game_timer_t = game_timer_t + dt
     game_timer_dt = dt -- note: for easy global reference

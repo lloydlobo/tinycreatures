@@ -3,6 +3,7 @@
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
 > A game jam for Ludum Dare 56's Tiny Creatures theme.
+
 ![Screencastfrom2024-10-0800-14-58-ezgif com-optimize(1)](https://github.com/user-attachments/assets/76aeedb2-c0b6-4715-b85f-98b02ecdf580)
 
 In **Tiny Blood Cells**, you take on the role of a healer, tasked with saving small cell-like creatures scattered across different levels.
@@ -127,7 +128,7 @@ Grateful to the following creators for their amazing sound and music contributio
 
 ### Special thanks
 
-- Twitch streamer among other things, Tkap1  for gifting a last minute invite code!!! Also do check out their game!!
+- Twitch streamer among other things, Tkap1 for gifting a last minute invite code!!! Also do check out their game!!
 - This game was based on a starter template ported from an Asteroids tutorial at [berbasoft.com](https://berbasoft.com/simplegametutorials/love/asteroids/).
 
 ## License
