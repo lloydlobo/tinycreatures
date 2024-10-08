@@ -12,16 +12,16 @@ Development
 
 --]]
 
-local moonshine = require 'lib.moonshine'
+local moonshine    = require 'lib.moonshine'
 
-local common    = require 'common'
-local config    = require 'config'
-local simulate  = require 'simulate'
+local common       = require 'common'
+local config       = require 'config'
+local simulate     = require 'simulate'
 
-local LG        = love.graphics
+local LG           = love.graphics
 
-local PHI       = config.PHI
-local lerp      = common.lerp
+local PHI, PHI_INV = config.PHI, config.PHI_INV
+local lerp         = common.lerp
 
 
 local CONSTANT_INITIAL_LARGE_CREATURES = 2 ^ 0 --- THIS IS USED BY `game_level` to mutate `INITIAL_LARGE_CREATURES`
@@ -190,6 +190,10 @@ function dash_player_entity(dt)
 
     update_player_entity(dt) -- remember to update once
 
+    --By default the value is set to 0 which means that air absorption effects
+    --are disabled. A value of 1 will apply high frequency attenuation to the
+    --Source at a rate of 0.05 dB per meter.
+
     cs.player_vel_x = prev_vel_x
     cs.player_vel_y = prev_vel_y
 end
@@ -331,6 +335,7 @@ function update_player_entity_projectiles(dt)
     -- #region Handle laser collisions.
     local laser_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle
+    local temp_hit_counter_this_frame = 0 -- for double hit sfx
     for laser_index = 1, #cs.lasers_x do
         if not (cs.lasers_is_active[laser_index] == common.Status.active) then
             goto continue_not_is_active_laser
@@ -352,6 +357,7 @@ function update_player_entity_projectiles(dt)
                 radius = creature_evolution_stages[curr_stage_id].radius,
             }
             if is_intersect_circles { a = creature_circle, b = laser_circle } then
+                temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
                 screenshake.duration = 0.15 -- got'em!
                 -- Deactivate projectile if touch creature.
                 cs.lasers_is_active[laser_index] = common.Status.not_active
@@ -391,6 +397,19 @@ function update_player_entity_projectiles(dt)
             ::continue_not_is_active_creature::
         end
         ::continue_not_is_active_laser::
+    end
+    if temp_hit_counter_this_frame > 1 then -- Double hit achievement
+        if temp_hit_counter_this_frame == 2 then
+            -- Placeholder for variation in sound
+            if love.math.random() < .5 then
+                sound_fire_combo_hit:play()
+            else
+                sound_fire_combo_hit:play()
+            end
+        else
+            sound_fire_combo_hit:play()
+            sound_fire_combo_hit:play()
+        end
     end
     -- #endregion
 end
@@ -658,6 +677,7 @@ function draw_hud()
         table.concat({
             'Healed ' .. laser_intersect_creature_counter,
             'Level ' .. game_level,
+            string.format('%.4s', game_timer_t),
         }, '\n'),
         1 * pos_x + 32,
         1 * pos_y
@@ -667,7 +687,6 @@ function draw_hud()
             table.concat({
                 'Infected ' .. active_counter,
                 'FPS ' .. fps,
-                string.format('%.5s', game_timer_t),
             }, '\n'),
 
             1 * pos_x,
@@ -730,6 +749,40 @@ function draw_debug_hud()
     LG.setColor(1, 1, 1)
 end
 
+--- @enum EngineMoveKind
+local EngineMoveKind = {
+    idle = 0,
+    forward = 1,
+    backward = 2,
+}
+
+---comment
+---@param dt number # Delta time.
+---@param movekind EngineMoveKind # Accelerating, reversing or idle
+function play_player_engine_sound(dt, movekind)
+    local cs = curr_state
+    sound_player_engine:play()
+    sound_player_engine:setVelocity(cs.player_vel_x, cs.player_vel_y, 1)
+
+    do -- Stop overlapping sound waves by making the consecutive one softer
+        local curr_pos = sound_player_engine:tell("samples")
+        local last_pos = sound_player_engine:getDuration("samples")
+        if movekind == EngineMoveKind.forward then
+            sound_player_engine:setVolume(1.3)
+            sound_player_engine:setAirAbsorption(dt) --- LOL (: warble effect due to using variable dt
+        elseif movekind == EngineMoveKind.backward then
+            sound_player_engine:setVolume(0.8)
+            sound_player_engine:setAirAbsorption(0) --- LOL (: warble effect due to using variable dt
+        elseif curr_pos >= PHI_INV * last_pos and curr_pos <= .99 * last_pos then
+            sound_player_engine:setVolume(movekind == EngineMoveKind.forward and .6 or .7)
+            sound_player_engine:setAirAbsorption(10) --- LOL (: warble effect due to using variable dt
+        elseif curr_pos > .99 * last_pos then
+            sound_player_engine:setVolume(1)
+            sound_player_engine:setAirAbsorption(20) --- LOL (: warble effect due to using variable dt
+        end
+    end
+end
+
 function handle_player_input(dt)
     local cs = curr_state
 
@@ -747,6 +800,7 @@ function handle_player_input(dt)
     if love.keyboard.isDown('up', 'w') then
         cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
         cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * config.PLAYER_ACCELERATION * dt
+        play_player_engine_sound(dt, EngineMoveKind.forward)
     end
 
     local is_reverse_enabled = true
@@ -757,6 +811,7 @@ function handle_player_input(dt)
             cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * reverese_acceleration * dt
             cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * reverese_acceleration * dt
         end
+        play_player_engine_sound(dt, EngineMoveKind.backward)
     end
 
     if love.keyboard.isDown 'space' then
@@ -786,6 +841,9 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     update_creatures(dt)
 end
 
+--- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
+--- monitor, alpha seems to be faster -> which causes the juice frequency to
+--- fluctute super fast
 function draw_game(alpha)
     draw_player(alpha)
     draw_projectiles(alpha)
@@ -806,40 +864,55 @@ function love.load()
 
     do                                                                                                                -- Music time
         sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_creature_healed_1:setPitch(1.15)
-        sound_creature_healed_1:setVolume(0.25)
-        sound_creature_healed_1:setRolloff(10000)
-        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_2.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_creature_healed_2:setPitch(1.15)
-        sound_creature_healed_2:setVolume(0.25)
-        sound_creature_healed_2:setRolloff(10000)
+        sound_creature_healed_1:setPitch(1.15)                                                                        -- tuned close to `music_bgm`'s key
+        sound_creature_healed_1:setVolume(0.625)
 
+        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin2_2.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_creature_healed_2:setPitch(1.15)                                                                        -- tuned close to `music_bgm`'s key
+        sound_creature_healed_2:setVolume(0.625)
 
         sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
-        sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static')   -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static')         -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_guns_turn_off:setEffect('bandpass')
+
+        sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+
+        sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static')       -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
         sound_fire_projectile:setPitch(5.0)
         sound_fire_projectile:setVolume(4.5)
         sound_fire_projectile:setRolloff(40)
+
+        sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_fire_combo_hit:setPitch(0.85)
+        sound_fire_combo_hit:setVolume(0.9)
+
+        sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
+
+        sound_guns_turn_off:setEffect('bandpass')
+
+        sound_player_engine:setFilter({ type = 'lowpass', volume = (3 * 1), highgain = -(3 * .5) })
+        sound_player_engine:setPitch(1.15)
 
         sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
         sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
-        sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static')         --stream and loop background music
-        sound_pickup:setVolume(0.9)                                                                  -- 90% of ordinary volume
-        sound_pickup:setPitch(0.5)                                                                   -- one octave lower
+        sound_atmosphere_tense_atmosphere = love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav',
+            'static')                                                                        -- Credit to DASK: Retro
+
+        sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') --stream and loop background music
+        sound_pickup:setVolume(0.9)                                                          -- 90% of ordinary volume
+        sound_pickup:setPitch(0.5)                                                           -- one octave lower
         sound_pickup:setVolume(0.6)
-        sound_pickup:play()                                                                          -- PLAY AT GAME START once
+        sound_pickup:play()                                                                  -- PLAY AT GAME START once
 
         -- Credits:
         --   Lupus Nocte: http://link.epidemicsound.com/LUPUS
         --   YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
         music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') --stream and loop background music
-        music_bgm:setFilter({ type = 'highpass', volume = 1, lowgain = 3 })
+        music_bgm:setFilter({ type = 'lowpass', volume = 1, highgain = 3 })
         music_bgm:setVolume(0.9)
         music_bgm:setPitch(1.11) -- one octave lower
-        music_bgm:setVolume(0.7)
+        music_bgm:setVolume(0.5)
 
         -- Master volume
         love.audio.setVolume(config.debug.is_development and 0.5 or 1.0) --volume # number # 1.0 is max and 0.0 is off.
@@ -858,7 +931,7 @@ function love.load()
     shaders = { --- @type Shader
         post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
             .chain(fx.chromasep)
-            .chain(fx.crt)
+            --.chain(fx.crt)
             .chain(fx.scanlines)
             .chain(fx.vignette)
             .chain(fx.godsray),
@@ -1040,6 +1113,12 @@ function love.update(dt)
     if not music_bgm:isPlaying() then
         love.audio.play(music_bgm)
     end
+    local is_every_10_second = (math.floor(game_timer_t) % 10) == 0
+    if is_every_10_second then -- each 10+ score
+        if not sound_atmosphere_tense_atmosphere:isPlaying() then
+            sound_atmosphere_tense_atmosphere:play()
+        end
+    end
     -- NOTE: love.audio is to be overriden by audio.lua, else this panics.
     -- love.audio.update()
     -----fade_start_time = fade_start_time + dt
@@ -1101,6 +1180,12 @@ end
 
 function love.keypressed(key, _, _)
     if key == common.ControlKey.escape_key or key == common.ControlKey.force_quit_game then
+        -- FIXME: At force-quit, warning logged to console:
+        --
+        -- warning: queue 0x558a6f8a9550 destroyed while proxies still attached:
+        --   wl_callback@58 still attached
+        --   wl_surface@40 still attached
+        --
         love.event.push 'quit'
     elseif key == common.ControlKey.toggle_hud then
         is_debug_hud_enabled = not is_debug_hud_enabled

@@ -42,3 +42,6 @@ luac.out
 scratch.lua
 lib/moonshine/.init.lua.un~
 work_in_progress
+README_scratch.md
+.vscode/settings.json
+README_scratch_1.md
