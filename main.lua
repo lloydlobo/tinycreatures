@@ -925,19 +925,30 @@ function love.load()
     player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
     creature_swarm_range = player_radius * 4                         -- FIXME: should be evolution_stage.radius specific
 
+    --[[ ORIGINAL PIPELINE
+    local fx = moonshine.effects
+    shaders = { --- @type Shader
+        post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
+            .chain(fx.chromasep)
+            .chain(fx.crt)
+            .chain(fx.scanlines)
+            .chain(fx.vignette)
+            .chain(fx.godsray),
+    }
+        ]]
     local fx = moonshine.effects
     shaders = { --- @type Shader
         post_processing = moonshine(arena_w, arena_h, fx.chromasep)
+            .chain(fx.colorgradesimple)
             .chain(fx.crt)
             .chain(fx.scanlines)
-            .chain(fx.colorgradesimple)
             .chain(fx.filmgrain)
             .chain(fx.vignette)
-            .chain(fx.boxblur)
+            --.chain(fx.boxblur)
             .chain(fx.godsray)
         ,
     }
-    shaders.post_processing.boxblur.radius=0.25
+    --shaders.post_processing.boxblur.radius=0.25
 
     --- @class GraphicsConfig
     --- @field bloom_intensity { enable: boolean, amount: number }
@@ -948,8 +959,8 @@ function love.load()
     --- Public API.
     local graphics_config = {
         bloom_intensity = { enable = true, amount = 1.0 },
-        chromatic_abberation = { enable = true, mode = 'advanced' },
-        curved_monitor = { enable = false, amount = 2.0 },
+        chromatic_abberation = { enable = true, mode = 'minimal' },
+        curved_monitor = { enable = true, amount = 2.0 },
         lens_dirt = { enable = false },
         scanlines = { enable = true, mode = 'horizontal' },
     }
@@ -985,11 +996,11 @@ function love.load()
     if true then
         local is_default = false
         shaders.post_processing.godsray.exposure = is_default and 0.25 or 0.05
-        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.90
+        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.95
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
         shaders.post_processing.godsray.weight = is_default and 0.50 or 0.90
         shaders.post_processing.godsray.light_position = is_default and { 0.5, 0.5 } or { 0.125, 0.125 }
-        shaders.post_processing.godsray.samples = is_default and 70 or 12
+        shaders.post_processing.godsray.samples = is_default and 70 or 8
     end
     if true then
         shaders.post_processing.vignette.radius = 0.8 + 0.4
