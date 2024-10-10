@@ -480,9 +480,7 @@ function update_creatures_this_frame(dt)
         if is_intersect_circles { a = player_circle, b = creature_circle } then
             sound_interference:play()
 
-            -- HACK while prototyping... can slow player down though???
             local is_player_vulnerable = not config.IS_PLAYER_INVULNERABLE and not (cs.player_invulnerability_timer > 0)
-
             if is_player_vulnerable then
                 local stage_damage = 1
                 cs.player_health = cs.player_health - stage_damage
@@ -866,12 +864,30 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     update_creatures_this_frame(dt)
 end
 
+local shield_pos_x = nil
+local shield_pos_y = nil
+
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
     draw_creatures(alpha)
     draw_projectiles(alpha)
+
+    -- TEMPORARY
+    do
+        if shield_pos_x == nil and shield_pos_y == nil then
+            shield_pos_x = love.math.random() * arena_w
+            shield_pos_y = love.math.random() * arena_h
+        end
+
+        LG.setColor { 0.6, 0.6, 0.3, 0.5 }
+        local shield_size = player_radius * PHI_INV
+        LG.circle('fill', shield_pos_x, shield_pos_y, shield_size)
+        LG.setColor { 0.9, 0.9, 0.4 }
+        draw_plus_icon(shield_pos_x, shield_pos_y, shield_size)
+    end
+
     draw_player(alpha)
 end
 
