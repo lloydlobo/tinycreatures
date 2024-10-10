@@ -476,22 +476,26 @@ function update_creatures_this_frame(dt)
         cs.creatures_x[i] = x
         cs.creatures_y[i] = y
 
-        -- Set gameover when player health is 0.
-        if is_intersect_circles { a = player_circle, b = creature_circle } then -- defeat
+        -- Player defeat!
+        if is_intersect_circles { a = player_circle, b = creature_circle } then
             sound_interference:play()
-            screenshake.duration = 0.15
 
             -- HACK while prototyping... can slow player down though???
             local is_player_vulnerable = not config.IS_PLAYER_INVULNERABLE and not (cs.player_invulnerability_timer > 0)
+
             if is_player_vulnerable then
                 local stage_damage = 1
                 cs.player_health = cs.player_health - stage_damage
                 if cs.player_health <= 0 then
+                    screenshake.duration = 0.15 * PHI * PHI -- bye bye
                     reset_game()
                     return
                 else
+                    screenshake.duration = 0.15 * PHI -- just a scratch
                     cs.player_invulnerability_timer = 1 -- 1 second on invulnerability
                 end
+            else
+                screenshake.duration = 0.15 * PHI -- guarder
             end
         end
         ::continue::
@@ -697,14 +701,11 @@ function draw_hud()
     )
     if config.debug.is_development and config.debug.is_trace_hud then
         LG.print(
-            table.concat(
-                {
-                    'player_invulnerability_timer ' .. cs.player_invulnerability_timer,
-                    'count_active_creatures() ' .. count_active_creatures(),
-                    'love.timer.getFPS() ' .. love.timer.getFPS(),
-                },
-                '\n'
-            ),
+            table.concat({
+                'player_invulnerability_timer ' .. cs.player_invulnerability_timer,
+                'count_active_creatures() ' .. count_active_creatures(),
+                'love.timer.getFPS() ' .. love.timer.getFPS(),
+            }, '\n'),
 
             1 * pos_x - (hud_w * 0.5),
             1 * pos_y + hud_h
