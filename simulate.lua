@@ -155,7 +155,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
 end
 
 function M.spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
-    if config.debug.is_test then
+    if config.debug.is_assert then
         assert(new_stage >= 1)
         assert(new_stage < #creature_evolution_stages)
         assert(
