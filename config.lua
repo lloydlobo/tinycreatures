@@ -65,7 +65,7 @@ M = {
 -- Configurations
 --
 
-M.DEFAULT_PLAYER_TURN_SPEED = ({ (30 / 2) / 4 + (M.PLAYER_ACCELERATION / M.FIXED_FPS), (10 * M.PHI_INV), 10 })[speed_mode]
+M.DEFAULT_PLAYER_TURN_SPEED = ({ -3 + (30 / 2) / 4 + (M.PLAYER_ACCELERATION / M.FIXED_FPS), (10 * M.PHI_INV), 10 })[speed_mode]
 M.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = M.PHI_INV
 
 --
