@@ -706,10 +706,19 @@ function draw_projectiles(alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
             end
 
-            if is_plus_sprite then
-                draw_plus_icon(pos_x, pos_y, laser_radius * PHI, 3)
-            else
+            if not config.IS_GRUG_BRAIN then
                 LG.circle('fill', pos_x, pos_y, laser_radius)
+            else
+                if i % 3 == 0 then
+                    LG.circle('fill', pos_x, pos_y, laser_radius)
+                else
+                    local target = laser_radius * (1 + alpha)
+                    local tween = math.sin(alpha) * 0.03 * PHI_INV -- prevent `sin` spikes with 0.03
+                    if config.debug.is_test then
+                        assert(tween >= 0 and tween <= 1)
+                    end
+                    LG.circle('fill', pos_x, pos_y, laser_radius + (target - laser_radius) * tween)
+                end
             end
         end
     end
