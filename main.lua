@@ -642,11 +642,21 @@ function draw_player(alpha)
         player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
         LG.setColor(common.Color.player_entity_firing_edge_darker)
         LG.circle('fill', player_x, player_y, player_radius)
+        if curr_state.player_health == 1 then -- last shield
+            if love.math.random() < 0.1 * alpha then
+                LG.setColor(0.90, 0.4, 0.6, lerp(0.2, 0.4, alpha)) -- creature_healing = { 0.95, 0.4, 0.6 },
+                LG.circle('fill', player_x, player_y, player_radius)
+            end
+        end
     end
 
     -- Draw player inner iris * (iris)
     local player_iris_radius = (player_radius * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
         * (1 + juice_frequency * juice_frequency_damper)
+    local ouch_timer = curr_state.player_invulnerability_timer
+    if ouch_timer > 0 then
+        player_iris_radius = lerp(player_iris_radius, (player_iris_radius * 1.328), ouch_timer * alpha)
+    end
     LG.setColor(common.Color.player_entity)
     LG.circle('fill', player_x, player_y, player_iris_radius)
 
