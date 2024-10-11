@@ -170,38 +170,6 @@ local function is_intersect_circles(ab)
     return (dx * dx + dy * dy <= ab_dist * ab_dist)
 end
 
-function fire_player_projectile() --- Fire projectile from players's position.
-    if laser_fire_timer <= 0 then
-        local cs = curr_state
-        cs.lasers_angle[laser_index] = cs.player_rot_angle
-        cs.lasers_is_active[laser_index] = common.Status.active
-        cs.lasers_time_left[laser_index] = 4
-        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
-        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
-        laser_index = (laser_index % config.MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
-        laser_fire_timer = config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
-        sound_fire_projectile:play() -- Unconventional but works without distraction.
-    end
-end
-
-function dash_player_entity(dt)
-    local dash_multiplier = PHI
-
-    local cs = curr_state
-    local prev_vel_x = cs.player_vel_x
-    local prev_vel_y = cs.player_vel_y
-    cs.player_vel_x = cs.player_vel_x * dash_multiplier
-    cs.player_vel_y = cs.player_vel_y * dash_multiplier
-    update_player_movement_this_frame(dt) -- remember to update once
-
-    --By default the value is set to 0 which means that air absorption effects
-    --are disabled. A value of 1 will apply high frequency attenuation to the
-    --Source at a rate of 0.05 dB per meter.
-
-    cs.player_vel_x = prev_vel_x
-    cs.player_vel_y = prev_vel_y
-end
-
 function find_inactive_creature_index()
     for i = 1, TOTAL_CREATURES_CAPACITY do
         if curr_state.creatures_is_active[i] == common.Status.not_active then
@@ -275,6 +243,77 @@ function spawn_new_creature(new_index, parent_index, new_stage, offset)
     cs.creatures_y[new_index] = cs.creatures_y[new_index] + love.math.random(-offset, offset)
 end
 
+function fire_player_projectile() --- Fire projectile from players's position.
+    if laser_fire_timer <= 0 then
+        local cs = curr_state
+        cs.lasers_angle[laser_index] = cs.player_rot_angle
+        cs.lasers_is_active[laser_index] = common.Status.active
+        cs.lasers_time_left[laser_index] = 4
+        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
+        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
+        laser_index = (laser_index % config.MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
+        laser_fire_timer = config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
+        sound_fire_projectile:play() -- Unconventional but works without distraction.
+    end
+end
+
+function dash_player_entity(dt)
+    local dash_multiplier = PHI
+
+    local cs = curr_state
+    local prev_vel_x = cs.player_vel_x
+    local prev_vel_y = cs.player_vel_y
+    cs.player_vel_x = cs.player_vel_x * dash_multiplier
+    cs.player_vel_y = cs.player_vel_y * dash_multiplier
+    update_player_position_this_frame(dt) -- remember to update once
+
+    --By default the value is set to 0 which means that air absorption effects
+    --are disabled. A value of 1 will apply high frequency attenuation to the
+    --Source at a rate of 0.05 dB per meter.
+
+    cs.player_vel_x = prev_vel_x
+    cs.player_vel_y = prev_vel_y
+end
+
+--- @enum PlayerDamageStatus
+local PlayerDamageStatus = {
+    DEAD = 'dead',
+    DAMAGED = 'damaged',
+    INVULNERABLE = 'invulnerable',
+}
+
+--- Dispatcher for `PlayerDamageStatus`.
+--- @type table<PlayerDamageStatus, function>
+local player_damage_status_actions = {
+    [PlayerDamageStatus.DEAD] = function()
+        screenshake.duration = 0.15 * PHI * PHI
+        sound_interference:play()
+        reset_game()
+    end,
+    [PlayerDamageStatus.DAMAGED] = function()
+        screenshake.duration = 0.15 * PHI
+        sound_interference:play()
+    end,
+    [PlayerDamageStatus.INVULNERABLE] = function() end, -- no-op
+}
+
+--- Mutates `player_invulnerability_timer`. Returns player damage state.
+--- @param damage integer? # Defaults to `1`.
+--- @return PlayerDamageStatus
+--- @nodiscard
+local function damage_player_fetch_status(damage)
+    local cs = curr_state
+    if config.IS_PLAYER_INVULNERABLE or cs.player_invulnerability_timer > 0 then
+        return PlayerDamageStatus.INVULNERABLE
+    end
+    cs.player_health = cs.player_health - (damage or 1)
+    if cs.player_health <= 0 then
+        return PlayerDamageStatus.DEAD
+    end
+    cs.player_invulnerability_timer = 1
+    return PlayerDamageStatus.DAMAGED
+end
+
 --
 --
 -- Update Handlers
@@ -307,7 +346,7 @@ function update_player_vulnerability_timer_this_frame(dt)
 end
 
 -- Use dt for position updates, because movement is time-dependent
-function update_player_movement_this_frame(dt)
+function update_player_position_this_frame(dt)
     local cs = curr_state
     cs.player_vel_x = cs.player_vel_x * config.AIR_RESISTANCE
     cs.player_vel_y = cs.player_vel_y * config.AIR_RESISTANCE
@@ -394,7 +433,7 @@ function update_player_entity_projectiles_this_frame(dt)
                 if curr_stage_id > 1 then
                     local new_stage_id = curr_stage_id - 1 -- note: initial stage is `#creature_evolution_stages`
                     cs.creatures_evolution_stage[creature_index] = new_stage_id
-                    for i = 1, 2 do
+                    for _ = 1, 2 do
                         local new_creature_index = find_inactive_creature_index()
                         if new_creature_index then
                             spawn_new_creature(new_creature_index, creature_index, new_stage_id)
@@ -433,11 +472,9 @@ function update_creatures_this_frame(dt)
         simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY)
     end
 
+    local weird_alpha = dt_accum * config.FIXED_DT -- FIXME: HOW TO FIX THIS ANOMALY? (SHOULD BE `FIXED_DT_INV`)
+
     local cs = curr_state
-
-    -- FIXME: HOW TO FIX THIS ANOMALY?
-    local weird_alpha = dt_accum * config.FIXED_DT -- SHOULD BE FIXED_DT_INV
-
     local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
     for i = 1, TOTAL_CREATURES_CAPACITY do
@@ -471,45 +508,29 @@ function update_creatures_this_frame(dt)
         local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], weird_alpha)
         local x = (cs.creatures_x[i] + math.cos(angle) * speed_x * dt) % arena_w --- @type number
         local y = (cs.creatures_y[i] + math.sin(angle) * speed_y * dt) % arena_h --- @type number
-        creature_circle = { x = x, y = y, radius = stage.radius }
-
         cs.creatures_x[i] = x
         cs.creatures_y[i] = y
 
-        -- Player defeat!
+        -- Player collision with creature.
+        creature_circle = { x = x, y = y, radius = stage.radius }
         if is_intersect_circles { a = player_circle, b = creature_circle } then
-            sound_interference:play()
-
-            local is_player_vulnerable = not config.IS_PLAYER_INVULNERABLE and not (cs.player_invulnerability_timer > 0)
-            if is_player_vulnerable then
-                local stage_damage = 1
-                cs.player_health = cs.player_health - stage_damage
-                if cs.player_health <= 0 then
-                    screenshake.duration = 0.15 * PHI * PHI -- bye bye
-                    reset_game()
-                    return
-                else
-                    screenshake.duration = 0.15 * PHI -- just a scratch
-                    cs.player_invulnerability_timer = 1 -- 1 second on invulnerability
-                end
-            else
-                screenshake.duration = 0.15 * PHI -- guarder
-            end
+            player_damage_status_actions[damage_player_fetch_status()]()
         end
+
         ::continue::
     end
 
-    -- PLAYER WON
-    if count_active_creatures() == 0 then -- victory
-        pcall(
-            assert,
-            EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter,
-            EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter
-        )
+    -- Player won!
+    if count_active_creatures() == 0 then
+        if config.debug.is_assert then
+            local cond = (EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter)
+            pcall(assert, cond, EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter)
+        end
 
         sound_upgrade:play()
         game_level = (game_level % config.MAX_GAME_LEVELS) + 1
         reset_game()
+
         return
     end
 end
@@ -572,6 +593,27 @@ function draw_player(alpha)
 
     LG.setColor(common.Color.player_entity_firing_edge_dark)
     LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
+end
+
+function draw_player_health_bar(alpha)
+    local cs = curr_state
+    local health_percentage = (cs.player_health / config.MAX_PLAYER_HEALTH)
+    if config.debug.is_assert then
+        assert(health_percentage >= 0.0 and health_percentage <= 1.0)
+    end
+    local bar_width = 2 ^ 8 -- Example width
+    local bar_height = 2 ^ 3 -- Example height
+    local bar_x = (arena_w * 0.5) - (bar_width * 0.5) -- X position on screen
+    local bar_y = bar_height * 2 * PHI -- Y position on screen
+
+    LG.setColor(common.Color.creature_healing) -- red
+    LG.rectangle('fill', bar_x, bar_y, bar_width, bar_height) -- missing health
+
+    local interpolated_health = lerp((prev_state.player_health / config.MAX_PLAYER_HEALTH), health_percentage, alpha)
+    LG.setColor(common.Color.creature_healed) -- white
+    LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health), bar_height) -- current health
+
+    LG.setColor(1, 1, 1) -- reset color to default
 end
 
 function draw_projectiles(alpha)
@@ -774,7 +816,7 @@ local EngineMoveKind = {
 
 ---comment
 ---@param dt number # Delta time.
----@param movekind EngineMoveKind # Accelerating, reversing or idle
+---@param movekind EngineMoveKind
 function play_player_engine_sound(dt, movekind)
     local cs = curr_state
     sound_player_engine:play()
@@ -802,9 +844,6 @@ end
 function handle_player_input_this_frame(dt)
     local cs = curr_state
 
-    --
-    -- FIXME: pressing right, up, and space together prevents turning right?
-    --
     if love.keyboard.isDown('right', 'd') then
         cs.player_rot_angle = cs.player_rot_angle + player_turn_speed * dt
     end
@@ -852,14 +891,14 @@ end
 
 ---
 ---
---- The Game Loop
+--- The Game Update & Draw Loops
 ---
 ---
 
 function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input_this_frame(dt)
     update_player_vulnerability_timer_this_frame(dt)
-    update_player_movement_this_frame(dt)
+    update_player_position_this_frame(dt)
     update_player_entity_projectiles_this_frame(dt)
     update_creatures_this_frame(dt)
 end
@@ -872,10 +911,9 @@ local shield_pos_y = nil
 --- fluctute super fast
 function draw_game(alpha)
     draw_creatures(alpha)
+    draw_player_health_bar(alpha)
     draw_projectiles(alpha)
-
-    -- TEMPORARY
-    do
+    do -- TEMPORARY
         if shield_pos_x == nil and shield_pos_y == nil then
             shield_pos_x = love.math.random() * arena_w
             shield_pos_y = love.math.random() * arena_h
@@ -887,7 +925,6 @@ function draw_game(alpha)
         LG.setColor { 0.9, 0.9, 0.4 }
         draw_plus_icon(shield_pos_x, shield_pos_y, shield_size)
     end
-
     draw_player(alpha)
 end
 
@@ -1159,7 +1196,7 @@ function love.load()
 
         is_debug_hud_enabled = false --- Toggled by keys event.
         laser_fire_timer = 0
-        laser_index = 1 -- circular buffer index
+        laser_index = 1 -- circular buffer index (duplicated below!)
         laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
         player_fire_cooldown_timer = 0
         player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED
@@ -1173,7 +1210,7 @@ function love.load()
         curr_state.player_y = arena_h * 0.5
 
         prev_state.player_invulnerability_timer = 0
-        prev_state.player_health = nil
+        prev_state.player_health = nil --- NOTE: What should this be?
         prev_state.player_rot_angle = 0
         prev_state.player_vel_x = 0
         prev_state.player_vel_y = 0
@@ -1187,7 +1224,7 @@ function love.load()
             curr_state.lasers_x[i] = 0
             curr_state.lasers_y[i] = 0
         end
-        laser_index = 1 -- reset circular buffer index
+        laser_index = 1 -- reset circular buffer index (duplicated! Look above)
 
         -- Test me:
         -- curr_state.creatures_x = { 100, arena_w - 100, arena_w / 2 }
