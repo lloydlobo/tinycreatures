@@ -14,6 +14,7 @@ Development
 
 local moonshine = require 'lib.moonshine'
 
+local Timer = require 'timer' --- @type Timer
 local common = require 'common'
 local config = require 'config'
 local simulate = require 'simulate'
@@ -32,6 +33,20 @@ do
     EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
     ---@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
     TOTAL_CREATURES_CAPACITY = 2 * (INITIAL_LARGE_CREATURES ^ 2)
+end
+
+function test_timer_basic_usage()
+    local isInvincible = true -- grant the player 5 seconds of invulnerability
+    Timer.after(5, function()
+        print('isInvincible', isInvincible)
+        isInvincible = false
+        print('isInvincible', isInvincible)
+    end)
+
+    Timer.after(1, function(func) -- print "foo" every second
+        print 'foo'
+        Timer.after(1, func) -- reschedule the timer to run after a second
+    end)
 end
 
 --
@@ -345,6 +360,36 @@ function update_player_vulnerability_timer_this_frame(dt)
     end
 end
 
+-- TODO: update trails, in update_player_position_this_frame
+-- TODO: Add a `laser_fire_timer` and `LASER_FIRE_TIMER_LIMIT` like constraints for this trail
+
+local MAX_PLAYER_TRAIL_COUNT = 2 ^ 5 - 12
+local is_big_blob = false
+local PLAYER_TRAIL_THICKNESS = math.floor(32 * PHI_INV) -- HACK: 32 is player_radius global var in love.load
+if is_big_blob then
+    PLAYER_TRAIL_THICKNESS = PLAYER_TRAIL_THICKNESS * config.PI
+end
+
+player_trails_x = {} --- @type number[]
+player_trails_y = {} --- @type number[]
+player_trails_vel_x = {} --- @type number[]
+player_trails_vel_y = {} --- @type number[]
+player_trails_rot_angle = {} --- @type number[]
+player_trails_is_active = {} --- @type Status[]
+player_trails_time_left = {} --- @type number[]
+player_trails_index = 1 --- @type integer # 1..`MAX_PLAYER_TRAIL_COUNT`
+do -- remember to initialize me
+    for i = 1, MAX_PLAYER_TRAIL_COUNT do
+        player_trails_x[i] = 0
+        player_trails_y[i] = 0
+        player_trails_vel_x[i] = 0
+        player_trails_vel_y[i] = 0
+        player_trails_rot_angle[i] = 0
+        player_trails_is_active[i] = common.Status.not_active
+        player_trails_time_left[i] = 0
+    end
+end
+
 -- Use dt for position updates, because movement is time-dependent
 function update_player_position_this_frame(dt)
     local cs = curr_state
@@ -352,6 +397,29 @@ function update_player_position_this_frame(dt)
     cs.player_vel_y = cs.player_vel_y * config.AIR_RESISTANCE
     cs.player_x = (cs.player_x + cs.player_vel_x * dt) % arena_w
     cs.player_y = (cs.player_y + cs.player_vel_y * dt) % arena_h
+    do
+        player_trails_x[player_trails_index] = cs.player_x
+        player_trails_y[player_trails_index] = cs.player_y
+        player_trails_vel_x[player_trails_index] = cs.player_vel_x
+        player_trails_vel_y[player_trails_index] = cs.player_vel_y
+        player_trails_rot_angle[player_trails_index] = cs.player_rot_angle
+        player_trails_index = (player_trails_index % MAX_PLAYER_TRAIL_COUNT) + 1
+        local is_temporary_print_trail_stats = false
+        if is_temporary_print_trail_stats then
+            for i = 1, MAX_PLAYER_TRAIL_COUNT do
+                print(
+                    'happy trails to yous',
+                    player_trails_x[i],
+                    player_trails_y[i],
+                    player_trails_vel_x[i],
+                    player_trails_vel_y[i],
+                    player_trails_rot_angle[i],
+                    player_trails_is_active[i],
+                    player_trails_time_left[i]
+                )
+            end
+        end
+    end
 end
 
 function update_player_entity_projectiles_this_frame(dt)
@@ -541,6 +609,22 @@ end
 --
 --
 
+function draw_player_trail(alpha)
+    LG.setColor(common.Color.player_entity)
+    LG.setColor(common.Color.player_entity_firing_projectile) --- this looks really greay with the eye iris player look.. maybe give the player some buttercup like eyes??
+    local freq = 440 -- Hz
+    local amplitude = 1
+    for i = MAX_PLAYER_TRAIL_COUNT, 1, -1 do -- iter in reverse
+        LG.circle(
+            'fill',
+            player_trails_x[i],
+            player_trails_y[i],
+            lerp(PLAYER_TRAIL_THICKNESS, PLAYER_TRAIL_THICKNESS + (amplitude * math.sin(freq * i)), alpha)
+            -- lerp(PLAYER_TRAIL_THICKNESS , PLAYER_TRAIL_THICKNESS * (1 + 1 / i), alpha)
+        )
+    end
+end
+
 function draw_player(alpha)
     local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
@@ -654,6 +738,7 @@ function draw_creatures(alpha)
                     local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
                     local segment_distortion_amplitude = 2
                     local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
+
                     -- FIXME: swarm range ─ should be evolution_stage.radius specific
                     local distorting_radius = lerp(creature_radius - 1, creature_radius + 1 + segment_distortion, alpha)
                     LG.circle('line', curr_x, curr_y, distorting_radius, segments)
@@ -667,16 +752,15 @@ function draw_creatures(alpha)
         else
             local curr_x = curr_state.creatures_x[i]
             local curr_y = curr_state.creatures_y[i]
+
+            -- Automatically disappear when the `find_inactive_creature_index`
+            -- looks them up and then `spawn_new_creature` mutates them.
             local is_not_moving = prev_state.creatures_x[i] ~= curr_x and prev_state.creatures_y[i] ~= curr_y
             local corner_offset = player_radius + evolution_stage.radius
-            local is_away_from_corner = (
-                curr_x >= 0 + corner_offset
+            local is_away_from_corner = curr_x >= 0 + corner_offset
                 and curr_x <= arena_w - corner_offset
                 and curr_y >= 0 + corner_offset
                 and curr_y <= arena_h - corner_offset
-            )
-            -- Automatically disappear when the `find_inactive_creature_index`
-            -- looks them up and then `spawn_new_creature` mutates them.
             if is_away_from_corner or is_not_moving then
                 local health = curr_state.creatures_health[i]
                 local is_healing = curr_state.creatures_is_active[i] == common.Status.not_active
@@ -731,9 +815,8 @@ function draw_hud()
     LG.setColor(common.Color.text_darkest)
     LG.print(
         table.concat({
-            'Health ' .. cs.player_health,
-            'Healed ' .. laser_intersect_creature_counter,
             'Level ' .. game_level,
+            'Healed ' .. laser_intersect_creature_counter,
             string.format('%.4s', game_timer_t),
         }, '\n'),
         1 * pos_x + 32,
@@ -746,7 +829,6 @@ function draw_hud()
                 'count_active_creatures() ' .. count_active_creatures(),
                 'love.timer.getFPS() ' .. love.timer.getFPS(),
             }, '\n'),
-
             1 * pos_x - (hud_w * 0.5),
             1 * pos_y + hud_h
         )
@@ -807,6 +889,12 @@ function draw_debug_hud()
     LG.setColor(1, 1, 1)
 end
 
+--
+--
+-- Uncategorized
+--
+--
+
 --- @enum EngineMoveKind
 local EngineMoveKind = {
     idle = 0,
@@ -814,9 +902,8 @@ local EngineMoveKind = {
     backward = 2,
 }
 
----comment
----@param dt number # Delta time.
----@param movekind EngineMoveKind
+--- @param dt number # Delta time.
+--- @param movekind EngineMoveKind
 function play_player_engine_sound(dt, movekind)
     local cs = curr_state
     sound_player_engine:play()
@@ -918,13 +1005,13 @@ function draw_game(alpha)
             shield_pos_x = love.math.random() * arena_w
             shield_pos_y = love.math.random() * arena_h
         end
-
         LG.setColor { 0.6, 0.6, 0.3, 0.5 }
         local shield_size = player_radius * PHI_INV
         LG.circle('fill', shield_pos_x, shield_pos_y, shield_size)
         LG.setColor { 0.9, 0.9, 0.4 }
         draw_plus_icon(shield_pos_x, shield_pos_y, shield_size)
     end
+    draw_player_trail(alpha)
     draw_player(alpha)
 end
 
@@ -1016,31 +1103,47 @@ function love.load()
         ]]
     local fx = moonshine.effects
     shaders = { --- @type Shader
-        post_processing = moonshine(arena_w, arena_h, fx.chromasep)
-            .chain(fx.colorgradesimple)
+        --- PIPELINE: MORE GRIT
+        -- post_processing = moonshine(arena_w, arena_h, fx.chromasep)
+        --     .chain(fx.colorgradesimple)
+        --     .chain(fx.crt)
+        --     .chain(fx.scanlines)
+        --     .chain(fx.filmgrain)
+        --     .chain(fx.vignette)
+        --     --.chain(fx.boxblur)
+        --     .chain(fx.godsray),
+
+        --- PIPELINE: CUTE
+        post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
+            .chain(fx.chromasep)
             .chain(fx.crt)
             .chain(fx.scanlines)
-            .chain(fx.filmgrain)
             .chain(fx.vignette)
-            --.chain(fx.boxblur)
+            -- .chain(fx.glow)
             .chain(fx.godsray),
     }
     --shaders.post_processing.boxblur.radius=0.25
 
+    --- Public API shader graphics config.
     --- @class GraphicsConfig
     --- @field bloom_intensity { enable: boolean, amount: number }
-    --- @field chromatic_abberation {enable:boolean, mode: 'advanced'|'minimal'}
+    --- @field chromatic_abberation {enable:boolean, mode: 'minimal'|'default'|'advanced'}
     --- @field curved_monitor {enable:boolean, amount:number}
     --- @field lens_dirt {enable:boolean}
     --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
-    --- Public API.
     local graphics_config = {
-        bloom_intensity = { enable = true, amount = 1.0 },
-        chromatic_abberation = { enable = true, mode = 'minimal' },
-        curved_monitor = { enable = true, amount = 2.0 },
+        bloom_intensity = { enable = false, amount = 1 }, --- For `fx.glow`.
+        chromatic_abberation = { enable = true, mode = 'default' },
+        curved_monitor = { enable = true, amount = PHI },
         lens_dirt = { enable = false },
         scanlines = { enable = true, mode = 'horizontal' },
     }
+    if graphics_config.bloom_intensity.enable then
+        local amount = graphics_config.bloom_intensity.amount
+        local defaults = { min_luma = 0.7, strength = 5 }
+        shaders.post_processing.glow.min_luma = defaults.min_luma * amount * 1000
+        shaders.post_processing.glow.strength = defaults.strength * amount * -100
+    end
 
     if graphics_config.chromatic_abberation.enable then
         local mode_settings = {
@@ -1262,10 +1365,15 @@ function love.load()
 
     reset_game()
 
+    -- if config.debug.is_test then
+    --     test_timer_basic_usage()
+    -- end
+
     LG.setBackgroundColor(common.Color.background)
 end
 
 function love.update(dt)
+    -- #1 Handle music and sound logic.
     if not music_bgm:isPlaying() then
         love.audio.play(music_bgm)
     end
@@ -1276,18 +1384,23 @@ function love.update(dt)
         end
     end
 
+    -- #2 Update game timer.
     game_timer_t = game_timer_t + dt
     game_timer_dt = dt -- note: for easy global reference
 
-    --#region Frame Rate Independence.
-    dt_accum = dt_accum + dt
-    while dt_accum >= config.FIXED_DT do
-        sync_prev_state()
-        update_game(config.FIXED_DT)
-        dt_accum = dt_accum - config.FIXED_DT
-    end
-    --#endregion
+    -- #3 Update all timers based on real dt.
+    Timer.update(dt) -- call this every frame to update timers
 
+    -- #4 Frame Rate Independence: Fixed timestep loop.
+    local fixed_dt = config.FIXED_DT
+    dt_accum = dt_accum + dt
+    while dt_accum >= fixed_dt do
+        sync_prev_state()
+        update_game(fixed_dt)
+        dt_accum = dt_accum - fixed_dt
+    end
+
+    -- #5 Update any other frame-based effects (e.g., screen shake).
     update_screenshake(dt)
 end
 
