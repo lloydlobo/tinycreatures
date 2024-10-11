@@ -305,6 +305,9 @@ local PlayerDamageStatus = {
     INVULNERABLE = 'invulnerable',
 }
 
+--- TODO: Add screen transition using a Timer.
+--- TODO: Fade to black and then back to player if reset_game
+---
 --- Dispatcher for `PlayerDamageStatus`.
 --- @type table<PlayerDamageStatus, function>
 local player_damage_status_actions = {
@@ -1207,7 +1210,7 @@ function love.load()
         shaders.post_processing.vignette.opacity = 0.5 + 0.1
         shaders.post_processing.vignette.color = common.Color.background
     end
-    if true then
+    if graphics_config.scanlines.enable then
         local defaults = { width = 2, phase = 0, thickness = 1, opacity = 1, color = { 0, 0, 0 } }
         local opts = {
             width = defaults.width,
