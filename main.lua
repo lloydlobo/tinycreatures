@@ -317,7 +317,10 @@ local player_damage_status_actions = {
         screenshake.duration = 0.15 * PHI
         sound_interference:play()
     end,
-    [PlayerDamageStatus.INVULNERABLE] = function() end, -- no-op
+    [PlayerDamageStatus.INVULNERABLE] = function()
+        screenshake.duration = 0.45
+        sound_player_engine:play() -- indicate player to move while they still can ^_^
+    end, -- no-op
 }
 
 --- Mutates `player_invulnerability_timer`. Returns player damage state.
@@ -1053,11 +1056,12 @@ function love.load()
         sound_fire_combo_hit:setVolume(0.9)
 
         sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
-        sound_player_engine:setPitch(0.5)
+        sound_player_engine:setPitch(0.6)
         sound_player_engine:setVolume(0.5)
-        sound_player_engine:setFilter { type = 'lowpass', volume = (3 * 1), highgain = -(3 * 0.5) }
-        sound_player_engine:setEffect 'bandpass'
-        sound_player_engine:setVolume(1.5)
+        -- sound_player_engine:setFilter { type = 'lowpass', volume = (3 * 1), highgain = -(3 * 0.5) }
+        sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
+        -- sound_player_engine:setEffect 'bandpass'
+        sound_player_engine:setVolume(1)
 
         sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
 
