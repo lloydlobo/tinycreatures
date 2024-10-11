@@ -49,6 +49,14 @@ function test_timer_basic_usage()
     end)
 end
 
+-- TODO:  REFACTOR ME TO CONFIG.LUA
+local MAX_PLAYER_TRAIL_COUNT = 2 ^ 5 - 12
+local is_big_blob = false
+local PLAYER_TRAIL_THICKNESS = math.floor(32 * PHI_INV) -- HACK: 32 is player_radius global var in love.load
+if is_big_blob then
+    PLAYER_TRAIL_THICKNESS = PLAYER_TRAIL_THICKNESS * config.PI
+end
+
 --
 --
 -- Types & Definitions
@@ -363,33 +371,6 @@ end
 -- TODO: update trails, in update_player_position_this_frame
 -- TODO: Add a `laser_fire_timer` and `LASER_FIRE_TIMER_LIMIT` like constraints for this trail
 
-local MAX_PLAYER_TRAIL_COUNT = 2 ^ 5 - 12
-local is_big_blob = false
-local PLAYER_TRAIL_THICKNESS = math.floor(32 * PHI_INV) -- HACK: 32 is player_radius global var in love.load
-if is_big_blob then
-    PLAYER_TRAIL_THICKNESS = PLAYER_TRAIL_THICKNESS * config.PI
-end
-
-player_trails_x = {} --- @type number[]
-player_trails_y = {} --- @type number[]
-player_trails_vel_x = {} --- @type number[]
-player_trails_vel_y = {} --- @type number[]
-player_trails_rot_angle = {} --- @type number[]
-player_trails_is_active = {} --- @type Status[]
-player_trails_time_left = {} --- @type number[]
-player_trails_index = 1 --- @type integer # 1..`MAX_PLAYER_TRAIL_COUNT`
-do -- remember to initialize me
-    for i = 1, MAX_PLAYER_TRAIL_COUNT do
-        player_trails_x[i] = 0
-        player_trails_y[i] = 0
-        player_trails_vel_x[i] = 0
-        player_trails_vel_y[i] = 0
-        player_trails_rot_angle[i] = 0
-        player_trails_is_active[i] = common.Status.not_active
-        player_trails_time_left[i] = 0
-    end
-end
-
 -- Use dt for position updates, because movement is time-dependent
 function update_player_position_this_frame(dt)
     local cs = curr_state
@@ -653,9 +634,9 @@ function draw_player(alpha)
     -- Draw player inner iris * (iris)
     local player_iris_radius = (player_radius * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
         * (1 + juice_frequency * juice_frequency_damper)
-    local ouch_timer = curr_state.player_invulnerability_timer
-    if ouch_timer > 0 then
-        player_iris_radius = lerp(player_iris_radius, (player_iris_radius * 1.328), ouch_timer * alpha)
+    if curr_state.player_invulnerability_timer > 0 then -- eye winces and widens
+        player_iris_radius =
+            lerp(player_iris_radius, (player_iris_radius * 1.328), curr_state.player_invulnerability_timer * alpha)
     end
     LG.setColor(common.Color.player_entity)
     LG.circle('fill', player_x, player_y, player_iris_radius)
@@ -681,8 +662,11 @@ function draw_player(alpha)
         end
         inertia_x = curr_state.player_vel_x * config.AIR_RESISTANCE
         inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
-        player_edge_x = player_edge_x - (0.328 * player_firing_edge_max_radius) * (inertia_x * game_timer_dt)
-        player_edge_y = player_edge_y - (0.328 * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
+        local amplitude_factor = 0.4
+        player_edge_x = player_edge_x
+            - (0.328 * amplitude_factor * player_firing_edge_max_radius) * (inertia_x * game_timer_dt)
+        player_edge_y = player_edge_y
+            - (0.328 * amplitude_factor * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
     end
 
     LG.setColor(common.Color.player_entity_firing_edge_dark)
@@ -1263,6 +1247,15 @@ function love.load()
         player_y = 0,
     }
 
+    player_trails_x = {} --- @type number[]
+    player_trails_y = {} --- @type number[]
+    player_trails_vel_x = {} --- @type number[]
+    player_trails_vel_y = {} --- @type number[]
+    player_trails_rot_angle = {} --- @type number[]
+    player_trails_is_active = {} --- @type Status[]
+    player_trails_time_left = {} --- @type number[]
+    player_trails_index = 1 --- @type integer # 1..`MAX_PLAYER_TRAIL_COUNT`
+
     screenshake = { --- @type ScreenShake
         amount = 5 * 0.5 * config.PHI_INV,
         duration = 0.0,
@@ -1329,6 +1322,16 @@ function love.load()
         prev_state.player_vel_y = 0
         prev_state.player_x = arena_w * 0.5
         prev_state.player_y = arena_h * 0.5
+
+        for i = 1, MAX_PLAYER_TRAIL_COUNT do
+            player_trails_x[i] = 0
+            player_trails_y[i] = 0
+            player_trails_vel_x[i] = 0
+            player_trails_vel_y[i] = 0
+            player_trails_rot_angle[i] = 0
+            player_trails_is_active[i] = common.Status.not_active
+            player_trails_time_left[i] = 0
+        end
 
         for i = 1, config.MAX_LASER_CAPACITY do
             curr_state.lasers_angle[i] = 0
