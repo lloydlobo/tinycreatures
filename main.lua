@@ -1124,10 +1124,11 @@ function love.load()
         post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple)
             .chain(fx.chromasep)
             .chain(fx.crt)
-            .chain(fx.scanlines)
-            .chain(fx.vignette)
+            -- .chain(fx.scanlines)
+            .chain(fx.godsray)
+            .chain(fx.filmgrain)
+            .chain(fx.vignette),
             -- .chain(fx.glow)
-            .chain(fx.godsray),
     }
     --shaders.post_processing.boxblur.radius=0.25
 
@@ -1137,13 +1138,15 @@ function love.load()
     --- @field chromatic_abberation {enable:boolean, mode: 'minimal'|'default'|'advanced'}
     --- @field curved_monitor {enable:boolean, amount:number}
     --- @field lens_dirt {enable:boolean}
+    --- @field filmgrain {enable:boolean}
     --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
     local graphics_config = {
         bloom_intensity = { enable = false, amount = 1 }, --- For `fx.glow`.
-        chromatic_abberation = { enable = true, mode = 'default' },
+        chromatic_abberation = { enable = true, mode = 'minimal' },
         curved_monitor = { enable = true, amount = PHI },
-        lens_dirt = { enable = false },
-        scanlines = { enable = true, mode = 'horizontal' },
+        lens_dirt = { enable = false }, --- unimplemented
+        filmgrain = { enable = true },
+        scanlines = { enable = false, mode = 'horizontal' },
     }
     if graphics_config.bloom_intensity.enable then
         local amount = graphics_config.bloom_intensity.amount
@@ -1179,6 +1182,14 @@ function love.load()
         }
         shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
         shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
+    end
+
+    if graphics_config.filmgrain.enable then
+        local defaults = { opacity = 0.3, size = 1 }
+        defaults.opacity = 0.5
+        defaults.size = 1
+        shaders.post_processing.filmgrain.opacity = defaults.opacity
+        shaders.post_processing.filmgrain.size = defaults.size
     end
 
     if true then
