@@ -4,7 +4,7 @@ You play as the Observer in this `asteroidlike` top down shooter, but wait you a
 
 > A game jam for Ludum Dare 56's Tiny Creatures theme.
 
-![Screencastfrom2024-10-0800-14-58-ezgif com-optimize(1)](https://github.com/user-attachments/assets/76aeedb2-c0b6-4715-b85f-98b02ecdf580)
+![tinycreatures_20241011](static/screenshots/tinycreatures_20241011.gif)
 
 In **Tiny Blood Cells**, you take on the role of a healer, tasked with saving small cell-like creatures scattered across different levels.
 Beware, though, as the creatures are infected and can damage you if you're not careful.
@@ -114,6 +114,7 @@ find -name '*.lua' | entr -crs 'date; love .; echo exit status $?'
 
 Grateful to the following creators for their amazing sound and music contributions:
 
+```text
 | Sound/Music                             | Source                                            | Credit                                                                                                                                   |
 | --------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | **statistics_pickup_coin2_1.wav**       | resources/audio/sfx/statistics_pickup_coin2_1.wav | DASK: Retro sounds [itch.io link](https://dagurasusk.itch.io/retrosounds)                                                                |
@@ -125,6 +126,7 @@ Grateful to the following creators for their amazing sound and music contributio
 | **menu_select.wav**                     | resources/audio/sfx/menu_select.wav               | DASK: Retro sounds [itch.io link](https://dagurasusk.itch.io/retrosounds)                                                                |
 | **pickup_holy.wav**                     | resources/audio/sfx/pickup_holy.wav               | DASK: Retro sounds [itch.io link](https://dagurasusk.itch.io/retrosounds)                                                                |
 | **Lupus Nocte Arcadewave (background)** | resources/audio/music/lupus_nocte_arcadewave.mp3  | Lupus Nocte: [Epidemic Sound link](http://link.epidemicsound.com/LUPUS) [YouTube link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC) |
+```
 
 ### Special thanks
 
@@ -134,3 +136,15 @@ Grateful to the following creators for their amazing sound and music contributio
 ## License
 
 This project is open source under the MIT License. See the LICENSE file for more details.
+
+---
+
+<details>
+
+<summary>Progress so far...</summary>
+
+![tinycreatures_20241011](static/screenshots/tinycreatures_20241011.gif)
+
+![tinycreatures_20241008](static/screenshots/tinycreatures_20241008.gif)
+
+</details>
