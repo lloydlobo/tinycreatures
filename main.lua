@@ -597,8 +597,12 @@ end
 --
 
 function draw_player_trail(alpha)
-    LG.setColor(common.Color.player_entity)
-    LG.setColor(common.Color.player_entity_firing_projectile) --- this looks really greay with the eye iris player look.. maybe give the player some buttercup like eyes??
+    if love.keyboard.isDown('lshift', 'rshift') then -- @BESERKER_MODE
+        LG.setColor { 0.9, 0.9, 0.4 }
+    else -- This looks really great with the eye iris player look.. maybe give the player some -- buttercup like eyes??
+        LG.setColor(common.Color.player_entity_firing_projectile)
+    end
+
     local freq = 440 -- Hz
     local amplitude = 1
     for i = MAX_PLAYER_TRAIL_COUNT, 1, -1 do -- iter in reverse
@@ -607,7 +611,6 @@ function draw_player_trail(alpha)
             player_trails_x[i],
             player_trails_y[i],
             lerp(PLAYER_TRAIL_THICKNESS, PLAYER_TRAIL_THICKNESS + (amplitude * math.sin(freq * i)), alpha)
-            -- lerp(PLAYER_TRAIL_THICKNESS , PLAYER_TRAIL_THICKNESS * (1 + 1 / i), alpha)
         )
     end
 end
@@ -702,7 +705,11 @@ end
 
 function draw_projectiles(alpha)
     -- Draw player player fired projectiles
-    LG.setColor(common.Color.player_entity_firing_projectile)
+    if love.keyboard.isDown('lshift', 'rshift') then -- @BESERKER_MODE
+        LG.setColor { 0.9, 0.9, 0.4 }
+    else
+        LG.setColor(common.Color.player_entity_firing_projectile)
+    end
     for i = 1, #curr_state.lasers_x do
         if curr_state.lasers_is_active[i] == common.Status.active then
             local pos_x = curr_state.lasers_x[i]
