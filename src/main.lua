@@ -1153,11 +1153,11 @@ function love.load()
 
         --- PIPELINE: CUTE
         post_processing = moonshine(arena_w, arena_h, fx.chromasep)
+            .chain(fx.vignette)
             .chain(fx.crt)
             -- .chain(fx.scanlines)
             .chain(fx.godsray) -- simulate pencil drawings -- aka light scattering
-            .chain(fx.colorgradesimple)
-            .chain(fx.vignette),
+            .chain(fx.colorgradesimple),
         -- .chain(fx.sketch)
         -- .chain(fx.gaussianblur)
     }
@@ -1225,20 +1225,20 @@ function love.load()
 
     if true then
         local is_default = false
-        shaders.post_processing.godsray.exposure = is_default and 0.25 or 0.0625 -- Choices: dark .125|light .325
-        shaders.post_processing.godsray.decay = is_default and 0.95 or 0.60-- Choices: dark .60|light .75
+            -- Choices: dark .125|light .325
+        shaders.post_processing.godsray.exposure = is_default and 0.25
+            or ({ 0.0625, 0.125, 0.25 })[config.CURRENT_THEME]
+        shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.600, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
-        shaders.post_processing.godsray.weight = is_default and 0.50 or 0.45
-        local light_factor = 1 / 1 -- Choices: 1|1/4
-        local light_x, light_y = 0.5 * light_factor, 0.5 * light_factor
-        shaders.post_processing.godsray.light_position = is_default and { 0.5, 0.5 } or { light_x, light_y }
+        shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.45, 0.45, 0.65 })[config.CURRENT_THEME]
+        shaders.post_processing.godsray.light_position =  { 0.5, 0.5 }
         shaders.post_processing.godsray.samples = is_default and 70 or 8 * 2
     end
-    if true then
-        shaders.post_processing.vignette.radius = 0.8 + 0.4
-        shaders.post_processing.vignette.softness = 0.5 + 0.2
-        shaders.post_processing.vignette.opacity = 0.5 + 0.1
-        shaders.post_processing.vignette.color = common.Color.background
+    if false then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
+        -- shaders.post_processing.vignette.radius = 0.8 - 0.1
+        -- shaders.post_processing.vignette.softness = 0.5 + 0.2
+        -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
+        -- shaders.post_processing.vignette.color = common.Color.background
     end
     if graphics_config.scanlines.enable then
         local defaults = { width = 2, phase = 0, thickness = 1, opacity = 1, color = { 0, 0, 0 } }

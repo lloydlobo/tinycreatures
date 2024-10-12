@@ -1,5 +1,7 @@
 local M = {}
 
+local config = require 'config'
+
 --- @enum Status
 M.Status = {
     not_active = 0,
@@ -41,7 +43,7 @@ M.Color = {
     --player_beserker_modifier = { 0.9, 0.9, 0.4 },                          --- Enhanced abilities, when either of shift key is pressed.
     --player_entity_firing_projectile = { 155 / 255, 190 / 255, 128 / 255 }, -- green mint
     --player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
-    background = { 0.05, 0.05, 0.05 }, -- exposure: 0.0625, decay: 0.60
+    background = ({ { 0.05, 0.05, 0.05 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 }})[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
     -- background = { 0.4, 0.4, 0.4 },-- exposure: 0.0625, decay: 0.60
     -- background = { 0.75, 0.75, 0.75 }, -- exposure: 0.325, decay: 0.75
     -- background = { 0.9, 0.9, 0.9 }, -- exposure: 0.325, decay: 0.75

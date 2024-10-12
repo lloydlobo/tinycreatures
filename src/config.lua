@@ -7,6 +7,12 @@ local Mode = { -- table indexes starts from 1
     advanced = 3,
 }
 
+local Theme = {
+    low_light = 1,
+    medium_light = 2,
+    high_light = 3,
+}
+
 local speed_mode = Mode.advanced
 
 M = {
@@ -40,6 +46,7 @@ M = {
     -- CONFIGURATIONS
 
     AIR_RESISTANCE = 0.98, --- Resistance factor between 0 and 1.
+    CURRENT_THEME = Theme.low_light,
 
     FIXED_FPS = 60,
     LASER_FIRE_TIMER_LIMIT = ({ 0.16, 0.12, 0.10 })[speed_mode], --- Reduce this to increase fire rate.
@@ -65,6 +72,7 @@ M.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = M.PHI_INV
 -- DERIVED CONFIGURATIONS
 --
 
+M.Theme = Theme
 M.PLAYER_TRAIL_THICKNESS = math.floor(32 * M.PHI_INV) -- HACK: 32 is player_radius global var in love.load
 local is_big_blob = false
 if is_big_blob then
