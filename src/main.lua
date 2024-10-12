@@ -533,8 +533,11 @@ function update_creatures_this_frame(dt)
         end
         if not (cs.creatures_is_active[i] == common.Status.active) then
             local health = cs.creatures_health[i]
+            local is_slow_heal = true
+            local healing_factor = is_slow_heal and 0.5 or 1
             if health >= common.HealthTransitions.healing and health < common.HealthTransitions.healthy then
-                cs.creatures_health[i] = health + dt -- increament counter
+                health = health + dt * healing_factor -- increament counter
+                cs.creatures_health[i] = health
             end
             if health >= common.HealthTransitions.healthy then -- Creature rescued. The End.
                 cs.creatures_health[i] = common.HealthTransitions.none -- note: using dt will make it feel too linear
@@ -807,10 +810,13 @@ function draw_creatures(alpha)
                     LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
 
                     -- Draw final creature evolution on successful healing.
-                    if alpha < config.PHI_INV then
+                    local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV) --- Avoid janky alpha fluctuations per game basis
+                    if smooth_alpha < config.PHI_INV then
                         local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
-                        local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
-                        local radius_factor = (1 + alpha * juice_frequency * lerp(1, juice_frequency_damper, alpha))
+                        local juice_frequency_damper = lerp(0.25, 0.125, alpha)
+                        local radius_factor = (
+                            1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha)
+                        )
                         local radius = evolution_stage.radius * radius_factor
                         LG.setColor(common.Color.creature_healing)
                         LG.circle('fill', curr_x, curr_y, radius)
@@ -1225,13 +1231,13 @@ function love.load()
 
     if true then
         local is_default = false
-            -- Choices: dark .125|light .325
+        -- Choices: dark .125|light .325
         shaders.post_processing.godsray.exposure = is_default and 0.25
             or ({ 0.0625, 0.125, 0.25 })[config.CURRENT_THEME]
         shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.600, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
         shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.45, 0.45, 0.65 })[config.CURRENT_THEME]
-        shaders.post_processing.godsray.light_position =  { 0.5, 0.5 }
+        shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
         shaders.post_processing.godsray.samples = is_default and 70 or 8 * 2
     end
     if false then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
@@ -1484,7 +1490,13 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
 
                 if screenshake.duration > 0 then -- vfx
-                    LG.setColor { 1, 1, 1, common.ScreenFlashAlphaLevel.low }
+                    local flash_alpha = common.ScreenFlashAlphaLevel.low
+                    local flash_color = ({
+                        { 0.125, 0.125, 0.125, flash_alpha },
+                        { 0.5, 0.5, 0.5, flash_alpha },
+                        { 1, 1, 1, flash_alpha },
+                    })[config.CURRENT_THEME]
+                    LG.setColor(flash_color)
                     LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
                     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
                 end
