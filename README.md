@@ -94,6 +94,17 @@ find -name '*.lua' | entr -crs 'date; love .; echo exit status $?'
 
 ### Architecture
 
+### Technology
+
+#### Core
+
+- [LÖVE─Source Code](https://github.com/love2d/love)
+- [love2d.org](https://love2d.org/)
+
+#### Libraries
+
+[moonshine─Postprocessing effect repository for LÖVE](https://github.com/vrld/moonshine)
+
 #### Key Enumerations
 
 - **ControlKey**: Defines the key bindings for various actions like shooting, movement, and game controls.

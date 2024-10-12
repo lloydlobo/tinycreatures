@@ -49,14 +49,6 @@ function test_timer_basic_usage()
     end)
 end
 
--- TODO:  REFACTOR ME TO CONFIG.LUA
-local MAX_PLAYER_TRAIL_COUNT = 2 ^ 5 - 12
-local is_big_blob = false
-local PLAYER_TRAIL_THICKNESS = math.floor(32 * PHI_INV) -- HACK: 32 is player_radius global var in love.load
-if is_big_blob then
-    PLAYER_TRAIL_THICKNESS = PLAYER_TRAIL_THICKNESS * config.PI
-end
-
 --
 --
 -- Types & Definitions
@@ -280,6 +272,7 @@ function fire_player_projectile() --- Fire projectile from players's position.
     end
 end
 
+--- TODO: Use dash timer for Renderer to react to it, else use key event to detect dash (hack).
 function dash_player_entity(dt)
     local dash_multiplier = PHI
 
@@ -390,7 +383,7 @@ function update_player_position_this_frame(dt)
         player_trails_vel_x[player_trails_index] = cs.player_vel_x
         player_trails_vel_y[player_trails_index] = cs.player_vel_y
         player_trails_rot_angle[player_trails_index] = cs.player_rot_angle
-        player_trails_index = (player_trails_index % MAX_PLAYER_TRAIL_COUNT) + 1
+        player_trails_index = (player_trails_index % config.MAX_PLAYER_TRAIL_COUNT) + 1
         local is_temporary_print_trail_stats = false
         if is_temporary_print_trail_stats then
             for i = 1, MAX_PLAYER_TRAIL_COUNT do
@@ -596,22 +589,44 @@ end
 --
 --
 
+local dst_trail_color = { 0, 0, 0 } --- Initialize zero value
 function draw_player_trail(alpha)
-    if love.keyboard.isDown('lshift', 'rshift') then -- @BESERKER_MODE
-        LG.setColor { 0.9, 0.9, 0.4 }
-    else -- This looks really great with the eye iris player look.. maybe give the player some -- buttercup like eyes??
-        LG.setColor(common.Color.player_entity_firing_projectile)
+    local clr_green = common.Color.player_beserker_modifier
+    local clr_pink = common.Color.player_dash_pink_modifier
+    local clr_yellow = common.Color.player_dash_yellow_modifier
+    local invulnerability_timer = curr_state.player_invulnerability_timer
+    local is_beserker = love.keyboard.isDown('lshift', 'rshift')
+    local is_dash = love.keyboard.isDown 'x'
+
+    local damage_freq = 2 * (1 + invulnerability_timer) -- Hz
+
+    if is_beserker and is_dash then
+        common.lerp_rbg(dst_trail_color, clr_green, clr_yellow, alpha)
+        LG.setColor(dst_trail_color)
+    elseif is_beserker then
+        LG.setColor(clr_green)
+    elseif is_dash then
+        -- common.lerp_rbg(dst_trail_color, clr_yellow, clr_pink, math.sin(alpha * damage_freq))
+        -- LG.setColor(dst_trail_color)
+        LG.setColor(common.Color.player_dash_neonblue_modifier)
+    else
+        LG.setColor(common.Color.player_entity_firing_projectile) -- MAYBE: buttercup like eyes??
     end
 
+    local thick = config.PLAYER_TRAIL_THICKNESS
     local freq = 440 -- Hz
     local amplitude = 1
-    for i = MAX_PLAYER_TRAIL_COUNT, 1, -1 do -- iter in reverse
-        LG.circle(
-            'fill',
-            player_trails_x[i],
-            player_trails_y[i],
-            lerp(PLAYER_TRAIL_THICKNESS, PLAYER_TRAIL_THICKNESS + (amplitude * math.sin(freq * i)), alpha)
-        )
+    local is_enlarge_tail = true
+    for i = config.MAX_PLAYER_TRAIL_COUNT, 1, -1 do -- iter in reverse
+        local radius = lerp(thick, thick + (amplitude * math.sin(freq * i)), alpha)
+        if config.debug.is_assert then
+            assert(invulnerability_timer <= 1)
+        end
+        if invulnerability_timer > 0 then -- tween -> swell or shrink up
+            local radius_tween = ((radius + (is_enlarge_tail and 8 or -8)) - radius) * invulnerability_timer
+            radius = lerp(radius + radius_tween, radius, alpha)
+        end
+        LG.circle('fill', player_trails_x[i], player_trails_y[i], radius)
     end
 end
 
@@ -697,16 +712,21 @@ function draw_player_health_bar(alpha)
     LG.rectangle('fill', bar_x, bar_y, bar_width, bar_height) -- missing health
 
     local interpolated_health = lerp((prev_state.player_health / config.MAX_PLAYER_HEALTH), health_percentage, alpha)
-    LG.setColor(common.Color.creature_healed) -- white
+    --LG.setColor(common.Color.creature_healed)                                         -- white
+    LG.setColor(0.95, 0.95, 0.95) -- white
     LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health), bar_height) -- current health
-
     LG.setColor(1, 1, 1) -- reset color to default
 end
 
 function draw_projectiles(alpha)
+    local is_beserker = love.keyboard.isDown('lshift', 'rshift')
+    local is_dash = love.keyboard.isDown 'x'
+
     -- Draw player player fired projectiles
-    if love.keyboard.isDown('lshift', 'rshift') then -- @BESERKER_MODE
-        LG.setColor { 0.9, 0.9, 0.4 }
+    if is_beserker then -- @BESERKER_MODE
+        LG.setColor(common.Color.player_beserker_modifier)
+    elseif is_dash then
+        LG.setColor(common.Color.player_dash_neonblue_modifier)
     else
         LG.setColor(common.Color.player_entity_firing_projectile)
     end
@@ -844,6 +864,7 @@ function draw_hud()
                 'player_invulnerability_timer ' .. cs.player_invulnerability_timer,
                 'count_active_creatures() ' .. count_active_creatures(),
                 'love.timer.getFPS() ' .. love.timer.getFPS(),
+                'alpha ' .. string.format('%f', dt_accum * config.FIXED_DT_INV),
             }, '\n'),
             1 * pos_x - (hud_w * 0.5),
             1 * pos_y + hud_h
@@ -1093,7 +1114,7 @@ function love.load()
         music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 3 }
         music_bgm:setVolume(0.9)
         music_bgm:setPitch(1.11) -- one octave lower
-        music_bgm:setVolume(0.5)
+        music_bgm:setVolume(1 - (2 * (3 / 16)))
 
         -- Master volume
         love.audio.setVolume(config.debug.is_development and 0.5 or 1.0) --volume # number # 1.0 is max and 0.0 is off.
@@ -1298,7 +1319,7 @@ function love.load()
         local speed_multiplier = 1
 
         creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
-            { speed = 100 * speed_multiplier, radius = math.ceil(15 * creature_scale) },
+            { speed = 90 * speed_multiplier, radius = math.ceil(15 * creature_scale) },
             { speed = 70 * speed_multiplier, radius = math.ceil(30 * creature_scale) },
             { speed = 50 * speed_multiplier, radius = math.ceil(50 * creature_scale) },
             { speed = 20 * speed_multiplier, radius = math.ceil(80 * creature_scale) },
@@ -1352,7 +1373,7 @@ function love.load()
         prev_state.player_x = arena_w * 0.5
         prev_state.player_y = arena_h * 0.5
 
-        for i = 1, MAX_PLAYER_TRAIL_COUNT do
+        for i = 1, config.MAX_PLAYER_TRAIL_COUNT do
             player_trails_x[i] = 0
             player_trails_y[i] = 0
             player_trails_vel_x[i] = 0

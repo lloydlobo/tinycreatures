@@ -13,8 +13,6 @@ local SFX_DIR = AUDIO_DIR .. 'sfx/'
 local LOOPS_DIR = AUDIO_DIR .. 'minimalistic_loops/'
 LOOPS_DIR = AUDIO_DIR .. 'music/'
 
-
-
 ---@enum Audio_Path
 local Audio_Path = { ---Enumerations for sound file paths.
     --[[stream]]
@@ -32,14 +30,10 @@ local Audio_Path = { ---Enumerations for sound file paths.
 ---@enum Audio_Play_How
 local Audio_Play_How = { Static = 'static', Stream = 'stream', Queue = 'queue' }
 
-
-
 ---@class Audio
 local Audio = {
     bgm = nil,
 }
-
-
 
 -- SEE IMPLEMENTATION :::: https://github.com/lloydlobo/sokoban-love/blob/aa48a970e3ae40244b230c30a77a64ac689e7544/main.lua#L727C1-L787C1
 
@@ -53,7 +47,9 @@ do
     function love.audio.update()
         local remove = {}
         for _, s in pairs(sound_sources) do
-            if s.isStopped ~= nil and s:isStopped() then remove[#remove + 1] = s end
+            if s.isStopped ~= nil and s:isStopped() then
+                remove[#remove + 1] = s
+            end
         end
 
         for i, s in pairs(remove) do
@@ -87,7 +83,9 @@ do
     ---@param src love.Source
     ---@diagnostic disable-next-line: duplicate-set-field
     function love.audio.stop(src)
-        if not src then return end
+        if not src then
+            return
+        end
         la_stop(src)
         sound_sources[src] = nil
     end
@@ -95,23 +93,24 @@ end
 
 local fade_color_opts = readonly { ---@type FadeColorOpts
     prologue = 0.050, --seconds opaque white.
-    attack = 1.750,   --seconds to make it transparent.
-    sustain = 0.450,  --seconds transparent.
-    decay = 1.900,    --seconds to go to opaque black.
-    epilogue = 0,     --seconds opaque black.
+    attack = 1.750, --seconds to make it transparent.
+    sustain = 0.450, --seconds transparent.
+    decay = 1.900, --seconds to go to opaque black.
+    epilogue = 0, --seconds opaque black.
 }
 local fade_start_time
 local total_fade_duration
 
-
 function Audio_load()
-    local function load_audio()                                                  --
+    local function load_audio() --
         Audio.bgm = love.audio.play(Audio_Path.Bgm, Audio_Play_How.Stream, true) --stream and loop background music
     end
 
     local ok, err = pcall(load_audio)
     io.write(string.format('%.8f  %s %s\n', os.clock(), '[Audio]', ok and 'Loaded succesfully' or 'Failed to load'))
-    if not ok then io.write('\tError: ', err) end
+    if not ok then
+        io.write('\tError: ', err)
+    end
 
     love.audio.setVolume(0.4) --volume # number # 1.0 is max and 0.0 is off.
 end

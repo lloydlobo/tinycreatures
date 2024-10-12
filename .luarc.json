@@ -10,7 +10,7 @@
     "diagnostics.globals": [
         "gh",
         "gw",
-        "reset_loaded_game_state"
+        "reset_game"
     ],
     "diagnostics.disable": []
 }
