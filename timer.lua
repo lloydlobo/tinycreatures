@@ -46,7 +46,7 @@ function M.update(dt)
         timer.time_left = timer.time_left - dt
         if timer.time_left <= 0 then
             timer.callback(timer.callback) -- execute callback function, passing itself as its parameter
-            table.remove(timers, i)        -- remove the timer after execution
+            table.remove(timers, i) -- remove the timer after execution
         end
     end
 end
@@ -129,6 +129,5 @@ do -- TODO: TWEENING
         -- end
     end
 end
-
 
 return M
