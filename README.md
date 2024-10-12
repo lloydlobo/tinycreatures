@@ -4,7 +4,7 @@ You play as the Observer in this `asteroidlike` top down shooter, but wait you a
 
 > A game jam for Ludum Dare 56's Tiny Creatures theme.
 
-![tinycreatures_20241011](static/screenshots/tinycreatures_20241011.gif)
+![tinycreatures_20241012](static/screenshots/tinycreatures_20241012.gif)
 
 In **Tiny Blood Cells**, you take on the role of a healer, tasked with saving small cell-like creatures scattered across different levels.
 Beware, though, as the creatures are infected and can damage you if you're not careful.
@@ -153,6 +153,8 @@ This project is open source under the MIT License. See the LICENSE file for more
 <details>
 
 <summary>Progress so far...</summary>
+
+![tinycreatures_20241012](static/screenshots/tinycreatures_20241012.gif)
 
 ![tinycreatures_20241011](static/screenshots/tinycreatures_20241011.gif)
 
