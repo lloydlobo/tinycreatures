@@ -25,7 +25,7 @@ M = {
     IS_GAME_SLOW = false,
     IS_GRUG_BRAIN = false, --- Whether to complicate life and the codebase.
     IS_PLAYER_INVULNERABLE = false,
-    IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = true, --- Flags if fired projectile should wrap around arena.
+    IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false, --- Flags if fired projectile should wrap around arena.
 
     -- DEBUGGING FLAGS
 

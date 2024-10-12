@@ -41,12 +41,19 @@ M.Color = {
     --player_beserker_modifier = { 0.9, 0.9, 0.4 },                          --- Enhanced abilities, when either of shift key is pressed.
     --player_entity_firing_projectile = { 155 / 255, 190 / 255, 128 / 255 }, -- green mint
     --player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
-    background = { 0.9, 0.9, 0.9 },
+    background = { 0.05, 0.05, 0.05 }, -- exposure: 0.0625, decay: 0.60
+    -- background = { 0.4, 0.4, 0.4 },-- exposure: 0.0625, decay: 0.60
+    -- background = { 0.75, 0.75, 0.75 }, -- exposure: 0.325, decay: 0.75
+    -- background = { 0.9, 0.9, 0.9 }, -- exposure: 0.325, decay: 0.75
 
-    creature_healed = { 0.85, 0.85, 0.85 },
-    creature_healing = { 0.95, 0.4, 0.6 }, --- (pink)
-    creature_infected = { 0.75, 0.1, 0.3 },
-    creature_infected_rgba = { 0.75, 0.1, 0.3, 0.5 },
+    -- creature_healed = { 0.85, 0.85, 0.85 },
+    -- creature_healing = { 0.95, 0.4, 0.6 }, --- (pink)
+    -- creature_infected = { 0.75, 0.1, 0.3 },
+    -- creature_infected_rgba = { 0.75, 0.1, 0.3, 0.5 },
+    creature_healed = { 0.75, 0.75, 0.75 },
+    creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
+    creature_infected = { 0.2, 0.9, 0.6 },
+    creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
     player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
     player_beserker_modifier = { 155 / 255, 190 / 255, 128 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
