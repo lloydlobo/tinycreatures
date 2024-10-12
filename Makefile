@@ -1,4 +1,3 @@
 release:
 	rm -f tinybloodcells.love
-	zip -r tinybloodcells.love * -x@.gitignore
-
+	zip -r tinybloodcells.love src -x@.gitignore
