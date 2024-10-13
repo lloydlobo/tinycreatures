@@ -1102,16 +1102,63 @@ function draw_game(alpha)
     draw_creatures(alpha)
     draw_player_health_bar(alpha)
     draw_projectiles(alpha)
-    do -- TEMPORARY
-        if shield_pos_x == nil and shield_pos_y == nil then
-            shield_pos_x = love.math.random() * arena_w
-            shield_pos_y = love.math.random() * arena_h
+    do -- TEMPORARY [SHIELD]
+        function respawn_next_shield()
+            if shield_pos_x == nil and shield_pos_y == nil then
+                shield_pos_x = love.math.random() * arena_w
+                shield_pos_y = love.math.random() * arena_h
+            end
         end
-        LG.setColor { 0.6, 0.6, 0.3, 0.5 }
-        local shield_size = player_radius * PHI_INV
-        LG.circle('fill', shield_pos_x, shield_pos_y, shield_size)
-        LG.setColor { 0.9, 0.9, 0.4 }
-        draw_plus_icon(shield_pos_x, shield_pos_y, shield_size)
+        local shield_radius = player_radius * (1 - PHI_INV)
+        do --update_player_on_collect_shield
+            if curr_state.player_health < config.MAX_PLAYER_HEALTH then
+                respawn_next_shield()
+            end
+
+            local is_player_incr_shield = is_intersect_circles {
+                a = { x = curr_state.player_x, y = curr_state.player_y, radius = player_radius },
+                b = { x = shield_pos_x or 0, y = shield_pos_y or 0, radius = shield_radius },
+            }
+            if (shield_pos_x ~= nil and shield_pos_y ~= nil) and is_player_incr_shield then
+                if curr_state.player_health < config.MAX_PLAYER_HEALTH then
+                    curr_state.player_health = curr_state.player_health + 1
+                end
+                assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH)
+
+                do -- make shield `not is_active`
+                    shield_pos_x = nil
+                    shield_pos_y = nil
+                end
+            end
+        end
+
+        do --draw collectible shield
+            if shield_pos_x ~= nil and shield_pos_y ~= nil then
+                local glowclr = common.Color.player_dash_pink_modifier
+                local freq = 127 -- Hz
+                local tween_fx =
+                    lerp(0.05, PHI_INV * math.sin(alpha * freq), alpha / math.min(0.4, game_timer_dt * math.sin(alpha)))
+                local tween = lerp(PHI, 2 * PHI * math.sin(alpha * freq), alpha)
+                LG.setColor(glowclr[1], glowclr[2], glowclr[3], 1.0 - math.sin(0.03 * alpha)) -- LG.setColor { 0.9, 0.9, 0.4 }
+                LG.circle('fill', shield_pos_x, shield_pos_y, (shield_radius * (1.2 + math.sin(0.03 * alpha)) + tween))
+
+                do
+                    local fxclr = common.Color.player_entity
+                    LG.setColor(fxclr[1], fxclr[2], fxclr[3], 0.2) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
+                    LG.circle('fill', shield_pos_x, shield_pos_y, shield_radius + tween_fx)
+                    LG.setColor(1, 1, 1, 0.2) -- LG.setColor { 0.9, 0.9, 0.4 }
+                    draw_plus_icon(shield_pos_x, shield_pos_y, shield_radius + tween_fx)
+                end
+                LG.setColor(common.Color.player_entity) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
+                LG.circle('fill', shield_pos_x, shield_pos_y, shield_radius + tween)
+
+                -- LG.setColor(1, 0, 0.9) -- LG.setColor { 0.9, 0.9, 0.4 }
+                LG.setColor(1, 1, 1) -- LG.setColor { 0.9, 0.9, 0.4 }
+                draw_plus_icon(shield_pos_x, shield_pos_y, shield_radius + tween)
+
+                LG.setColor(1, 1, 1) --reset color
+            end
+        end
     end
     draw_player_trail(alpha)
     draw_player(alpha)

@@ -45,13 +45,12 @@ M = {
 
     -- CONFIGURATIONS
 
-    CURRENT_THEME = Theme.low_light,
-
     AIR_RESISTANCE = 0.98, --- Resistance factor between 0 and 1.
+    CURRENT_THEME = Theme.low_light,
     FIXED_FPS = 60,
-    -- LASER_FIRE_TIMER_LIMIT = ({ 0.16, 0.12, 0.10 })[speed_mode], --- Reduce this to increase fire rate.
+
     LASER_FIRE_TIMER_LIMIT = ({ 0.21, 0.16, 0.14 })[speed_mode], --- Reduce this to increase fire rate.
-    LASER_PROJECTILE_SPEED = ({ 2 ^ 8, 2 ^ 9, 2 ^ 9 + 256 })[speed_mode], --- 256|512|768
+    LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[speed_mode], --- 256|512|768
 
     MAX_PLAYER_TRAIL_COUNT = 2 ^ 4 - 2, -- player_radius(32)*PHI==20(approx)
     MAX_GAME_LEVELS = 2 ^ 6, --> 64
@@ -65,7 +64,7 @@ M = {
 M.DEFAULT_PLAYER_TURN_SPEED = ({
     (10 * M.PHI_INV),
     10,
-    -3 + (30 / 2) / 4 + (M.PLAYER_ACCELERATION / M.FIXED_FPS),
+    -3.5 + (30 / 2) / 4 + (M.PLAYER_ACCELERATION / M.FIXED_FPS),
 })[speed_mode]
 M.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = M.PHI_INV
 
@@ -79,8 +78,9 @@ local is_big_blob = false
 if is_big_blob then
     M.PLAYER_TRAIL_THICKNESS = M.PLAYER_TRAIL_THICKNESS * M.PI
 end
+assert(M.PLAYER_ACCELERATION / M.DEFAULT_PLAYER_TURN_SPEED <= 60, 'Expected <= 60. Actual: ' .. M.PLAYER_ACCELERATION)
+
 M.FIXED_DT = 1 / M.FIXED_FPS --- Consistent update frame rate fluctuations.
 M.FIXED_DT_INV = 1 / (1 / M.FIXED_FPS) --- avoid dividing each frame
-assert(M.PLAYER_ACCELERATION / M.DEFAULT_PLAYER_TURN_SPEED <= 60)
 
 return M
