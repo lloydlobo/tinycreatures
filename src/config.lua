@@ -29,7 +29,7 @@ M = {
     IS_CREATURE_FUSION_ENABLED = false, --- FIXME: Assertion fails in `simulate.lua`
     IS_CREATURE_SWARM_ENABLED = true,
     IS_GAME_SLOW = false,
-    IS_GRUG_BRAIN = false, --- Whether to complicate life and the codebase.
+    IS_GRUG_BRAIN = true, --- Whether to complicate life and the codebase.
     IS_PLAYER_INVULNERABLE = false,
     IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false, --- Flags if fired projectile should wrap around arena.
 
@@ -45,9 +45,9 @@ M = {
 
     -- CONFIGURATIONS
 
-    AIR_RESISTANCE = 0.98, --- Resistance factor between 0 and 1.
     CURRENT_THEME = Theme.low_light,
 
+    AIR_RESISTANCE = 0.98, --- Resistance factor between 0 and 1.
     FIXED_FPS = 60,
     -- LASER_FIRE_TIMER_LIMIT = ({ 0.16, 0.12, 0.10 })[speed_mode], --- Reduce this to increase fire rate.
     LASER_FIRE_TIMER_LIMIT = ({ 0.21, 0.16, 0.14 })[speed_mode], --- Reduce this to increase fire rate.
@@ -55,7 +55,7 @@ M = {
 
     MAX_PLAYER_TRAIL_COUNT = 2 ^ 4 - 2, -- player_radius(32)*PHI==20(approx)
     MAX_GAME_LEVELS = 2 ^ 6, --> 64
-    MAX_LASER_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
+    MAX_LASER_CAPACITY = 2 ^ 5, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     MAX_PLAYER_HEALTH = 3,
 
     PLAYER_ACCELERATION = ({ 150, 200, 300 })[speed_mode],

@@ -700,24 +700,73 @@ function draw_player(alpha)
     LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
 end
 
+local temp_last_ouch_x = nil
+local temp_last_ouch_y = nil
+local temp_ouch_messages = { 'OUCH!', 'OWW!', 'HEYY!' }
+local temp_last_ouch_message_index = love.math.random(1, MAX_TEMP_OUCH_MESSAGES)
+local MAX_TEMP_OUCH_MESSAGES = #temp_ouch_messages
 function draw_player_health_bar(alpha)
     local cs = curr_state
-    local health_percentage = (cs.player_health / config.MAX_PLAYER_HEALTH)
+    local sw = 1 -- scale width
+    local sh = 1 -- scale height
+
+    local player_invulnerability_timer = cs.player_invulnerability_timer
+    local curr_health_percentage = (cs.player_health / config.MAX_PLAYER_HEALTH)
     if config.debug.is_assert then
-        assert(health_percentage >= 0.0 and health_percentage <= 1.0)
+        assert(curr_health_percentage >= 0.0 and curr_health_percentage <= 1.0)
     end
     local bar_width = 2 ^ 8 -- Example width
     local bar_height = 2 ^ 3 -- Example height
     local bar_x = (arena_w * 0.5) - (bar_width * 0.5) -- X position on screen
     local bar_y = bar_height * 2 * PHI -- Y position on screen
 
+    local prev_health_percentage = (prev_state.player_health / config.MAX_PLAYER_HEALTH)
+    local interpolated_health = lerp(prev_health_percentage, curr_health_percentage, alpha)
     LG.setColor(common.Color.creature_healing) -- red
-    LG.rectangle('fill', bar_x, bar_y, bar_width, bar_height) -- missing health
+    if config.IS_GRUG_BRAIN and player_invulnerability_timer > 0 then -- @juice: inflate/deflate health bar
+        -- sw = sw * 1.1 -- horizontal translation is tricky and trippy ^_^
+        sh = lerp(sh * 0.95, sh * 1.25, player_invulnerability_timer * alpha)
+    end
 
-    local interpolated_health = lerp((prev_state.player_health / config.MAX_PLAYER_HEALTH), health_percentage, alpha)
+    LG.setColor(common.Color.creature_healing) -- red
+    LG.rectangle('fill', bar_x, bar_y, bar_width * sw, bar_height * sh) -- missing health
+
     --LG.setColor(common.Color.creature_healed)                                         -- white
     LG.setColor(0.95, 0.95, 0.95) -- white
-    LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health), bar_height) -- current health
+    LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health) * sw, bar_height * sh) -- current health
+    if player_invulnerability_timer > 0 then
+        if temp_last_ouch_x == nil and temp_last_ouch_y == nil then
+            temp_last_ouch_x = cs.player_x + player_radius - 4
+            temp_last_ouch_y = cs.player_y - player_radius - 4
+            temp_last_ouch_message_index = math.floor(love.math.random(1, MAX_TEMP_OUCH_MESSAGES)) --- WARN: Is the random output inclusive?
+            assert(temp_last_ouch_message_index >= 1 and temp_last_ouch_message_index <= MAX_TEMP_OUCH_MESSAGES)
+        else
+            LG.setColor(common.Color.player_dash_pink_modifier) -- white
+            LG.print(temp_ouch_messages[temp_last_ouch_message_index], temp_last_ouch_x, temp_last_ouch_y)
+        end
+
+        -- Draw invulnerability timer
+        local invulnerability_bar_height = bar_height * PHI_INV * 0.5
+        --LG.setColor(common.Color.creature_healed) -- red
+        LG.setColor(0.95, 0.95, 0.95, 0.1) -- white
+        LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
+
+        local invulnerable_tween = player_invulnerability_timer
+        if config.IS_GRUG_BRAIN then
+            invulnerable_tween = lerp(player_invulnerability_timer - game_timer_dt, player_invulnerability_timer, alpha)
+        end
+        LG.setColor(0, 1, 1) -- cyan?????
+        LG.rectangle(
+            'fill',
+            bar_x,
+            bar_y + bar_height * sh,
+            (bar_width * invulnerable_tween) * sw,
+            invulnerability_bar_height * sh
+        ) -- current invulnerability
+    else
+        temp_last_ouch_x = nil
+        temp_last_ouch_y = nil
+    end
     LG.setColor(1, 1, 1) -- reset color to default
 end
 
@@ -773,14 +822,24 @@ function draw_creatures(alpha)
             if config.IS_CREATURE_SWARM_ENABLED then -- note: better to use a wave shader for ripples
                 local tolerance = evolution_stage.speed
                 if math.abs(curr_state.creatures_vel_x[i] - prev_state.creatures_vel_x[i]) >= tolerance then
-                    LG.setColor(common.Color.creature_infected_rgba)
                     local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
                     local segment_distortion_amplitude = 2
                     local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
 
-                    -- FIXME: swarm range ─ should be evolution_stage.radius specific
-                    local distorting_radius = lerp(creature_radius - 1, creature_radius + 1 + segment_distortion, alpha)
-                    LG.circle('line', curr_x, curr_y, distorting_radius, segments)
+                    local is_draw_segment = false
+                    local distorting_radius = lerp(
+                        creature_radius - 1,
+                        creature_radius + (is_draw_segment and 1 + segment_distortion or 2),
+                        alpha
+                    )
+                    if is_draw_segment then
+                        -- FIXME: swarm range ─ should be evolution_stage.radius specific
+                        LG.setColor(common.Color.creature_infected_rgba)
+                        LG.circle('line', curr_x, curr_y, distorting_radius, segments)
+                    else
+                        LG.setColor(0.5, 0.6, 0.5, 0.05)
+                        LG.circle('line', curr_x, curr_y, distorting_radius)
+                    end
                     LG.setColor(common.Color.creature_infected) --- HACK: RESET leaking color to post-processing shader
                 end
             end
@@ -1095,17 +1154,12 @@ function love.load()
         sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
         sound_player_engine:setPitch(0.6)
         sound_player_engine:setVolume(0.5)
-        -- sound_player_engine:setFilter { type = 'lowpass', volume = (3 * 1), highgain = -(3 * 0.5) }
         sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
-        -- sound_player_engine:setEffect 'bandpass'
         sound_player_engine:setVolume(1)
 
         sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-
         sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-
-        sound_atmosphere_tense_atmosphere =
-            love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static') -- Credit to DASK: Retro
+        sound_atmosphere_tense = love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static') -- Credit to DASK: Retro
 
         sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') --stream and loop background music
         sound_pickup:setVolume(0.9) -- 90% of ordinary volume
@@ -1113,11 +1167,12 @@ function love.load()
         sound_pickup:setVolume(0.6)
         sound_pickup:play() -- PLAY AT GAME START once
 
-        -- Credits:
-        --   Lupus Nocte: http://link.epidemicsound.com/LUPUS
-        --   YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
+        -- Credits: --   Lupus Nocte: http://link.epidemicsound.com/LUPUS YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
         music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') --stream and loop background music
-        music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 3 }
+        music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 1 }
+        if config.debug.is_development then
+            music_bgm:setFilter { type = 'bandpass', lowgain = 1 }
+        end
         music_bgm:setVolume(0.9)
         music_bgm:setPitch(1.11) -- one octave lower
         music_bgm:setVolume(1 - (2 * (3 / 16)))
@@ -1129,7 +1184,7 @@ function love.load()
     game_level = 1
     dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
     laser_radius = 5
-    player_radius = 32
+    player_radius = 30
 
     player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
     creature_swarm_range = player_radius * 4 -- FIXME: should be evolution_stage.radius specific
@@ -1161,11 +1216,9 @@ function love.load()
         post_processing = moonshine(arena_w, arena_h, fx.chromasep)
             .chain(fx.vignette)
             .chain(fx.crt)
-            -- .chain(fx.scanlines)
-            .chain(fx.godsray) -- simulate pencil drawings -- aka light scattering
+            -- .chain(fx.filmgrain)
+            .chain(fx.godsray) -- aka light scattering
             .chain(fx.colorgradesimple),
-        -- .chain(fx.sketch)
-        -- .chain(fx.gaussianblur)
     }
     --shaders.post_processing.boxblur.radius=0.25
 
@@ -1174,15 +1227,15 @@ function love.load()
     --- @field bloom_intensity { enable: boolean, amount: number }
     --- @field chromatic_abberation {enable:boolean, mode: 'minimal'|'default'|'advanced'}
     --- @field curved_monitor {enable:boolean, amount:number}
+    --- @field filmgrain {enable:boolean, amount:number}
     --- @field lens_dirt {enable:boolean}
-    --- @field filmgrain {enable:boolean}
     --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
     local graphics_config = {
         bloom_intensity = { enable = false, amount = 1 }, --- For `fx.glow`.
         chromatic_abberation = { enable = true, mode = 'default' },
         curved_monitor = { enable = true, amount = PHI },
         lens_dirt = { enable = false }, --- unimplemented
-        filmgrain = { enable = false },
+        filmgrain = { enable = false, amount = PHI_INV },
         scanlines = { enable = false, mode = 'horizontal' },
     }
     if graphics_config.bloom_intensity.enable then
@@ -1222,27 +1275,31 @@ function love.load()
     end
 
     if graphics_config.filmgrain.enable then
-        local defaults = { opacity = 0.3, size = 1 }
-        defaults.opacity = 0.5
-        defaults.size = 1
+        local amount = graphics_config.filmgrain.amount
+        local defaults = { opacity = lerp(0.3, 1.0, amount), size = lerp(1, 4, amount) }
         shaders.post_processing.filmgrain.opacity = defaults.opacity
         shaders.post_processing.filmgrain.size = defaults.size
     end
 
     if true then
+        -- shaders.post_processing.godsray.exposure = is_default and 0.25 or ({ 0.520, 0.125, 0.25 })[config.CURRENT_THEME]
+        -- shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.48, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
+        -- shaders.post_processing.godsray.density = is_default and 0.15 or 0.15 -- PERFORMANCE HOG
+        -- shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.38, 0.45, 0.65 })[config.CURRENT_THEME]
+        -- shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
+
         local is_default = false
         -- Choices: dark .125|light .325
-        shaders.post_processing.godsray.exposure = is_default and 0.25
-            or ({ 0.0625, 0.125, 0.25 })[config.CURRENT_THEME]
+        shaders.post_processing.godsray.exposure = is_default and 0.25 or ({ 0.085, 0.125, 0.25 })[config.CURRENT_THEME]
         shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.600, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
         shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.45, 0.45, 0.65 })[config.CURRENT_THEME]
         shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
         shaders.post_processing.godsray.samples = is_default and 70 or 8 * 2
     end
-    if false then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-        -- shaders.post_processing.vignette.radius = 0.8 - 0.1
-        -- shaders.post_processing.vignette.softness = 0.5 + 0.2
+    if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
+        shaders.post_processing.vignette.radius = 0.8 + 0.1 -- avoid health bar at the top
+        -- shaders.post_processing.vignette.softness = (0.5 + 0.2)
         -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
         -- shaders.post_processing.vignette.color = common.Color.background
     end
@@ -1447,8 +1504,8 @@ function love.update(dt)
     end
     local is_every_10_second = (math.floor(game_timer_t) % 10) == 0
     if is_every_10_second then -- each 10+ score
-        if not sound_atmosphere_tense_atmosphere:isPlaying() then
-            sound_atmosphere_tense_atmosphere:play()
+        if not sound_atmosphere_tense:isPlaying() then
+            sound_atmosphere_tense:play()
         end
     end
 
@@ -1490,14 +1547,15 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
 
                 if screenshake.duration > 0 then -- vfx
-                    local flash_alpha = common.ScreenFlashAlphaLevel.low
-                    local flash_color = ({
-                        { 0.125, 0.125, 0.125, flash_alpha },
-                        { 0.5, 0.5, 0.5, flash_alpha },
-                        { 1, 1, 1, flash_alpha },
-                    })[config.CURRENT_THEME]
-                    LG.setColor(flash_color)
-                    LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
+                    if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
+                        local flash_alpha = common.ScreenFlashAlphaLevel.low
+                        LG.setColor(({
+                            { 0.15, 0.15, 0.15, flash_alpha },
+                            { 0.5, 0.5, 0.5, flash_alpha },
+                            { 1, 1, 1, flash_alpha },
+                        })[config.CURRENT_THEME])
+                        LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
+                    end
                     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
                 end
 
