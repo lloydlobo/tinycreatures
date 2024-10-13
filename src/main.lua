@@ -264,8 +264,8 @@ function fire_player_projectile() --- Fire projectile from players's position.
         cs.lasers_angle[laser_index] = cs.player_rot_angle
         cs.lasers_is_active[laser_index] = common.Status.active
         cs.lasers_time_left[laser_index] = 4
-        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * player_radius
-        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * player_radius
+        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * config.PLAYER_RADIUS
+        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * config.PLAYER_RADIUS
         laser_index = (laser_index % config.MAX_LASER_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
         laser_fire_timer = config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
         sound_fire_projectile:play() -- Unconventional but works without distraction.
@@ -445,7 +445,7 @@ function update_player_entity_projectiles_this_frame(dt)
         laser_circle = {
             x = cs.lasers_x[laser_index],
             y = cs.lasers_y[laser_index],
-            radius = laser_radius,
+            radius = config.LASER_RADIUS,
         }
         for creature_index = 1, TOTAL_CREATURES_CAPACITY do
             if not (cs.creatures_is_active[creature_index] == common.Status.active) then
@@ -523,7 +523,7 @@ function update_creatures_this_frame(dt)
     local weird_alpha = dt_accum * config.FIXED_DT -- FIXME: HOW TO FIX THIS ANOMALY? (SHOULD BE `FIXED_DT_INV`)
 
     local cs = curr_state
-    local player_circle = { x = cs.player_x, y = cs.player_y, radius = player_radius } ---@type Circle
+    local player_circle = { x = cs.player_x, y = cs.player_y, radius = config.PLAYER_RADIUS } ---@type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
     for i = 1, TOTAL_CREATURES_CAPACITY do
         if config.debug.is_assert then
@@ -637,7 +637,7 @@ function draw_player(alpha)
     local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
 
-    -- Draw player player
+    -- Draw player entity.
     local player_angle = lerp(prev_state.player_rot_angle, curr_state.player_rot_angle, alpha)
     local player_x = lerp(prev_state.player_x, curr_state.player_x, alpha)
     local player_y = lerp(prev_state.player_y, curr_state.player_y, alpha)
@@ -649,17 +649,17 @@ function draw_player(alpha)
         player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
         player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
         LG.setColor(common.Color.player_entity_firing_edge_darker)
-        LG.circle('fill', player_x, player_y, player_radius)
+        LG.circle('fill', player_x, player_y, config.PLAYER_RADIUS)
         if curr_state.player_health == 1 then -- last shield
             if love.math.random() < 0.1 * alpha then
                 LG.setColor(0.90, 0.4, 0.6, lerp(0.2, 0.4, alpha)) -- creature_healing = { 0.95, 0.4, 0.6 },
-                LG.circle('fill', player_x, player_y, player_radius)
+                LG.circle('fill', player_x, player_y, config.PLAYER_RADIUS)
             end
         end
     end
 
     -- Draw player inner iris * (iris)
-    local player_iris_radius = (player_radius * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
+    local player_iris_radius = (config.PLAYER_RADIUS * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
         * (1 + juice_frequency * juice_frequency_damper)
     if curr_state.player_invulnerability_timer > 0 then -- eye winces and widens
         player_iris_radius =
@@ -669,9 +669,8 @@ function draw_player(alpha)
     LG.circle('fill', player_x, player_y, player_iris_radius)
 
     -- Draw player player firing trigger • (circle)
-    local player_trigger_radius = lerp(player_firing_edge_max_radius - 4, player_firing_edge_max_radius - 3, alpha)
-    local player_edge_x = player_x + math.cos(player_angle) * player_firing_edge_max_radius
-    local player_edge_y = player_y + math.sin(player_angle) * player_firing_edge_max_radius
+    local player_edge_x = player_x + math.cos(player_angle) * config.PLAYER_FIRING_EDGE_MAX_RADIUS
+    local player_edge_y = player_y + math.sin(player_angle) * config.PLAYER_FIRING_EDGE_MAX_RADIUS
     do -- @juice ─ simulate the twinkle in eye to go opposite to player's direction
         local inertia_x = 0
         local inertia_y = 0
@@ -681,23 +680,43 @@ function draw_player(alpha)
             inertia_y = curr_state.player_vel_y
                 + math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
         end
+        local is_reversing = false
         if love.keyboard.isDown('down', 's') then
+            is_reversing = true
+            reverse_damp_dist = 0.5
             inertia_x = curr_state.player_vel_x
                 - math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
             inertia_y = curr_state.player_vel_y
                 - math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
+        else
+            is_reversing = false
         end
         inertia_x = curr_state.player_vel_x * config.AIR_RESISTANCE
         inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
-        local amplitude_factor = 0.4
+        local dfactor = true and 0.328 or (PHI_INV * 0.8) -- ideal: .328 (distance factor)
+        local amplitude_factor = is_reversing and 0.125 or 0.5
         player_edge_x = player_edge_x
-            - (0.328 * amplitude_factor * player_firing_edge_max_radius) * (inertia_x * game_timer_dt)
+            - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
         player_edge_y = player_edge_y
-            - (0.328 * amplitude_factor * player_firing_edge_max_radius) * (inertia_y * game_timer_dt)
+            - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
     end
-
+    local invultimer = curr_state.player_invulnerability_timer
+    local player_trigger_radius = lerp(
+        config.PLAYER_FIRING_EDGE_RADIUS - 4,
+        config.PLAYER_FIRING_EDGE_RADIUS - 3, --
+        alpha + (invultimer * 0.5)
+    )
     LG.setColor(common.Color.player_entity_firing_edge_dark)
-    LG.circle('fill', player_edge_x, player_edge_y, player_trigger_radius)
+    LG.circle(
+        'fill',
+        player_edge_x,
+        player_edge_y,
+        (
+            invultimer > 0
+                and lerp(player_trigger_radius - (3 * invultimer), player_trigger_radius + (3 * invultimer), invultimer)
+            or player_trigger_radius
+        )
+    )
 end
 
 local temp_last_ouch_x = nil
@@ -736,8 +755,8 @@ function draw_player_health_bar(alpha)
     LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health) * sw, bar_height * sh) -- current health
     if player_invulnerability_timer > 0 then
         if temp_last_ouch_x == nil and temp_last_ouch_y == nil then
-            temp_last_ouch_x = cs.player_x + player_radius - 4
-            temp_last_ouch_y = cs.player_y - player_radius - 4
+            temp_last_ouch_x = cs.player_x + config.PLAYER_RADIUS - 4
+            temp_last_ouch_y = cs.player_y - config.PLAYER_RADIUS - 4
             temp_last_ouch_message_index = math.floor(love.math.random(1, MAX_TEMP_OUCH_MESSAGES)) --- WARN: Is the random output inclusive?
             assert(temp_last_ouch_message_index >= 1 and temp_last_ouch_message_index <= MAX_TEMP_OUCH_MESSAGES)
         else
@@ -792,17 +811,17 @@ function draw_projectiles(alpha)
             end
 
             if not config.IS_GRUG_BRAIN then
-                LG.circle('fill', pos_x, pos_y, laser_radius)
+                LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
             else
                 if i % 3 == 0 then
-                    LG.circle('fill', pos_x, pos_y, laser_radius)
+                    LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
                 else
-                    local target = laser_radius * (1 + alpha)
+                    local target = config.LASER_RADIUS * (1 + alpha)
                     local tween = math.sin(alpha) * 0.03 * PHI_INV -- prevent `sin` spikes with 0.03
                     if config.debug.is_test then
                         assert(tween >= 0 and tween <= 1)
                     end
-                    LG.circle('fill', pos_x, pos_y, laser_radius + (target - laser_radius) * tween)
+                    LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS + (target - config.LASER_RADIUS) * tween)
                 end
             end
         end
@@ -854,7 +873,7 @@ function draw_creatures(alpha)
             -- Automatically disappear when the `find_inactive_creature_index`
             -- looks them up and then `spawn_new_creature` mutates them.
             local is_not_moving = prev_state.creatures_x[i] ~= curr_x and prev_state.creatures_y[i] ~= curr_y
-            local corner_offset = player_radius + evolution_stage.radius
+            local corner_offset = config.PLAYER_RADIUS + evolution_stage.radius
             local is_away_from_corner = curr_x >= 0 + corner_offset
                 and curr_x <= arena_w - corner_offset
                 and curr_y >= 0 + corner_offset
@@ -1067,14 +1086,14 @@ function handle_player_input_this_frame(dt)
     end
 
     if love.keyboard.isDown('lshift', 'rshift') then --- enhance attributes while spinning like a top
-        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED * PHI
+        player_turn_speed = config.PLAYER_DEFAULT_TURN_SPEED * PHI
         if love.math.random() < 0.05 then
             laser_fire_timer = 0
         else
             laser_fire_timer = game_timer_dt
         end
     else
-        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED
+        player_turn_speed = config.PLAYER_DEFAULT_TURN_SPEED
     end
 end
 
@@ -1109,14 +1128,14 @@ function draw_game(alpha)
                 shield_pos_y = love.math.random() * arena_h
             end
         end
-        local shield_radius = player_radius * (1 - PHI_INV)
+        local shield_radius = config.PLAYER_RADIUS * (1 - PHI_INV)
         do --update_player_on_collect_shield
             if curr_state.player_health < config.MAX_PLAYER_HEALTH then
                 respawn_next_shield()
             end
 
             local is_player_incr_shield = is_intersect_circles {
-                a = { x = curr_state.player_x, y = curr_state.player_y, radius = player_radius },
+                a = { x = curr_state.player_x, y = curr_state.player_y, radius = config.PLAYER_RADIUS },
                 b = { x = shield_pos_x or 0, y = shield_pos_y or 0, radius = shield_radius },
             }
             if (shield_pos_x ~= nil and shield_pos_y ~= nil) and is_player_incr_shield then
@@ -1230,11 +1249,8 @@ function love.load()
 
     game_level = 1
     dt_accum = 0.0 --- Accumulator keeps track of time passed between frames.
-    laser_radius = 5
-    player_radius = 30
 
-    player_firing_edge_max_radius = math.ceil(player_radius * 0.328) --- Trigger distance from center of player.
-    creature_swarm_range = player_radius * 4 -- FIXME: should be evolution_stage.radius specific
+    creature_swarm_range = config.PLAYER_RADIUS * 4 -- FIXME: should be evolution_stage.radius specific
 
     --[[ ORIGINAL PIPELINE
     local fx = moonshine.effects
@@ -1464,7 +1480,7 @@ function love.load()
         laser_index = 1 -- circular buffer index (duplicated below!)
         laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
         player_fire_cooldown_timer = 0
-        player_turn_speed = config.DEFAULT_PLAYER_TURN_SPEED
+        player_turn_speed = config.PLAYER_DEFAULT_TURN_SPEED
 
         curr_state.player_invulnerability_timer = 0
         curr_state.player_health = config.MAX_PLAYER_HEALTH
