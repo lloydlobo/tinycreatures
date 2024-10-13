@@ -44,3 +44,4 @@ lib/moonshine/.init.lua.un~
 work_in_progress
 .vscode/settings.json
 tinybloodcells.love
+src/tinybloodcells.love

@@ -36,7 +36,7 @@ M = {
     MAX_GAME_LEVELS = 2 ^ 6, --> 64
     MAX_LASER_CAPACITY = 2 ^ 5, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     MAX_PLAYER_HEALTH = 3,
-    MAX_PLAYER_TRAIL_COUNT = math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
+    MAX_PLAYER_TRAIL_COUNT = -3 + math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
     PLAYER_ACCELERATION = ({ 150, 200, 300 })[speed_mode],
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _phi_inv,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _phi_inv), 10, -3.5 + (30 / 2) / 4 + (_player_acceleration / _fixed_fps) })[speed_mode],
@@ -44,7 +44,7 @@ M = {
     PLAYER_FIRING_EDGE_MAX_RADIUS = 0.9 * math.ceil(_player_radius * (true and 0.328 or (_phi_inv * _phi_inv))), --- Trigger distance from center of player.
     PLAYER_FIRING_EDGE_RADIUS = 1.1 * math.ceil(_player_radius * (true and 0.328 or (_phi_inv * _phi_inv))), --- Trigger distance from center of player.
     PLAYER_RADIUS = _player_radius,
-    PLAYER_TRAIL_THICKNESS = math.ceil(_player_radius * _phi_inv), -- HACK: 32 is player_radius global var in love.load
+    PLAYER_TRAIL_THICKNESS = 1.2 * math.ceil(_player_radius * _phi_inv), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
 
     -- FLAGS
 
