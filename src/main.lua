@@ -18,6 +18,11 @@ local Timer = require 'timer' --- @type Timer
 local common = require 'common'
 local config = require 'config'
 local simulate = require 'simulate'
+local stars = require 'stars'
+-- do
+--     print(stars)
+--     stars.new({}, 0)
+-- end
 
 local LG = love.graphics
 
@@ -694,7 +699,7 @@ function draw_player(alpha)
         inertia_x = curr_state.player_vel_x * config.AIR_RESISTANCE
         inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
         local dfactor = true and 0.328 or (PHI_INV * 0.8) -- ideal: .328 (distance factor)
-        local amplitude_factor = is_reversing and 0.125 or 0.5
+        local amplitude_factor = is_reversing and 0.125 or 0.35
         player_edge_x = player_edge_x
             - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
         player_edge_y = player_edge_y
@@ -1113,72 +1118,106 @@ end
 
 local shield_pos_x = nil
 local shield_pos_y = nil
+function update_and_draw_player_shield_collectible(alpha)
+    local COLLECTIBLE_SHIELD_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 3
+
+    -- TEMPORARY [SHIELD]
+    function respawn_next_shield()
+        if shield_pos_x == nil and shield_pos_y == nil then
+            shield_pos_x = love.math.random() * arena_w
+            shield_pos_y = love.math.random() * arena_h
+        end
+    end
+    do --update_player_on_collect_shield
+        if curr_state.player_health < config.MAX_PLAYER_HEALTH then
+            respawn_next_shield()
+        end
+
+        local is_player_incr_shield = is_intersect_circles {
+            a = { x = curr_state.player_x, y = curr_state.player_y, radius = config.PLAYER_RADIUS },
+            b = { x = shield_pos_x or 0, y = shield_pos_y or 0, radius = COLLECTIBLE_SHIELD_RADIUS },
+        }
+        if (shield_pos_x ~= nil and shield_pos_y ~= nil) and is_player_incr_shield then
+            if curr_state.player_health < config.MAX_PLAYER_HEALTH then
+                curr_state.player_health = curr_state.player_health + 1
+            end
+            assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH)
+
+            do -- make shield `not is_active`
+                shield_pos_x = nil
+                shield_pos_y = nil
+            end
+        end
+    end
+
+    do --draw collectible shield
+        if shield_pos_x ~= nil and shield_pos_y ~= nil then
+            local glowclr = common.Color.player_dash_pink_modifier
+            local freq = 127 -- Hz
+            local tween_fx =
+                lerp(0.05, PHI_INV * math.sin(alpha * freq), alpha / math.min(0.4, game_timer_dt * math.sin(alpha)))
+            local tween = lerp(PHI, 2 * PHI * math.sin(alpha * freq), alpha)
+            LG.setColor(glowclr[1], glowclr[2], glowclr[3], 1.0 - math.sin(0.03 * alpha)) -- LG.setColor { 0.9, 0.9, 0.4 }
+            LG.circle(
+                'fill',
+                shield_pos_x,
+                shield_pos_y,
+                (COLLECTIBLE_SHIELD_RADIUS * (1.2 + math.sin(0.03 * alpha)) + tween)
+            )
+
+            do
+                local fxclr = common.Color.player_entity
+                LG.setColor(fxclr[1], fxclr[2], fxclr[3], 0.2) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
+                LG.circle('fill', shield_pos_x, shield_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
+                LG.setColor(1, 1, 1, 0.2) -- LG.setColor { 0.9, 0.9, 0.4 }
+                draw_plus_icon(shield_pos_x, shield_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
+            end
+            LG.setColor(common.Color.player_entity) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
+            LG.circle('fill', shield_pos_x, shield_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+
+            -- LG.setColor(1, 0, 0.9) -- LG.setColor { 0.9, 0.9, 0.4 }
+            LG.setColor(1, 1, 1) -- LG.setColor { 0.9, 0.9, 0.4 }
+            draw_plus_icon(shield_pos_x, shield_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+
+            LG.setColor(1, 1, 1) --reset color
+        end
+    end
+end
+
+local MAX_STARS = 2 ^ 5
+local stars_depth = {}
+local stars_frames = {}
+local stars_is_active = {}
+local stars_pos_x = {} -- without arena_w
+local stars_pos_y = {} -- without arena_h
+local stars_radius = {}
+for i = 1, MAX_STARS do
+    stars_depth[i] = love.math.random(1, 3)
+    stars_frames[i] = love.math.random(7, 12)
+    stars_is_active[i] = true
+    stars_pos_x[i] = love.math.random()
+    stars_pos_y[i] = love.math.random()
+    stars_radius[i] = love.math.random(1, 2)
+end
+assert(((#stars_pos_x) ^ 2) % 2 == 0, 'Assert count of stars is a perfect square') -- HACK: not the correct perfect square finder implementation...
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
+    do -- TEMPORARY [STARS]
+        -- stylua: ignore
+        for i = 1, MAX_STARS, 4 do
+            LG.circle( 'fill', stars_pos_x[i] * arena_w, stars_pos_y[i] * arena_h, lerp(stars_radius[i] - alpha, stars_radius[i] + alpha, love.math.random() * alpha))
+            LG.circle( 'fill', stars_pos_x[i + 1] * arena_w, stars_pos_y[i + 1] * arena_h, lerp(stars_radius[i + 1] - alpha, stars_radius[i + 1] + alpha, love.math.random() * alpha))
+            LG.circle( 'fill', stars_pos_x[i + 2] * arena_w, stars_pos_y[i + 2] * arena_h, lerp(stars_radius[i + 2] - alpha, stars_radius[i + 2] + alpha, love.math.random() * alpha))
+            LG.circle( 'fill', stars_pos_x[i + 3] * arena_w, stars_pos_y[i + 3] * arena_h, lerp(stars_radius[i + 3] - alpha, stars_radius[i + 3] + alpha, love.math.random() * alpha))
+        end
+    end
     draw_creatures(alpha)
     draw_player_health_bar(alpha)
     draw_projectiles(alpha)
-    do -- TEMPORARY [SHIELD]
-        function respawn_next_shield()
-            if shield_pos_x == nil and shield_pos_y == nil then
-                shield_pos_x = love.math.random() * arena_w
-                shield_pos_y = love.math.random() * arena_h
-            end
-        end
-        local shield_radius = config.PLAYER_RADIUS * (1 - PHI_INV)
-        do --update_player_on_collect_shield
-            if curr_state.player_health < config.MAX_PLAYER_HEALTH then
-                respawn_next_shield()
-            end
-
-            local is_player_incr_shield = is_intersect_circles {
-                a = { x = curr_state.player_x, y = curr_state.player_y, radius = config.PLAYER_RADIUS },
-                b = { x = shield_pos_x or 0, y = shield_pos_y or 0, radius = shield_radius },
-            }
-            if (shield_pos_x ~= nil and shield_pos_y ~= nil) and is_player_incr_shield then
-                if curr_state.player_health < config.MAX_PLAYER_HEALTH then
-                    curr_state.player_health = curr_state.player_health + 1
-                end
-                assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH)
-
-                do -- make shield `not is_active`
-                    shield_pos_x = nil
-                    shield_pos_y = nil
-                end
-            end
-        end
-
-        do --draw collectible shield
-            if shield_pos_x ~= nil and shield_pos_y ~= nil then
-                local glowclr = common.Color.player_dash_pink_modifier
-                local freq = 127 -- Hz
-                local tween_fx =
-                    lerp(0.05, PHI_INV * math.sin(alpha * freq), alpha / math.min(0.4, game_timer_dt * math.sin(alpha)))
-                local tween = lerp(PHI, 2 * PHI * math.sin(alpha * freq), alpha)
-                LG.setColor(glowclr[1], glowclr[2], glowclr[3], 1.0 - math.sin(0.03 * alpha)) -- LG.setColor { 0.9, 0.9, 0.4 }
-                LG.circle('fill', shield_pos_x, shield_pos_y, (shield_radius * (1.2 + math.sin(0.03 * alpha)) + tween))
-
-                do
-                    local fxclr = common.Color.player_entity
-                    LG.setColor(fxclr[1], fxclr[2], fxclr[3], 0.2) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
-                    LG.circle('fill', shield_pos_x, shield_pos_y, shield_radius + tween_fx)
-                    LG.setColor(1, 1, 1, 0.2) -- LG.setColor { 0.9, 0.9, 0.4 }
-                    draw_plus_icon(shield_pos_x, shield_pos_y, shield_radius + tween_fx)
-                end
-                LG.setColor(common.Color.player_entity) -- LG.setColor { 0.6, 0.6, 0.3, 0.5 }
-                LG.circle('fill', shield_pos_x, shield_pos_y, shield_radius + tween)
-
-                -- LG.setColor(1, 0, 0.9) -- LG.setColor { 0.9, 0.9, 0.4 }
-                LG.setColor(1, 1, 1) -- LG.setColor { 0.9, 0.9, 0.4 }
-                draw_plus_icon(shield_pos_x, shield_pos_y, shield_radius + tween)
-
-                LG.setColor(1, 1, 1) --reset color
-            end
-        end
-    end
+    update_and_draw_player_shield_collectible(alpha)
     draw_player_trail(alpha)
     draw_player(alpha)
 end
@@ -1353,12 +1392,12 @@ function love.load()
 
         local is_default = false
         -- Choices: dark .125|light .325
-        shaders.post_processing.godsray.exposure = is_default and 0.25 or ({ 0.085, 0.125, 0.25 })[config.CURRENT_THEME]
+        shaders.post_processing.godsray.exposure = is_default and 0.25 or ({ 0.145, 0.125, 0.25 })[config.CURRENT_THEME]
         shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.600, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.post_processing.godsray.density = is_default and 0.15 or 0.15
         shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.45, 0.45, 0.65 })[config.CURRENT_THEME]
         shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-        shaders.post_processing.godsray.samples = is_default and 70 or 8 * 2
+        shaders.post_processing.godsray.samples = is_default and 70 or 8 * 1
     end
     if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
         shaders.post_processing.vignette.radius = 0.8 + 0.1 -- avoid health bar at the top
@@ -1461,6 +1500,7 @@ function love.load()
         end
     end
 
+    is_debug_hud_enabled = false --- Toggled by keys event.
     function reset_game()
         do -- MUTATE GLOBAL VARS
             INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
@@ -1475,7 +1515,6 @@ function love.load()
         game_timer_dt = 0.0
         game_timer_t = 0.0
 
-        is_debug_hud_enabled = false --- Toggled by keys event.
         laser_fire_timer = 0
         laser_index = 1 -- circular buffer index (duplicated below!)
         laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
