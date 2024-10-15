@@ -211,7 +211,7 @@ function check_creature_is_close_enough(index1, index2, fuse_distance)
         x1 = cs.creatures_x[index1],
         y1 = cs.creatures_y[index1],
         x2 = cs.creatures_x[index2],
-        y2 = cs.creatures_y[index2],
+        y2 = cs.creatures_y[index2]
     }
 
     local stage_id_1 = cs.creatures_evolution_stage[index1]
@@ -294,7 +294,7 @@ end
 local PlayerDamageStatus = {
     DEAD = 'dead',
     DAMAGED = 'damaged',
-    INVULNERABLE = 'invulnerable',
+    INVULNERABLE = 'invulnerable'
 }
 
 --- TODO: Add screen transition using a Timer.
@@ -315,7 +315,7 @@ local player_damage_status_actions = {
     [PlayerDamageStatus.INVULNERABLE] = function()
         screenshake.duration = 0.45
         sound_player_engine:play() -- indicate player to move while they still can ^_^
-    end,                           -- no-op
+    end                            -- no-op
 }
 
 --- Mutates `player_invulnerability_timer`. Returns player damage state.
@@ -386,16 +386,9 @@ function update_player_position_this_frame(dt)
         local is_temporary_print_trail_stats = false
         if is_temporary_print_trail_stats then
             for i = 1, MAX_PLAYER_TRAIL_COUNT do
-                print(
-                    'happy trails to yous',
-                    player_trails_x[i],
-                    player_trails_y[i],
-                    player_trails_vel_x[i],
-                    player_trails_vel_y[i],
-                    player_trails_rot_angle[i],
-                    player_trails_is_active[i],
-                    player_trails_time_left[i]
-                )
+                print('happy trails to yous', player_trails_x[i], player_trails_y[i], player_trails_vel_x[i],
+                    player_trails_vel_y[i], player_trails_rot_angle[i], player_trails_is_active[i],
+                    player_trails_time_left[i])
             end
         end
     end
@@ -412,19 +405,15 @@ function update_player_entity_projectiles_this_frame(dt)
                 cs.lasers_is_active[laser_index] = common.Status.not_active
             else
                 local angle = cs.lasers_angle[laser_index]
-                cs.lasers_x[laser_index] = cs.lasers_x[laser_index]
-                    + math.cos(angle) * config.LASER_PROJECTILE_SPEED * dt
-                cs.lasers_y[laser_index] = cs.lasers_y[laser_index]
-                    + math.sin(angle) * config.LASER_PROJECTILE_SPEED * dt
+                cs.lasers_x[laser_index] = cs.lasers_x[laser_index] + math.cos(angle) * config.LASER_PROJECTILE_SPEED *
+                    dt
+                cs.lasers_y[laser_index] = cs.lasers_y[laser_index] + math.sin(angle) * config.LASER_PROJECTILE_SPEED *
+                    dt
                 if config.IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA then
                     cs.lasers_x[laser_index] = cs.lasers_x[laser_index] % arena_w
                     cs.lasers_y[laser_index] = cs.lasers_y[laser_index] % arena_h
-                elseif --[[Deactivate if it goes off screen]]
-                    cs.lasers_x[laser_index] < 0
-                    or cs.lasers_x[laser_index] >= arena_w
-                    or cs.lasers_y[laser_index] < 0
-                    or cs.lasers_y[laser_index] >= arena_h
-                then
+                elseif --[[Deactivate if it goes off screen]] cs.lasers_x[laser_index] < 0 or cs.lasers_x[laser_index] >=
+                    arena_w or cs.lasers_y[laser_index] < 0 or cs.lasers_y[laser_index] >= arena_h then
                     cs.lasers_is_active[laser_index] = common.Status.not_active
                 end
             end
@@ -437,12 +426,12 @@ function update_player_entity_projectiles_this_frame(dt)
     local laser_circle = {
         x = 0,
         y = 0,
-        radius = 0,
+        radius = 0
     } ---@type Circle
     local creature_circle = {
         x = 0,
         y = 0,
-        radius = 0,
+        radius = 0
     } ---@type Circle
     local temp_hit_counter_this_frame = 0 -- for double hit sfx
     for laser_index = 1, #cs.lasers_x do
@@ -452,7 +441,7 @@ function update_player_entity_projectiles_this_frame(dt)
         laser_circle = {
             x = cs.lasers_x[laser_index],
             y = cs.lasers_y[laser_index],
-            radius = config.LASER_RADIUS,
+            radius = config.LASER_RADIUS
         }
         for creature_index = 1, TOTAL_CREATURES_CAPACITY do
             if not (cs.creatures_is_active[creature_index] == common.Status.active) then
@@ -463,14 +452,12 @@ function update_player_entity_projectiles_this_frame(dt)
             creature_circle = {
                 x = cs.creatures_x[creature_index],
                 y = cs.creatures_y[creature_index],
-                radius = creature_evolution_stages[curr_stage_id].radius,
+                radius = creature_evolution_stages[curr_stage_id].radius
             }
-            if
-                is_intersect_circles {
+            if is_intersect_circles {
                     a = creature_circle,
-                    b = laser_circle,
-                }
-            then
+                    b = laser_circle
+                } then
                 temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
                 screenshake.duration = 0.15 -- got'em!
                 -- Deactivate projectile if touch creature.
@@ -535,12 +522,12 @@ function update_creatures_this_frame(dt)
     local player_circle = {
         x = cs.player_x,
         y = cs.player_y,
-        radius = config.PLAYER_RADIUS,
+        radius = config.PLAYER_RADIUS
     } ---@type Circle
     local creature_circle = {
         x = 0,
         y = 0,
-        radius = 0,
+        radius = 0
     } ---@type Circle # hope for cache-locality
     for i = 1, TOTAL_CREATURES_CAPACITY do
         if config.debug.is_assert then
@@ -583,11 +570,11 @@ function update_creatures_this_frame(dt)
         creature_circle = {
             x = x,
             y = y,
-            radius = stage.radius,
+            radius = stage.radius
         }
         if is_intersect_circles {
                 a = player_circle,
-                b = creature_circle,
+                b = creature_circle
             } then
             player_damage_status_actions[damage_player_fetch_status()]()
         end
@@ -683,11 +670,11 @@ function draw_player(alpha)
     end
 
     -- Draw player inner iris * (iris)
-    local player_iris_radius = (config.PLAYER_RADIUS * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO)
-        * (1 + juice_frequency * juice_frequency_damper)
+    local player_iris_radius = (config.PLAYER_RADIUS * config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO) *
+        (1 + juice_frequency * juice_frequency_damper)
     if curr_state.player_invulnerability_timer > 0 then -- eye winces and widens
-        player_iris_radius =
-            lerp(player_iris_radius, (player_iris_radius * 1.328), curr_state.player_invulnerability_timer * alpha)
+        player_iris_radius = lerp(player_iris_radius, (player_iris_radius * 1.328),
+            curr_state.player_invulnerability_timer * alpha)
     end
     LG.setColor(common.Color.player_entity)
     LG.circle('fill', player_x, player_y, player_iris_radius)
@@ -699,19 +686,19 @@ function draw_player(alpha)
         local inertia_x = 0
         local inertia_y = 0
         if love.keyboard.isDown('up', 'w') then
-            inertia_x = curr_state.player_vel_x
-                + math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
-            inertia_y = curr_state.player_vel_y
-                + math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
+            inertia_x = curr_state.player_vel_x + math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION *
+                game_timer_dt
+            inertia_y = curr_state.player_vel_y + math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION *
+                game_timer_dt
         end
         local is_reversing = false
         if love.keyboard.isDown('down', 's') then
             is_reversing = true
             reverse_damp_dist = 0.5
-            inertia_x = curr_state.player_vel_x
-                - math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
-            inertia_y = curr_state.player_vel_y
-                - math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
+            inertia_x = curr_state.player_vel_x - math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION *
+                game_timer_dt
+            inertia_y = curr_state.player_vel_y - math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION *
+                game_timer_dt
         else
             is_reversing = false
         end
@@ -719,28 +706,18 @@ function draw_player(alpha)
         inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
         local dfactor = true and 0.328 or (PHI_INV * 0.8) -- ideal: .328 (distance factor)
         local amplitude_factor = is_reversing and 0.125 or 0.35
-        player_edge_x = player_edge_x
-            - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
-        player_edge_y = player_edge_y
-            - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
+        player_edge_x = player_edge_x - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) *
+            (inertia_x * game_timer_dt)
+        player_edge_y = player_edge_y - (dfactor * amplitude_factor * config.PLAYER_FIRING_EDGE_MAX_RADIUS) *
+            (inertia_y * game_timer_dt)
     end
     local invultimer = curr_state.player_invulnerability_timer
-    local player_trigger_radius = lerp(
-        config.PLAYER_FIRING_EDGE_RADIUS - 4,
-        config.PLAYER_FIRING_EDGE_RADIUS - 3, --
-        alpha + (invultimer * 0.5)
-    )
+    local player_trigger_radius = lerp(config.PLAYER_FIRING_EDGE_RADIUS - 4, config.PLAYER_FIRING_EDGE_RADIUS - 3, --
+        alpha + (invultimer * 0.5))
     LG.setColor(common.Color.player_entity_firing_edge_dark)
-    LG.circle(
-        'fill',
-        player_edge_x,
-        player_edge_y,
-        (
-            invultimer > 0
-            and lerp(player_trigger_radius - (3 * invultimer), player_trigger_radius + (3 * invultimer), invultimer)
-            or player_trigger_radius
-        )
-    )
+    LG.circle('fill', player_edge_x, player_edge_y, (invultimer > 0 and
+        lerp(player_trigger_radius - (3 * invultimer), player_trigger_radius + (3 * invultimer), invultimer) or
+        player_trigger_radius))
 end
 
 local temp_last_ouch_x = nil
@@ -798,14 +775,9 @@ function draw_player_health_bar(alpha)
         if config.IS_GRUG_BRAIN then
             invulnerable_tween = lerp(player_invulnerability_timer - game_timer_dt, player_invulnerability_timer, alpha)
         end
-        LG.setColor(0, 1, 1) -- cyan?????
-        LG.rectangle(
-            'fill',
-            bar_x,
-            bar_y + bar_height * sh,
-            (bar_width * invulnerable_tween) * sw,
-            invulnerability_bar_height * sh
-        ) -- current invulnerability
+        LG.setColor(0, 1, 1)                 -- cyan?????
+        LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw,
+            invulnerability_bar_height * sh) -- current invulnerability
     else
         temp_last_ouch_x = nil
         temp_last_ouch_y = nil
@@ -870,11 +842,8 @@ function draw_creatures(alpha)
                     local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
 
                     local is_draw_segment = false
-                    local distorting_radius = lerp(
-                        creature_radius - 1,
-                        creature_radius + (is_draw_segment and 1 + segment_distortion or 2),
-                        alpha
-                    )
+                    local distorting_radius = lerp(creature_radius - 1,
+                        creature_radius + (is_draw_segment and 1 + segment_distortion or 2), alpha)
                     if is_draw_segment then
                         -- FIXME: swarm range ─ should be evolution_stage.radius specific
                         LG.setColor(common.Color.creature_infected_rgba)
@@ -898,15 +867,12 @@ function draw_creatures(alpha)
             -- looks them up and then `spawn_new_creature` mutates them.
             local is_not_moving = prev_state.creatures_x[i] ~= curr_x and prev_state.creatures_y[i] ~= curr_y
             local corner_offset = config.PLAYER_RADIUS + evolution_stage.radius
-            local is_away_from_corner = curr_x >= 0 + corner_offset
-                and curr_x <= arena_w - corner_offset
-                and curr_y >= 0 + corner_offset
-                and curr_y <= arena_h - corner_offset
+            local is_away_from_corner = curr_x >= 0 + corner_offset and curr_x <= arena_w - corner_offset and curr_y >=
+                0 + corner_offset and curr_y <= arena_h - corner_offset
             if is_away_from_corner or is_not_moving then
                 local health = curr_state.creatures_health[i]
-                local is_healing = curr_state.creatures_is_active[i] == common.Status.not_active
-                    and health > common.HealthTransitions.healing
-                    and health <= common.HealthTransitions.healthy
+                local is_healing = curr_state.creatures_is_active[i] == common.Status.not_active and health >
+                    common.HealthTransitions.healing and health <= common.HealthTransitions.healthy
                 if is_healing then
                     LG.setColor(common.Color.creature_healed)
                     LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
@@ -916,10 +882,8 @@ function draw_creatures(alpha)
                     if smooth_alpha < config.PHI_INV then
                         local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
                         local juice_frequency_damper = lerp(0.25, 0.125, alpha)
-                        local radius_factor = (
-                            1
-                            + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha)
-                        )
+                        local radius_factor = (1 + smooth_alpha * juice_frequency *
+                            lerp(1, juice_frequency_damper, smooth_alpha))
                         local radius = evolution_stage.radius * radius_factor
                         LG.setColor(common.Color.creature_healing)
                         LG.circle('fill', curr_x, curr_y, radius)
@@ -958,15 +922,8 @@ function draw_hud()
     local cs = curr_state
 
     LG.setColor(common.Color.text_darkest)
-    LG.print(
-        table.concat({
-            'Level ' .. game_level,
-            'Healed ' .. laser_intersect_creature_counter,
-            string.format('%.4s', game_timer_t),
-        }, '\n'),
-        1 * pos_x + 32,
-        1 * pos_y
-    )
+    LG.print(table.concat({ 'Level ' .. game_level, 'Healed ' .. laser_intersect_creature_counter,
+        string.format('%.4s', game_timer_t) }, '\n'), 1 * pos_x + 32, 1 * pos_y)
     -- if config.debug.is_development and config.debug.is_trace_hud then
     --     LG.print(
     --         table.concat({
@@ -1006,30 +963,15 @@ function draw_debug_hud()
     end
 
     LG.setColor(common.Color.text_debug_hud)
-    LG.print(
-        table.concat({
-            'creatures.active: ' .. active_counter,
-            'creatures.count: ' .. #cs.creatures_x,
-            'player.angle: ' .. cs.player_rot_angle,
-            'player.speed_x: ' .. cs.player_vel_x,
-            'player.speed_y: ' .. cs.player_vel_y,
-            'player.x: ' .. cs.player_x,
-            'player.y: ' .. cs.player_y,
-            'stats.canvases: ' .. stats.canvases,
-            'stats.canvasswitches: ' .. stats.canvasswitches,
-            'stats.drawcalls: ' .. stats.drawcalls,
-            'stats.drawcallsbatch: ' .. stats.drawcallsbatched,
-            'stats.fonts: ' .. stats.fonts,
-            'stats.images: ' .. stats.images,
-            'stats.shaderswitches: ' .. stats.shaderswitches,
-            'stats.texturememory: ' .. stats.texturememory,
-            'timer.dt: ' .. dt,
-            'timer.fps: ' .. fps,
-            'lasers.count: ' .. #cs.lasers_x,
-        }, '\n'),
-        pos_x + pad_x,
-        pos_y + pad_y
-    )
+    LG.print(table.concat({ 'creatures.active: ' .. active_counter, 'creatures.count: ' .. #cs.creatures_x,
+        'player.angle: ' .. cs.player_rot_angle, 'player.speed_x: ' .. cs.player_vel_x,
+        'player.speed_y: ' .. cs.player_vel_y, 'player.x: ' .. cs.player_x,
+        'player.y: ' .. cs.player_y, 'stats.canvases: ' .. stats.canvases,
+        'stats.canvasswitches: ' .. stats.canvasswitches, 'stats.drawcalls: ' .. stats.drawcalls,
+        'stats.drawcallsbatch: ' .. stats.drawcallsbatched, 'stats.fonts: ' .. stats.fonts,
+        'stats.images: ' .. stats.images, 'stats.shaderswitches: ' .. stats.shaderswitches,
+        'stats.texturememory: ' .. stats.texturememory, 'timer.dt: ' .. dt, 'timer.fps: ' .. fps,
+        'lasers.count: ' .. #cs.lasers_x }, '\n'), pos_x + pad_x, pos_y + pad_y)
 
     -- HACK: To avoid leaking debug hud text color into post-processing shader.
     LG.setColor(1, 1, 1)
@@ -1045,7 +987,7 @@ end
 local EngineMoveKind = {
     idle = 0,
     forward = 1,
-    backward = 2,
+    backward = 2
 }
 
 --- @param dt number # Delta time.
@@ -1158,13 +1100,13 @@ function update_and_draw_player_shield_collectible(alpha)
             a = {
                 x = curr_state.player_x,
                 y = curr_state.player_y,
-                radius = config.PLAYER_RADIUS,
+                radius = config.PLAYER_RADIUS
             },
             b = {
                 x = shield_pos_x or 0,
                 y = shield_pos_y or 0,
-                radius = COLLECTIBLE_SHIELD_RADIUS,
-            },
+                radius = COLLECTIBLE_SHIELD_RADIUS
+            }
         }
         if (shield_pos_x ~= nil and shield_pos_y ~= nil) and is_player_incr_shield then
             if curr_state.player_health < config.MAX_PLAYER_HEALTH then
@@ -1183,16 +1125,12 @@ function update_and_draw_player_shield_collectible(alpha)
         if shield_pos_x ~= nil and shield_pos_y ~= nil then
             local glowclr = common.Color.player_dash_pink_modifier
             local freq = 127 -- Hz
-            local tween_fx =
-                lerp(0.05, PHI_INV * math.sin(alpha * freq), alpha / math.min(0.4, game_timer_dt * math.sin(alpha)))
+            local tween_fx = lerp(0.05, PHI_INV * math.sin(alpha * freq),
+                alpha / math.min(0.4, game_timer_dt * math.sin(alpha)))
             local tween = lerp(PHI, 2 * PHI * math.sin(alpha * freq), alpha)
             LG.setColor(glowclr[1], glowclr[2], glowclr[3], 1.0 - math.sin(0.03 * alpha)) -- LG.setColor { 0.9, 0.9, 0.4 }
-            LG.circle(
-                'fill',
-                shield_pos_x,
-                shield_pos_y,
-                (COLLECTIBLE_SHIELD_RADIUS * (1.2 + math.sin(0.03 * alpha)) + tween)
-            )
+            LG.circle('fill', shield_pos_x, shield_pos_y,
+                (COLLECTIBLE_SHIELD_RADIUS * (1.2 + math.sin(0.03 * alpha)) + tween))
 
             do
                 local fxclr = common.Color.player_entity
@@ -1223,63 +1161,96 @@ local stars_radius = {}
 for i = 1, MAX_STARS do
     -- bigger stars go slow?
     -- or closer to the screen goes slow?
-    stars_radius[i] = love.math.random(config.PLAYER_RADIUS - 12, config.PLAYER_RADIUS + 2)
-    stars_depth[i] = love.math.random(1, 2)
+    stars_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV, config.PLAYER_RADIUS - 2)
+    stars_depth[i] = love.math.random(1, 3)
     stars_frames[i] = love.math.random(7, 12)
     stars_is_active[i] = true
     stars_pos_x[i] = love.math.random()
     stars_pos_y[i] = love.math.random()
 end
-assert(((#stars_pos_x) ^ 2) % 2 == 0, 'Assert count of stars is a perfect square') -- HACK: not the correct perfect square finder implementation...
+assert(#stars_pos_x == math.sqrt(#stars_pos_x) * math.sqrt(#stars_pos_x), 'Assert count of stars is a perfect square')
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
+
+local offset_x = 0
+local offset_y = 0
 function draw_game(alpha)
-    do     -- TEMPORARY [STARS]
+    do                                                                                       -- TEMPORARY [STARS]
         -- stylua: ignore
-        do -- UPDATE
-            local star_vel_x = math.sin(alpha * .03) * .0001625 * (love.math.random(-1, 1) - alpha)
-            local star_vel_y = math.sin(alpha * .03) * .00025
+        do                                                                                   -- UPDATE
+            --- TODO: make them individual for each star
+            local x_fluctuate_freq = lerp(({ -1, 1 })[love.math.random(1, 2)] * .03 * alpha, --
+                ({ -4, 4 })[love.math.random(1, 2)] * .03 * alpha,                           --
+                math.sin(.03 * alpha))
+
+            local star_vel_x = math.sin(alpha * .05) * .08 * x_fluctuate_freq
+            local star_vel_y = math.sin(alpha * .3) * .0008
+
             -- stylua: ignore
             for i = 1, MAX_STARS, 4 do
                 stars_pos_x[i] = stars_pos_x[i] - math.sin(stars_depth[i] * star_vel_x)
                 stars_pos_x[i + 1] = stars_pos_x[i + 1] - math.sin(stars_depth[i + 1] * star_vel_x)
                 stars_pos_x[i + 2] = stars_pos_x[i + 2] - math.sin(stars_depth[i + 2] * star_vel_x)
                 stars_pos_x[i + 3] = stars_pos_x[i + 3] - math.sin(stars_depth[i + 3] * star_vel_x)
+
                 stars_pos_y[i] = stars_pos_y[i] - (star_vel_y / stars_depth[i])
                 stars_pos_y[i + 1] = stars_pos_y[i + 1] - (star_vel_y / stars_depth[i + 1])
                 stars_pos_y[i + 2] = stars_pos_y[i + 2] - (star_vel_y / stars_depth[i + 2])
                 stars_pos_y[i + 3] = stars_pos_y[i + 3] - (star_vel_y / stars_depth[i + 3])
-                if stars_pos_y[i] < 0 then stars_pos_y[i] = 1 end
-                if stars_pos_y[i + 1] < 0 then stars_pos_y[i + 1] = 1 end
-                if stars_pos_y[i + 2] < 0 then stars_pos_y[i + 2] = 1 end
-                if stars_pos_y[i + 3] < 0 then stars_pos_y[i + 4] = 1 end
+                if stars_pos_y[i] < 0 then
+                    stars_pos_y[i] = 1
+                end
+                if stars_pos_y[i + 1] < 0 then
+                    stars_pos_y[i + 1] = 1
+                end
+                if stars_pos_y[i + 2] < 0 then
+                    stars_pos_y[i + 2] = 1
+                end
+                if stars_pos_y[i + 3] < 0 then
+                    stars_pos_y[i + 4] = 1
+                end
             end
         end
         do -- DRAW
+            local cs = curr_state
             shaders.background_shader(function()
-                local alpha_color = .8
+                local off_x = cs.player_x
+                local off_y = cs.player_y
+                offset_x = off_x / arena_w   -- should lerp on wrap
+                offset_y = off_y / arena_h
+                local offset_factor_x = .015 -- NOTE: Should be lower to avoid puking
+                local offset_factor_y = offset_factor_x * PHI
+                local dx = offset_x * offset_factor_x
+                local dy = offset_y * offset_factor_y
+
+                local alpha_color = ({ .05, .7, 1 })[config.CURRENT_THEME]
                 for i = 1, MAX_STARS, 4 do
-                    LG.setColor(.2, .2, .2, alpha_color / stars_depth[i]) -- Transparent gelatonous-like cells
-                    LG.circle('fill', stars_pos_x[i] * arena_w, stars_pos_y[i] * arena_h,
+                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i])   -- Transparent gelatonous-like cells
+                    LG.circle('fill',                                       --
+                        (stars_pos_x[i] - (dx / stars_depth[i])) * arena_w, --
+                        (stars_pos_y[i] - (dy / stars_depth[i])) * arena_h, --
                         lerp(stars_depth[i] * stars_radius[i] - alpha, stars_depth[i] * stars_radius[i] + alpha,
                             love.math.random() + alpha))
-                    LG.setColor(.2, .2, .2, alpha_color / stars_depth[i + 1]) -- Transparent gelatonous-like cells
-                    LG.circle('fill', stars_pos_x[i + 1] * arena_w, stars_pos_y[i + 1] * arena_h,
+
+                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 1]) -- Transparent gelatonous-like cells
+                    LG.circle('fill', (stars_pos_x[i + 1] - (dx / stars_depth[i + 1])) * arena_w,
+                        (stars_pos_y[i + 1] - (dy / stars_depth[i + 1])) * arena_h,
                         lerp(stars_depth[i + 1] * stars_radius[i + 1] - alpha,
-                            stars_depth[i + 1] * stars_radius[i + 1] + alpha,
-                            love.math.random() + alpha))
-                    LG.setColor(.2, .2, .2, alpha_color / stars_depth[i + 2]) -- Transparent gelatonous-like cells
-                    LG.circle('fill', stars_pos_x[i + 2] * arena_w, stars_pos_y[i + 2] * arena_h,
+                            stars_depth[i + 1] * stars_radius[i + 1] + alpha, love.math.random() + alpha))
+
+                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 2]) -- Transparent gelatonous-like cells
+                    LG.circle('fill', (stars_pos_x[i + 2] - (dx / stars_depth[i + 2])) * arena_w,
+                        (stars_pos_y[i + 2] - (dy / stars_depth[i + 2])) * arena_h,
                         lerp(stars_depth[i + 2] * stars_radius[i + 2] - alpha,
-                            stars_depth[i + 2] * stars_radius[i + 2] + alpha,
-                            love.math.random() + alpha))
-                    LG.setColor(.2, .2, .2, alpha_color / stars_depth[i + 3]) -- Transparent gelatonous-like cells
-                    LG.circle('fill', stars_pos_x[i + 3] * arena_w, stars_pos_y[i + 3] * arena_h,
+                            stars_depth[i + 2] * stars_radius[i + 2] + alpha, love.math.random() + alpha))
+
+                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 3]) -- Transparent gelatonous-like cells
+                    LG.circle('fill', (stars_pos_x[i + 3] - (dx / stars_depth[i + 3])) * arena_w,
+                        (stars_pos_y[i + 3] - (dy / stars_depth[i + 3])) * arena_h,
                         lerp(stars_depth[i + 3] * stars_radius[i + 3] - alpha,
-                            stars_depth[i + 3] * stars_radius[i + 3] + alpha,
-                            love.math.random() + alpha))
+                            stars_depth[i + 3] * stars_radius[i + 3] + alpha, love.math.random() + alpha))
                 end
             end)
         end
@@ -1332,7 +1303,7 @@ function love.load()
         sound_player_engine:setFilter {
             type = 'lowpass',
             volume = 1,
-            highgain = (3 * 0.5),
+            highgain = (3 * 0.5)
         }
         sound_player_engine:setVolume(1)
 
@@ -1351,12 +1322,12 @@ function love.load()
         music_bgm:setFilter {
             type = 'lowpass',
             volume = 1,
-            highgain = 1,
+            highgain = 1
         }
         if config.debug.is_development then
             music_bgm:setFilter {
                 type = 'bandpass',
-                lowgain = 1,
+                lowgain = 1
             }
         end
         music_bgm:setVolume(0.9)
@@ -1378,14 +1349,18 @@ function love.load()
         post_processing = moonshine(arena_w, arena_h, fx.colorgradesimple) .chain(fx.chromasep) .chain(fx.crt) .chain(fx.scanlines) .chain(fx.vignette) .chain(fx.godsray),
     ]]
     local fx = moonshine.effects
-    shaders = { --- @type Shader
-        background_shader = moonshine(arena_w, arena_h, fx.fastgaussianblur).chain(fx.chromasep).chain(fx.desaturate),
-        post_processing = moonshine(arena_w, arena_h, fx.chromasep).chain(fx.vignette).chain(fx.crt).chain(fx.godsray)
-            .chain(fx.colorgradesimple), --- PIPELINE: CUTE
+    shaders = {                                                                            --- @type Shader
+        background_shader = moonshine(arena_w, arena_h, fx.fastgaussianblur)               --
+            .chain(fx.chromasep)                                                           --
+            -- .chain(fx.pixelate) --
+            .chain(fx.scanlines)                                                           -- gives an aquarium like feel
+            .chain(fx.desaturate),                                                         --
+
+        post_processing = moonshine(arena_w, arena_h, fx.chromasep)                        --
+            .chain(fx.vignette).chain(fx.crt).chain(fx.godsray).chain(fx.colorgradesimple) --- PIPELINE: CUTE
     }
     -- post_processing = moonshine(arena_w, arena_h, fx.chromasep).chain(fx.colorgradesimple).chain(fx.crt).chain(fx
     --     .scanlines).chain(fx.filmgrain).chain(fx.vignette).chain(fx.godsray), --- PIPELINE: MORE GRIT
-
 
     -- shaders.post_processing.boxblur.radius=0.25
 
@@ -1400,33 +1375,33 @@ function love.load()
     local graphics_config = {
         bloom_intensity = {
             enable = false,
-            amount = 1,
+            amount = 1
         }, --- For `fx.glow`.
         chromatic_abberation = {
-            enable = true,
-            mode = 'default',
+            enable = false,
+            mode = 'default'
         },
         curved_monitor = {
             enable = true,
-            amount = PHI,
+            amount = PHI
         },
         lens_dirt = {
-            enable = false,
+            enable = false
         }, --- unimplemented
         filmgrain = {
             enable = false,
-            amount = PHI_INV,
+            amount = PHI_INV
         },
         scanlines = {
-            enable = false,
-            mode = 'horizontal',
-        },
+            enable = true, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
+            mode = 'horizontal'
+        }
     }
     if graphics_config.bloom_intensity.enable then
         local amount = graphics_config.bloom_intensity.amount
         local defaults = {
             min_luma = 0.7,
-            strength = 5,
+            strength = 5
         }
         shaders.post_processing.glow.min_luma = defaults.min_luma * amount * 1000
         shaders.post_processing.glow.strength = defaults.strength * amount * -100
@@ -1436,16 +1411,16 @@ function love.load()
         local mode_settings = {
             default = {
                 angle = 0,
-                radius = 0.0,
+                radius = 0.0
             },
             minimal = {
                 angle = 0,
-                radius = 0.5,
+                radius = 0.5
             },
             advanced = {
                 angle = 180,
-                radius = 1.2,
-            },
+                radius = 1.2
+            }
         }
         local mode = graphics_config.chromatic_abberation.mode
         local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
@@ -1461,26 +1436,26 @@ function love.load()
             default = {
                 distortion_factor = { 1.06, 1.065 },
                 feather = 0.02,
-                scale_factor = 1,
+                scale_factor = 1
             },
             minimal = {
                 distortion_factor = { 1.0, 1.0 },
                 feather = 0.0,
-                scale_factor = 1,
+                scale_factor = 1
             },
             advanced = {
                 distortion_factor = { 0.92, 1.08 },
                 feather = 0.02,
-                scale_factor = 0.99,
-            },
+                scale_factor = 0.99
+            }
         }
         local minimal = mode_settings.minimal
         local advanced = mode_settings.advanced
         local amount = graphics_config.curved_monitor.amount
-        shaders.post_processing.crt.distortionFactor = {
-            lerp(minimal.distortion_factor[1], advanced.distortion_factor[1], amount),
-            lerp(minimal.distortion_factor[2], advanced.distortion_factor[2], amount),
-        }
+        shaders.post_processing.crt.distortionFactor = { lerp(minimal.distortion_factor[1],
+            advanced.distortion_factor[1], amount),
+            lerp(minimal.distortion_factor[2],
+                advanced.distortion_factor[2], amount) }
         shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
         shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
     end
@@ -1489,7 +1464,7 @@ function love.load()
         local amount = graphics_config.filmgrain.amount
         local defaults = {
             opacity = lerp(0.3, 1.0, amount),
-            size = lerp(1, 4, amount),
+            size = lerp(1, 4, amount)
         }
         shaders.post_processing.filmgrain.opacity = defaults.opacity
         shaders.post_processing.filmgrain.size = defaults.size
@@ -1525,11 +1500,15 @@ function love.load()
             phase = 0,
             thickness = 1,
             opacity = 1,
-            color = { 0, 0, 0 },
+            color = { 0, 0, 0 }
         }
-        shaders.post_processing.scanlines.opacity = 1 * 0.618 * 0.5
-        shaders.post_processing.scanlines.thickness = 1 * 0.5 -- * 0.0618
-        shaders.post_processing.scanlines.width = 2           -- * 0.25
+        -- shaders.post_processing.scanlines.opacity = 1 * 0.618 * 0.5
+        -- shaders.post_processing.scanlines.thickness = 1 * 0.5 -- * 0.0618
+        -- shaders.post_processing.scanlines.width = 2 -- * 0.25
+
+        shaders.background_shader.scanlines.opacity = 1 * (1 - PHI_INV)
+        shaders.background_shader.scanlines.thickness = 2 * PHI_INV
+        shaders.background_shader.scanlines.width = 3 -- * 0.25 (HIGHER VALUES GIVE TRIPPY WATERY HORIZONTAL LINE VIBES FOR BG SHADER on low_light background)
     end
 
     -- can put a fadeout timer for infected -> healed creatures as achievement with color change
@@ -1554,7 +1533,7 @@ function love.load()
         player_vel_x = 0,
         player_vel_y = 0,
         player_x = 0,
-        player_y = 0,
+        player_y = 0
     }
 
     curr_state = { --- @type GameState
@@ -1578,7 +1557,7 @@ function love.load()
         player_vel_x = 0,
         player_vel_y = 0,
         player_x = 0,
-        player_y = 0,
+        player_y = 0
     }
 
     player_trails_x = {}         --- @type number[]
@@ -1595,7 +1574,7 @@ function love.load()
         duration = 0.0,
         offset_x = 0.0,
         offset_y = 0.0,
-        wait = 0.0,
+        wait = 0.0
     }
 
     do
@@ -1605,30 +1584,24 @@ function love.load()
         creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
             {
                 speed = 90 * speed_multiplier,
-                radius = math.ceil(15 * creature_scale),
-            },
-            {
-                speed = 70 * speed_multiplier,
-                radius = math.ceil(30 * creature_scale),
-            },
-            {
-                speed = 50 * speed_multiplier,
-                radius = math.ceil(50 * creature_scale),
-            },
-            {
-                speed = 20 * speed_multiplier,
-                radius = math.ceil(80 * creature_scale),
-            },
-        }
+                radius = math.ceil(15 * creature_scale)
+            }, {
+            speed = 70 * speed_multiplier,
+            radius = math.ceil(30 * creature_scale)
+        }, {
+            speed = 50 * speed_multiplier,
+            radius = math.ceil(50 * creature_scale)
+        }, {
+            speed = 20 * speed_multiplier,
+            radius = math.ceil(80 * creature_scale)
+        } }
         do -- Test `creature_evolution_stages`.
             local max_creature_mutation_count = 0
             for i = 1, #creature_evolution_stages do
                 max_creature_mutation_count = max_creature_mutation_count + i
             end
-            assert(
-                max_creature_mutation_count == 10,
-                'Assert 1 creature (ancestor) »»mutates»» into ten creatures including itself.'
-            )
+            assert(max_creature_mutation_count == 10,
+                'Assert 1 creature (ancestor) »»mutates»» into ten creatures including itself.')
         end
     end
 
@@ -1783,11 +1756,8 @@ function love.draw()
                 if screenshake.duration > 0 then                                           -- vfx
                     if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
                         local flash_alpha = common.ScreenFlashAlphaLevel.low
-                        LG.setColor(({
-                            { 0.15, 0.15, 0.15, flash_alpha },
-                            { 0.5,  0.5,  0.5,  flash_alpha },
-                            { 1,    1,    1,    flash_alpha },
-                        })[config.CURRENT_THEME])
+                        LG.setColor(({ { 0.15, 0.15, 0.15, flash_alpha }, { 0.5, 0.5, 0.5, flash_alpha },
+                            { 1,    1,    1,    flash_alpha } })[config.CURRENT_THEME])
                         LG.rectangle('fill', 0, 0, arena_w, arena_h)         -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
                     end
                     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
