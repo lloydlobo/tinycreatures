@@ -1069,7 +1069,10 @@ end
 ---
 
 function update_game(dt) ---@param dt number # Fixed delta time.
+
     handle_player_input_this_frame(dt)
+
+    update_background_shader(dt)
     update_player_vulnerability_timer_this_frame(dt)
     update_player_position_this_frame(dt)
     update_player_entity_projectiles_this_frame(dt)
@@ -1149,129 +1152,106 @@ function update_and_draw_player_shield_collectible(alpha)
     end
 end
 
-local MAX_STARS = 2 ^ 4
-local stars_depth = {}
-local stars_frames = {}
-local stars_is_active = {}
-local stars_pos_x = {} -- without arena_w
-local stars_pos_y = {} -- without arena_h
-local stars_radius = {}
-for i = 1, MAX_STARS do
-    -- bigger stars go slow?
-    -- or closer to the screen goes slow?
-    stars_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI, config.PLAYER_RADIUS * PHI_INV)
-    stars_depth[i] = love.math.random(1, 4)
-    stars_pos_x[i] = love.math.random()
-    stars_pos_y[i] = love.math.random()
-    stars_frames[i] = love.math.random(7, 12)
-    stars_is_active[i] = true
+-- bigger parallax entities go slow?
+-- or closer to the screen goes slow?
+local MAX_PARALLAX_ENTITIES = (2 ^ 7)
+local PARALLAX_OFFSET_FACTOR_X = 0.05 * PHI_INV -- NOTE: Should be lower to avoid puking
+local PARALLAX_OFFSET_FACTOR_Y = 0.05 * PHI_INV
+local parallax_entity_depth = {}
+local parallax_entity_frames = {}
+local parallax_entity_is_active = {}
+local parallax_entity_pos_x = {} -- without arena_w
+local parallax_entity_pos_y = {} -- without arena_h
+local parallax_entity_radius = {}
+for i = 1, MAX_PARALLAX_ENTITIES do
+    parallax_entity_depth[i] = love.math.random(2, 12)
+    parallax_entity_frames[i] = love.math.random(7, 12)
+    parallax_entity_is_active[i] = true
+    parallax_entity_pos_x[i] = love.math.random()
+    parallax_entity_pos_y[i] = love.math.random()
+    parallax_entity_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * .5)
 end
-assert(#stars_pos_x == math.sqrt(#stars_pos_x) * math.sqrt(#stars_pos_x), 'Assert count of stars is a perfect square')
+-- assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x), 'Assert count of parallax entity is a perfect square')
+local offset_x = 0
+local offset_y = 0
+local parallax_entity_alpha_color = ({0.96, 0.7, 1.0})[config.CURRENT_THEME]
+local sign1 = ({-1, 1})[love.math.random(1, 2)]
+local sign2 = ({-2, 2})[love.math.random(1, 2)]
+
+function update_background_shader(dt)
+    local alpha = dt_accum * config.FIXED_DT_INV
+    local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
+    local smoothValue = common.lerper.smoothstep(a, b, t)
+    local freq = common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001),
+        common.sign(smoothValue) * (smoothValue + 0.001), .5)
+    local star_vel_x = .01 * 5 * freq * dt
+    local star_vel_y = math.abs(0.6 * 5 * freq) * dt
+    for i = 1, MAX_PARALLAX_ENTITIES, 4 do
+        parallax_entity_pos_x[i] = parallax_entity_pos_x[i] - math.sin(parallax_entity_depth[i] * star_vel_x)
+        parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] -
+                                           math.sin(parallax_entity_depth[i + 1] * star_vel_x)
+        parallax_entity_pos_x[i + 2] = parallax_entity_pos_x[i + 2] -
+                                           math.sin(parallax_entity_depth[i + 2] * star_vel_x)
+        parallax_entity_pos_x[i + 3] = parallax_entity_pos_x[i + 3] -
+                                           math.sin(parallax_entity_depth[i + 3] * star_vel_x)
+
+        parallax_entity_pos_y[i] = parallax_entity_pos_y[i] - (star_vel_y / parallax_entity_depth[i])
+        parallax_entity_pos_y[i + 1] = parallax_entity_pos_y[i + 1] - (star_vel_y / parallax_entity_depth[i + 1])
+        parallax_entity_pos_y[i + 2] = parallax_entity_pos_y[i + 2] - (star_vel_y / parallax_entity_depth[i + 2])
+        parallax_entity_pos_y[i + 3] = parallax_entity_pos_y[i + 3] - (star_vel_y / parallax_entity_depth[i + 3])
+
+        if parallax_entity_pos_y[i] < 0 then
+            parallax_entity_pos_y[i] = 1
+        end
+        if parallax_entity_pos_y[i + 1] < 0 then
+            parallax_entity_pos_y[i + 1] = 1
+        end
+        if parallax_entity_pos_y[i + 2] < 0 then
+            parallax_entity_pos_y[i + 2] = 1
+        end
+        if parallax_entity_pos_y[i + 3] < 0 then
+            parallax_entity_pos_y[i + 4] = 1
+        end
+    end
+
+end
+
+function draw_background_shader(alpha)
+    local cs = curr_state
+    offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
+    offset_y = cs.player_y / arena_h
+    local dx = offset_x * PARALLAX_OFFSET_FACTOR_X
+    local dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
+    if config.debug.is_development then
+        LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
+    end
+
+    shaders.background_shader(function()
+        for i = 1, MAX_PARALLAX_ENTITIES, 4 do
+            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i])
+            LG.circle('fill', (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w,
+                (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, parallax_entity_radius[i])
+            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 1])
+            LG.circle('fill', (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w,
+                (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h,
+                parallax_entity_radius[i + 1])
+            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 2])
+            LG.circle('fill', (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w,
+                (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h,
+                parallax_entity_radius[i + 2])
+            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 3])
+            LG.circle('fill', (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w,
+                (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h,
+                parallax_entity_radius[i + 3])
+        end
+    end)
+end
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
-
-local offset_x = 0
-local offset_y = 0
-
 function draw_game(alpha)
-    do -- TEMPORARY [STARS]
-        -- stylua: ignore
-        -- local freq = .0005 + common.lerper['smoothstep'](({-1, 1})[love.math.random(1, 2)] * .03 * alpha,
-        --     ({-2, 2})[love.math.random(1, 2)] * .03 * alpha, math.sin(.03 * alpha))
-        -- freq = lerp(common.sign(freq) * math.max(.002, math.abs(freq)), freq, freq)
-
-        local sign1 = ({-1, 1})[love.math.random(1, 2)]
-        local sign2 = ({-4, 4})[love.math.random(1, 2)]
-
-        local smoothValue = common.lerper.smoothstep(sign1 * 0.003 * alpha, sign2 * 0.03 * alpha,
-            math.sin(0.003 * alpha))
-        local freq = common.lerper['smoothstep'](common.sign(smoothValue) * (game_timer_dt + 0.001),
-            common.sign(smoothValue) * (smoothValue + 0.001), .5)
-        if config.debug.is_development then
-            LG.print('bg shader freq ' .. freq, arena_w - 256, arena_h * .5)
-        end
-
-        do -- UPDATE
-            --- TODO: make them individual for each star
-
-            local star_vel_x = .001 * freq
-            local star_vel_y = math.abs(.004 * freq)
-
-            -- stylua: ignore
-            for i = 1, MAX_STARS, 4 do
-                stars_pos_x[i] = stars_pos_x[i] - math.sin(stars_depth[i] * star_vel_x)
-                stars_pos_x[i + 1] = stars_pos_x[i + 1] - math.sin(stars_depth[i + 1] * star_vel_x)
-                stars_pos_x[i + 2] = stars_pos_x[i + 2] - math.sin(stars_depth[i + 2] * star_vel_x)
-                stars_pos_x[i + 3] = stars_pos_x[i + 3] - math.sin(stars_depth[i + 3] * star_vel_x)
-
-                stars_pos_y[i] = stars_pos_y[i] - (star_vel_y / stars_depth[i])
-                stars_pos_y[i + 1] = stars_pos_y[i + 1] - (star_vel_y / stars_depth[i + 1])
-                stars_pos_y[i + 2] = stars_pos_y[i + 2] - (star_vel_y / stars_depth[i + 2])
-                stars_pos_y[i + 3] = stars_pos_y[i + 3] - (star_vel_y / stars_depth[i + 3])
-
-                if stars_pos_y[i] < 0 then
-                    stars_pos_y[i] = 1
-                end
-                if stars_pos_y[i + 1] < 0 then
-                    stars_pos_y[i + 1] = 1
-                end
-                if stars_pos_y[i + 2] < 0 then
-                    stars_pos_y[i + 2] = 1
-                end
-                if stars_pos_y[i + 3] < 0 then
-                    stars_pos_y[i + 4] = 1
-                end
-            end
-        end
-        do -- DRAW
-            local cs = curr_state
-            shaders.background_shader(function()
-                local off_x = cs.player_x
-                local off_y = cs.player_y
-                offset_x = off_x / arena_w -- should lerp on wrap
-                offset_y = off_y / arena_h
-
-                local offset_factor_x = .015 -- NOTE: Should be lower to avoid puking
-                local offset_factor_y = offset_factor_x * PHI
-                local dx = offset_x * offset_factor_x
-                local dy = offset_y * offset_factor_y
-
-                local alpha_color = ({.55, .7, 1})[config.CURRENT_THEME]
-
-                for i = 1, MAX_STARS, 4 do
-                    -- LG.setColor(.5, .5, .5, alpha_color / stars_depth[i])
-                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i])
-                    local r1_1 = lerp(stars_depth[i] * stars_radius[i] - alpha,
-                        stars_depth[i] * stars_radius[i] + alpha, love.math.random() + freq)
-                    local r1_2 = lerp(stars_depth[i] * stars_radius[i] - alpha,
-                        stars_depth[i] * stars_radius[i] + alpha, love.math.random() - freq)
-                    LG.ellipse('fill', (stars_pos_x[i] - (dx / stars_depth[i])) * arena_w,
-                        (stars_pos_y[i] - (dy / stars_depth[i])) * arena_h, r1_1 * (1 + 1.2 * freq),
-                        r1_2 * (1 + 2 * freq))
-
-                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 1])
-                    LG.circle('fill', (stars_pos_x[i + 1] - (dx / stars_depth[i + 1])) * arena_w,
-                        (stars_pos_y[i + 1] - (dy / stars_depth[i + 1])) * arena_h,
-                        lerp(stars_depth[i + 1] * stars_radius[i + 1] - alpha,
-                            stars_depth[i + 1] * stars_radius[i + 1] + alpha, love.math.random() + alpha))
-
-                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 2])
-                    LG.circle('fill', (stars_pos_x[i + 2] - (dx / stars_depth[i + 2])) * arena_w,
-                        (stars_pos_y[i + 2] - (dy / stars_depth[i + 2])) * arena_h,
-                        lerp(stars_depth[i + 2] * stars_radius[i + 2] - alpha,
-                            stars_depth[i + 2] * stars_radius[i + 2] + alpha, love.math.random() + alpha))
-
-                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 3])
-                    LG.circle('fill', (stars_pos_x[i + 3] - (dx / stars_depth[i + 3])) * arena_w,
-                        (stars_pos_y[i + 3] - (dy / stars_depth[i + 3])) * arena_h,
-                        lerp(stars_depth[i + 3] * stars_radius[i + 3] - alpha,
-                            stars_depth[i + 3] * stars_radius[i + 3] + alpha, love.math.random() + alpha))
-                end
-            end)
-        end
-    end
+    draw_background_shader(alpha)
     draw_creatures(alpha)
     draw_player_health_bar(alpha)
     draw_projectiles(alpha)
@@ -1367,11 +1347,10 @@ function love.load()
     ]]
     local fx = moonshine.effects
     shaders = { --- @type Shader
-        background_shader = moonshine(arena_w, arena_h, fx.fastgaussianblur) --
-        .chain(fx.godsray) --
-        .chain(fx.chromasep) --
+        background_shader = moonshine(arena_w, arena_h, fx.chromasep) --
         .chain(fx.pixelate) --
-        -- .chain(fx.scanlines) -- gives an aquarium like feel
+        .chain(fx.godsray) --
+        .chain(fx.fastgaussianblur) --
         .chain(fx.desaturate) --
         .chain(fx.vignette) --
         ,
@@ -1385,12 +1364,12 @@ function love.load()
         shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0 `(return color * mix(.2*meanc, c, feedback);)`
 
         --- Rays from top
-        shaders.background_shader.godsray.decay = ({0.75, 0.69, 0.70})[config.CURRENT_THEME] -- Choices: dark .60|light .75
+        shaders.background_shader.godsray.decay = ({0.80, 0.69, 0.70})[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.background_shader.godsray.density = 0.15 -- WARN: Performance Hog!
-        shaders.background_shader.godsray.exposure = ({0.745, 0.125, 0.25})[config.CURRENT_THEME]
+        shaders.background_shader.godsray.exposure = ({0.32, 0.125, 0.25})[config.CURRENT_THEME]
         shaders.background_shader.godsray.light_position = {0.50, -0.99} -- twice the height above
-        shaders.background_shader.godsray.samples = 12 -- lower sample helps to spread out rays
-        shaders.background_shader.godsray.weight = ({0.85, 0.45, 0.65})[config.CURRENT_THEME]
+        shaders.background_shader.godsray.samples = 32 -- lower sample helps to spread out rays
+        shaders.background_shader.godsray.weight = ({0.65, 0.45, 0.65})[config.CURRENT_THEME]
     end
 
     -- post_processing = moonshine(arena_w, arena_h, fx.chromasep).chain(fx.colorgradesimple).chain(fx.crt).chain(fx
@@ -1412,7 +1391,7 @@ function love.load()
             amount = 1
         }, --- For `fx.glow`.
         chromatic_abberation = {
-            enable = false,
+            enable = true,
             mode = 'default'
         },
         curved_monitor = {
@@ -1461,8 +1440,8 @@ function love.load()
         shaders.post_processing.chromasep.angle = settings.angle
         shaders.post_processing.chromasep.radius = settings.radius
 
-        shaders.background_shader.chromasep.angle = settings.angle + 127
-        shaders.background_shader.chromasep.radius = settings.radius + 8
+        shaders.background_shader.chromasep.angle = 180 -- 180 light from above reflects rays downwards
+        shaders.background_shader.chromasep.radius = 3
     end
 
     if graphics_config.curved_monitor.enable then
@@ -1770,7 +1749,6 @@ function love.update(dt)
 end
 
 function love.draw()
-    --- NOTE: adding `.01` to prevent startup spike
     local alpha = dt_accum * config.FIXED_DT_INV --- @type number
 
     if config.debug.is_assert then

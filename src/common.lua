@@ -33,6 +33,7 @@ M.ControlKey = {
 --- stage progresses.
 M.CreatureStageColor = {{0.75, 0.1, 0.3}, {0.70, 0.2, 0.3}, {0.70, 0.3, 0.4}, {0.52, 0.45, 0.45}}
 
+local ordia_blue = {0.06, 0.16, 0.38}
 --- @enum Color
 M.Color = {
     -- player_beserker_modifier = { 0.9, 0.9, 0.4 },                          --- Enhanced abilities, when either of shift key is pressed.
@@ -191,6 +192,7 @@ end
 ---
 --- | "smoothstep" # Shapes the curve such that eases in and eases out, avoiding abrupt changes at the boundaries. A smooth transition that starts and ends slowly, unlike the constant rate of lerp. Use for smoother animations or transitions─where we want to avoid sudden starts or stops.
 
+--- See also https://easings.net/
 --- @type table<M.LerpMode, M.LerpFn>
 M.lerper = {
     cube = function(a, b, t)
