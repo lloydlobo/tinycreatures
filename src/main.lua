@@ -1159,12 +1159,12 @@ local stars_radius = {}
 for i = 1, MAX_STARS do
     -- bigger stars go slow?
     -- or closer to the screen goes slow?
-    stars_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV, config.PLAYER_RADIUS - 2)
-    stars_depth[i] = love.math.random(1, 3)
-    stars_frames[i] = love.math.random(7, 12)
-    stars_is_active[i] = true
+    stars_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI, config.PLAYER_RADIUS * PHI_INV)
+    stars_depth[i] = love.math.random(1, 4)
     stars_pos_x[i] = love.math.random()
     stars_pos_y[i] = love.math.random()
+    stars_frames[i] = love.math.random(7, 12)
+    stars_is_active[i] = true
 end
 assert(#stars_pos_x == math.sqrt(#stars_pos_x) * math.sqrt(#stars_pos_x), 'Assert count of stars is a perfect square')
 
@@ -1174,11 +1174,25 @@ assert(#stars_pos_x == math.sqrt(#stars_pos_x) * math.sqrt(#stars_pos_x), 'Asser
 
 local offset_x = 0
 local offset_y = 0
+
 function draw_game(alpha)
     do -- TEMPORARY [STARS]
         -- stylua: ignore
-        local freq = .00001 + common.lerper['smoothstep'](({-1, 1})[love.math.random(1, 2)] * .03 * alpha,
-            ({-2, 2})[love.math.random(1, 2)] * .03 * alpha, math.sin(.03 * alpha))
+        -- local freq = .0005 + common.lerper['smoothstep'](({-1, 1})[love.math.random(1, 2)] * .03 * alpha,
+        --     ({-2, 2})[love.math.random(1, 2)] * .03 * alpha, math.sin(.03 * alpha))
+        -- freq = lerp(common.sign(freq) * math.max(.002, math.abs(freq)), freq, freq)
+
+        local sign1 = ({-1, 1})[love.math.random(1, 2)]
+        local sign2 = ({-4, 4})[love.math.random(1, 2)]
+
+        local smoothValue = common.lerper.smoothstep(sign1 * 0.003 * alpha, sign2 * 0.03 * alpha,
+            math.sin(0.003 * alpha))
+        local freq = common.lerper['smoothstep'](common.sign(smoothValue) * (game_timer_dt + 0.001),
+            common.sign(smoothValue) * (smoothValue + 0.001), .5)
+        if config.debug.is_development then
+            LG.print('bg shader freq ' .. freq, arena_w - 256, arena_h * .5)
+        end
+
         do -- UPDATE
             --- TODO: make them individual for each star
 
@@ -1218,33 +1232,38 @@ function draw_game(alpha)
                 local off_y = cs.player_y
                 offset_x = off_x / arena_w -- should lerp on wrap
                 offset_y = off_y / arena_h
+
                 local offset_factor_x = .015 -- NOTE: Should be lower to avoid puking
                 local offset_factor_y = offset_factor_x * PHI
                 local dx = offset_x * offset_factor_x
                 local dy = offset_y * offset_factor_y
 
-                local alpha_color = ({.5, .7, 1})[config.CURRENT_THEME]
-                for i = 1, MAX_STARS, 4 do
-                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i]) -- Transparent gelatonous-like cells
-                    LG.circle('fill', --
-                    (stars_pos_x[i] - (dx / stars_depth[i])) * arena_w, --
-                    (stars_pos_y[i] - (dy / stars_depth[i])) * arena_h, --
-                    lerp(stars_depth[i] * stars_radius[i] - alpha, stars_depth[i] * stars_radius[i] + alpha,
-                        love.math.random() + freq))
+                local alpha_color = ({.55, .7, 1})[config.CURRENT_THEME]
 
-                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 1]) -- Transparent gelatonous-like cells
+                for i = 1, MAX_STARS, 4 do
+                    -- LG.setColor(.5, .5, .5, alpha_color / stars_depth[i])
+                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i])
+                    local r1_1 = lerp(stars_depth[i] * stars_radius[i] - alpha,
+                        stars_depth[i] * stars_radius[i] + alpha, love.math.random() + freq)
+                    local r1_2 = lerp(stars_depth[i] * stars_radius[i] - alpha,
+                        stars_depth[i] * stars_radius[i] + alpha, love.math.random() - freq)
+                    LG.ellipse('fill', (stars_pos_x[i] - (dx / stars_depth[i])) * arena_w,
+                        (stars_pos_y[i] - (dy / stars_depth[i])) * arena_h, r1_1 * (1 + 1.2 * freq),
+                        r1_2 * (1 + 2 * freq))
+
+                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 1])
                     LG.circle('fill', (stars_pos_x[i + 1] - (dx / stars_depth[i + 1])) * arena_w,
                         (stars_pos_y[i + 1] - (dy / stars_depth[i + 1])) * arena_h,
                         lerp(stars_depth[i + 1] * stars_radius[i + 1] - alpha,
                             stars_depth[i + 1] * stars_radius[i + 1] + alpha, love.math.random() + alpha))
 
-                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 2]) -- Transparent gelatonous-like cells
+                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 2])
                     LG.circle('fill', (stars_pos_x[i + 2] - (dx / stars_depth[i + 2])) * arena_w,
                         (stars_pos_y[i + 2] - (dy / stars_depth[i + 2])) * arena_h,
                         lerp(stars_depth[i + 2] * stars_radius[i + 2] - alpha,
                             stars_depth[i + 2] * stars_radius[i + 2] + alpha, love.math.random() + alpha))
 
-                    LG.setColor(.5, .5, .5, alpha_color / stars_depth[i + 3]) -- Transparent gelatonous-like cells
+                    LG.setColor(.4, .4, .4, alpha_color / stars_depth[i + 3])
                     LG.circle('fill', (stars_pos_x[i + 3] - (dx / stars_depth[i + 3])) * arena_w,
                         (stars_pos_y[i + 3] - (dy / stars_depth[i + 3])) * arena_h,
                         lerp(stars_depth[i + 3] * stars_radius[i + 3] - alpha,
@@ -1349,14 +1368,31 @@ function love.load()
     local fx = moonshine.effects
     shaders = { --- @type Shader
         background_shader = moonshine(arena_w, arena_h, fx.fastgaussianblur) --
+        .chain(fx.godsray) --
         .chain(fx.chromasep) --
-        -- .chain(fx.pixelate) --
-        .chain(fx.scanlines) -- gives an aquarium like feel
-        .chain(fx.desaturate), --
+        .chain(fx.pixelate) --
+        -- .chain(fx.scanlines) -- gives an aquarium like feel
+        .chain(fx.desaturate) --
+        .chain(fx.vignette) --
+        ,
 
         post_processing = moonshine(arena_w, arena_h, fx.chromasep) --
         .chain(fx.vignette).chain(fx.crt).chain(fx.godsray).chain(fx.colorgradesimple) --- PIPELINE: CUTE
     }
+
+    if true then
+        shaders.background_shader.pixelate.size = {4, 4} -- Default: {5, 5}
+        shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0 `(return color * mix(.2*meanc, c, feedback);)`
+
+        --- Rays from top
+        shaders.background_shader.godsray.decay = ({0.75, 0.69, 0.70})[config.CURRENT_THEME] -- Choices: dark .60|light .75
+        shaders.background_shader.godsray.density = 0.15 -- WARN: Performance Hog!
+        shaders.background_shader.godsray.exposure = ({0.745, 0.125, 0.25})[config.CURRENT_THEME]
+        shaders.background_shader.godsray.light_position = {0.50, -0.99} -- twice the height above
+        shaders.background_shader.godsray.samples = 12 -- lower sample helps to spread out rays
+        shaders.background_shader.godsray.weight = ({0.85, 0.45, 0.65})[config.CURRENT_THEME]
+    end
+
     -- post_processing = moonshine(arena_w, arena_h, fx.chromasep).chain(fx.colorgradesimple).chain(fx.crt).chain(fx
     --     .scanlines).chain(fx.filmgrain).chain(fx.vignette).chain(fx.godsray), --- PIPELINE: MORE GRIT
 
@@ -1391,7 +1427,7 @@ function love.load()
             amount = PHI_INV
         },
         scanlines = {
-            enable = true, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
+            enable = not true, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
             mode = 'horizontal'
         }
     }
