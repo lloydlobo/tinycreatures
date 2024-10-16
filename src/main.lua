@@ -75,6 +75,7 @@ end
 --- @field player_y number # 0|300
 
 --- @class Shader
+--- @field background_post_processing table
 --- @field background_shader table
 --- @field post_processing table
 
@@ -296,27 +297,6 @@ local PlayerDamageStatus = {
     INVULNERABLE = 'invulnerable'
 }
 
---- TODO: Add screen transition using a Timer.
---- TODO: Fade to black and then back to player if reset_game
----
---- Dispatcher for `PlayerDamageStatus`.
---- @type table<PlayerDamageStatus, function>
-local player_damage_status_actions = {
-    [PlayerDamageStatus.DEAD] = function()
-        screenshake.duration = 0.15 * PHI * PHI
-        sound_interference:play()
-        reset_game()
-    end,
-    [PlayerDamageStatus.DAMAGED] = function()
-        screenshake.duration = 0.15 * PHI
-        sound_interference:play()
-    end,
-    [PlayerDamageStatus.INVULNERABLE] = function()
-        screenshake.duration = 0.45
-        sound_player_engine:play() -- indicate player to move while they still can ^_^
-    end -- no-op
-}
-
 --- Mutates `player_invulnerability_timer`. Returns player damage state.
 --- @param damage integer? # Defaults to `1`.
 --- @return PlayerDamageStatus
@@ -426,12 +406,13 @@ function update_player_entity_projectiles_this_frame(dt)
         x = 0,
         y = 0,
         radius = 0
-    } ---@type Circle
+    } --- @type Circle
     local creature_circle = {
         x = 0,
         y = 0,
         radius = 0
-    } ---@type Circle
+    } --- @type Circle
+
     local temp_hit_counter_this_frame = 0 -- for double hit sfx
     for laser_index = 1, #cs.lasers_x do
         if not (cs.lasers_is_active[laser_index] == common.Status.active) then
@@ -576,7 +557,7 @@ function update_creatures_this_frame(dt)
             a = player_circle,
             b = creature_circle
         } then
-            player_damage_status_actions[damage_player_fetch_status()]()
+            player_damage_status_actions(damage_player_fetch_status())
         end
 
         ::continue::
@@ -1014,6 +995,23 @@ function play_player_engine_sound(dt, movekind)
     end
 end
 
+--- TODO: Add screen transition using a Timer.
+--- TODO: Fade to black and then back to player if reset_game
+--- @param status PlayerDamageStatus
+function player_damage_status_actions(status)
+    if status == PlayerDamageStatus.DEAD then
+        screenshake.duration = 0.15 * PHI * PHI
+        sound_interference:play()
+        reset_game()
+    elseif status == PlayerDamageStatus.DAMAGED then
+        screenshake.duration = 0.15 * PHI
+        sound_interference:play()
+    elseif status == PlayerDamageStatus.INVULNERABLE then
+        screenshake.duration = 0.45
+        sound_player_engine:play() -- indicate player to move while they still can ^_^
+    end -- no-op
+end
+
 function handle_player_input_this_frame(dt)
     local cs = curr_state
 
@@ -1113,7 +1111,9 @@ function update_and_draw_player_shield_collectible(alpha)
             if curr_state.player_health < config.MAX_PLAYER_HEALTH then
                 curr_state.player_health = curr_state.player_health + 1
             end
-            assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH)
+            if config.debug.is_assert then
+                assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH)
+            end
 
             do -- make shield `not is_active`
                 shield_pos_x = nil
@@ -1154,7 +1154,7 @@ end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 7)
+local MAX_PARALLAX_ENTITIES = (2 ^ 4)
 local PARALLAX_OFFSET_FACTOR_X = 0.05 * PHI_INV -- NOTE: Should be lower to avoid puking
 local PARALLAX_OFFSET_FACTOR_Y = 0.05 * PHI_INV
 local parallax_entity_depth = {}
@@ -1167,26 +1167,36 @@ for i = 1, MAX_PARALLAX_ENTITIES do
     parallax_entity_depth[i] = love.math.random(2, 12)
     parallax_entity_frames[i] = love.math.random(7, 12)
     parallax_entity_is_active[i] = true
-    parallax_entity_pos_x[i] = love.math.random()
-    parallax_entity_pos_y[i] = love.math.random()
-    parallax_entity_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * .5)
+    parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
+    parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
+    parallax_entity_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5)
 end
 -- assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x), 'Assert count of parallax entity is a perfect square')
 local offset_x = 0
 local offset_y = 0
-local parallax_entity_alpha_color = ({0.96, 0.7, 1.0})[config.CURRENT_THEME]
+local parallax_entity_alpha_color = ({0.56, 0.7, 1.0})[config.CURRENT_THEME]
 local sign1 = ({-1, 1})[love.math.random(1, 2)]
-local sign2 = ({-2, 2})[love.math.random(1, 2)]
+local sign2 = ({-8, 8})[love.math.random(1, 2)]
 
 function update_background_shader(dt)
     local alpha = dt_accum * config.FIXED_DT_INV
     local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
     local smoothValue = common.lerper.smoothstep(a, b, t)
+
     local freq = common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001),
         common.sign(smoothValue) * (smoothValue + 0.001), .5)
-    local star_vel_x = .01 * 5 * freq * dt
-    local star_vel_y = math.abs(0.6 * 5 * freq) * dt
+    local star_vel_x = .001 * 5 * freq * dt
+    local star_vel_y = math.abs(0.6 * 8 * freq) * dt
+
     for i = 1, MAX_PARALLAX_ENTITIES, 4 do
+        if screenshake.duration > 0 then
+            star_vel_x = star_vel_x -
+                             common.lerper['smoothstep'](star_vel_x * (-love.math.random(-4, 4)),
+                    star_vel_x * love.math.random(-4, 4), smoothValue)
+            star_vel_y = star_vel_y -
+                             common.lerper['smoothstep'](star_vel_y * (-love.math.random(-0.5, 2.5)),
+                    star_vel_y * love.math.random(0, 8), smoothValue)
+        end
         parallax_entity_pos_x[i] = parallax_entity_pos_x[i] - math.sin(parallax_entity_depth[i] * star_vel_x)
         parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] -
                                            math.sin(parallax_entity_depth[i + 1] * star_vel_x)
@@ -1245,6 +1255,23 @@ function draw_background_shader(alpha)
                 parallax_entity_radius[i + 3])
         end
     end)
+    shaders.background_post_processing(function()
+        -- draw_screenshake_fx(alpha)
+
+    end)
+end
+
+function draw_screenshake_fx(alpha)
+    if screenshake.duration > 0 then -- vfx
+        if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
+            local flash_alpha = common.ScreenFlashAlphaLevel.low
+            LG.setColor(
+                ({{0.15, 0.15, 0.15, flash_alpha}, {0.5, 0.5, 0.5, flash_alpha}, {1, 1, 1, flash_alpha}})[config.CURRENT_THEME])
+            LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
+        end
+        LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
+    end
+
 end
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
@@ -1252,12 +1279,14 @@ end
 --- fluctute super fast
 function draw_game(alpha)
     draw_background_shader(alpha)
+    draw_screenshake_fx(alpha)
     draw_creatures(alpha)
     draw_player_health_bar(alpha)
     draw_projectiles(alpha)
     update_and_draw_player_shield_collectible(alpha)
     draw_player_trail(alpha)
     draw_player(alpha)
+
 end
 
 --
@@ -1347,23 +1376,41 @@ function love.load()
     ]]
     local fx = moonshine.effects
     shaders = { --- @type Shader
+        background_post_processing = moonshine(arena_w / 1, arena_h / 1, fx.glow) --
+        .chain(fx.fastgaussianblur) --
+        .chain(fx.boxblur) --
+        .chain(fx.pixelate) --
+        .chain(fx.vignette) --
+        .chain(fx.colorgradesimple) --
+        ,
+
         background_shader = moonshine(arena_w, arena_h, fx.chromasep) --
         .chain(fx.pixelate) --
         .chain(fx.godsray) --
         .chain(fx.fastgaussianblur) --
         .chain(fx.desaturate) --
         .chain(fx.vignette) --
+        .chain(fx.colorgradesimple) --
         ,
 
-        post_processing = moonshine(arena_w, arena_h, fx.chromasep) --
-        .chain(fx.vignette).chain(fx.crt).chain(fx.godsray).chain(fx.colorgradesimple) --- PIPELINE: CUTE
+        post_processing = moonshine(arena_w, arena_h, fx.godsray) --
+        .chain(fx.chromasep) --
+        .chain(fx.crt) --
+        .chain(fx.vignette) --
+        .chain(fx.colorgradesimple) --
     }
 
     if true then
+        --- Primary Rays from top
+        -- shaders.background_rays.godsray.weight = ({0.35, 0.45, 0.65})[config.CURRENT_THEME]
+
+    end
+    if true then
+
         shaders.background_shader.pixelate.size = {4, 4} -- Default: {5, 5}
         shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0 `(return color * mix(.2*meanc, c, feedback);)`
 
-        --- Rays from top
+        --- Secondary Rays from top
         shaders.background_shader.godsray.decay = ({0.80, 0.69, 0.70})[config.CURRENT_THEME] -- Choices: dark .60|light .75
         shaders.background_shader.godsray.density = 0.15 -- WARN: Performance Hog!
         shaders.background_shader.godsray.exposure = ({0.32, 0.125, 0.25})[config.CURRENT_THEME]
@@ -1764,16 +1811,6 @@ function love.draw()
             for x = -1, 1 do
                 LG.origin()
                 LG.translate(x * arena_w, y * arena_h)
-
-                if screenshake.duration > 0 then -- vfx
-                    if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
-                        local flash_alpha = common.ScreenFlashAlphaLevel.low
-                        LG.setColor(({{0.15, 0.15, 0.15, flash_alpha}, {0.5, 0.5, 0.5, flash_alpha},
-                                      {1, 1, 1, flash_alpha}})[config.CURRENT_THEME])
-                        LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
-                    end
-                    LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
-                end
 
                 draw_game(alpha)
             end
