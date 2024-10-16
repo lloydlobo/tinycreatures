@@ -625,6 +625,27 @@ function draw_player_trail(alpha)
     end
 end
 
+--- Excellent for predicting visually where player might end up.. like a lookahead (great for dodge!)
+function draw_player_direction_ray(alpha)
+    local player_angle = lerp(prev_state.player_rot_angle, curr_state.player_rot_angle, alpha)
+    local player_x = lerp(prev_state.player_x, curr_state.player_x, alpha)
+    local player_y = lerp(prev_state.player_y, curr_state.player_y, alpha)
+
+    local player_speed_x = lerp(prev_state.player_vel_x, curr_state.player_vel_x * config.AIR_RESISTANCE, alpha)
+    local player_speed_y = lerp(prev_state.player_vel_y, curr_state.player_vel_y * config.AIR_RESISTANCE, alpha)
+    player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
+    player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
+    LG.setColor(1, 1, 1, .18)
+    local last_ray_radius = 4
+    for i = -1, 1, 1 do
+        local ease = 0.15 - i * .0125 * PHI_INV -- like the flash of a torch on zz ground
+        player_x = (player_x + player_speed_x * ease) % arena_w
+        player_y = (player_y + player_speed_y * ease) % arena_h
+        LG.circle('fill', player_x, player_y, config.PLAYER_RADIUS * 0.328 + ease * math.log(i) * last_ray_radius)
+    end
+
+end
+
 function draw_player(alpha)
     local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
@@ -1285,6 +1306,7 @@ function draw_game(alpha)
     draw_projectiles(alpha)
     update_and_draw_player_shield_collectible(alpha)
     draw_player_trail(alpha)
+    draw_player_direction_ray(alpha)
     draw_player(alpha)
 
 end
