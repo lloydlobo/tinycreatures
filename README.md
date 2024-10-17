@@ -2,7 +2,7 @@
 
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
-![tinycreatures_202410141048](static/screencasts/tinycreatures_202410141048.gif)
+![tinycreatures_20241017121242](static/screencasts/tinycreatures_20241017121242.gif)
 
 > Initially built during a game jam for Ludum Dare 56's Tiny Creatures theme.
 
@@ -188,6 +188,7 @@ This project is open source under the MIT License. See the LICENSE file for more
 ![tinycreatures_202410121749](static/screencasts/tinycreatures_202410121749.gif)
 ![tinycreatures_20241012](static/screencasts/tinycreatures_20241012.gif)
 ![tinycreatures_202410141048](static/screencasts/tinycreatures_202410141048.gif)
+![tinycreatures_20241017121242](static/screencasts/tinycreatures_20241017121242.gif)
 
 </details>
 

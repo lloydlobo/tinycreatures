@@ -74,7 +74,6 @@ end
 --- @field player_y number # 0|300
 
 --- @class Shader
---- @field background_post_processing table
 --- @field background_shader table
 --- @field post_processing table
 
@@ -469,7 +468,7 @@ function update_player_entity_projectiles_this_frame(dt)
                         end
                     end
                 end
-                break -- This projectile has served it's purpose.
+                break -- This projectile has now served it's purpose.
             end
             ::continue_not_is_active_creature::
         end
@@ -1189,7 +1188,8 @@ for i = 1, MAX_PARALLAX_ENTITIES do
     parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
     parallax_entity_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5)
 end
--- assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x), 'Assert count of parallax entity is a perfect square')
+assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
+    'Assert count of parallax entity is a perfect square')
 local offset_x = 0
 local offset_y = 0
 local parallax_entity_alpha_color = ({ 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
@@ -1201,56 +1201,49 @@ function update_background_shader(dt)
     local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
     local smoothValue = common.lerper.smoothstep(a, b, t)
 
-    local freq = common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001),
-        common.sign(smoothValue) * (smoothValue + 0.001), .5)
+    local freq = (common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), .5))
     local star_vel_x = .001 * 5 * freq * dt
     local star_vel_y = math.abs(0.6 * 8 * freq) * dt
 
     for i = 1, MAX_PARALLAX_ENTITIES, 4 do
-        if screenshake.duration > 0 then
-            star_vel_x = star_vel_x -
-                common.lerper['smoothstep'](star_vel_x * (-love.math.random(-4, 4)),
-                    star_vel_x * love.math.random(-4, 4), smoothValue)
-            star_vel_y = star_vel_y -
-                common.lerper['smoothstep'](star_vel_y * (-love.math.random(-0.5, 2.5)),
-                    star_vel_y * love.math.random(0, 8), smoothValue)
+        if config.IS_GRUG_BRAIN then
+            if screenshake.duration > 0 then
+                star_vel_x = (star_vel_x - common.lerper['smoothstep'](star_vel_x * (-love.math.random(-4, 4)), star_vel_x * love.math.random(-4, 4), smoothValue))
+                star_vel_y = (star_vel_y - common.lerper['smoothstep'](star_vel_y * (-love.math.random(-0.5, 2.5)), star_vel_y * love.math.random(0, 8), smoothValue))
+            end
         end
+
         parallax_entity_pos_x[i] = parallax_entity_pos_x[i] - math.sin(parallax_entity_depth[i] * star_vel_x)
-        parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] -
-            math.sin(parallax_entity_depth[i + 1] * star_vel_x)
-        parallax_entity_pos_x[i + 2] = parallax_entity_pos_x[i + 2] -
-            math.sin(parallax_entity_depth[i + 2] * star_vel_x)
-        parallax_entity_pos_x[i + 3] = parallax_entity_pos_x[i + 3] -
-            math.sin(parallax_entity_depth[i + 3] * star_vel_x)
+        parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] - math.sin(parallax_entity_depth[i + 1] * star_vel_x)
+        parallax_entity_pos_x[i + 2] = parallax_entity_pos_x[i + 2] - math.sin(parallax_entity_depth[i + 2] * star_vel_x)
+        parallax_entity_pos_x[i + 3] = parallax_entity_pos_x[i + 3] - math.sin(parallax_entity_depth[i + 3] * star_vel_x)
 
         parallax_entity_pos_y[i] = parallax_entity_pos_y[i] - (star_vel_y / parallax_entity_depth[i])
         parallax_entity_pos_y[i + 1] = parallax_entity_pos_y[i + 1] - (star_vel_y / parallax_entity_depth[i + 1])
         parallax_entity_pos_y[i + 2] = parallax_entity_pos_y[i + 2] - (star_vel_y / parallax_entity_depth[i + 2])
         parallax_entity_pos_y[i + 3] = parallax_entity_pos_y[i + 3] - (star_vel_y / parallax_entity_depth[i + 3])
 
-        if parallax_entity_pos_y[i] < 0 then
-            parallax_entity_pos_y[i] = 1
-        end
-        if parallax_entity_pos_y[i + 1] < 0 then
-            parallax_entity_pos_y[i + 1] = 1
-        end
-        if parallax_entity_pos_y[i + 2] < 0 then
-            parallax_entity_pos_y[i + 2] = 1
-        end
-        if parallax_entity_pos_y[i + 3] < 0 then
-            parallax_entity_pos_y[i + 4] = 1
-        end
+        if parallax_entity_pos_y[i] < 0 then parallax_entity_pos_y[i] = 1 end
+        if parallax_entity_pos_y[i + 1] < 0 then parallax_entity_pos_y[i + 1] = 1 end
+        if parallax_entity_pos_y[i + 2] < 0 then parallax_entity_pos_y[i + 2] = 1 end
+        if parallax_entity_pos_y[i + 3] < 0 then parallax_entity_pos_y[i + 4] = 1 end
     end
 end
 
 function draw_background_shader(alpha)
     local cs = curr_state
-    offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
-    offset_y = cs.player_y / arena_h
-    local dx = offset_x * PARALLAX_OFFSET_FACTOR_X
-    local dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
-    if config.debug.is_development then
-        LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
+    local dx = 0
+    local dy = 0
+
+    local is_follow_player_parallax = not true
+    if is_follow_player_parallax then
+        offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
+        offset_y = cs.player_y / arena_h
+        dx = offset_x * PARALLAX_OFFSET_FACTOR_X
+        dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
+        if config.debug.is_development then
+            LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
+        end
     end
 
     shaders.background_shader(function()
@@ -1271,9 +1264,6 @@ function draw_background_shader(alpha)
                 (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h,
                 parallax_entity_radius[i + 3])
         end
-    end)
-    shaders.background_post_processing(function()
-        -- draw_screenshake_fx(alpha)
     end)
 end
 
@@ -1401,13 +1391,6 @@ function love.load()
             .chain(fx.colorgradesimple)                               --
         ,
 
-        background_post_processing = moonshine(arena_w / 1, arena_h / 1, fx.glow) --
-            .chain(fx.fastgaussianblur)                                           --
-            .chain(fx.boxblur)                                                    --
-            .chain(fx.pixelate)                                                   --
-            .chain(fx.vignette)                                                   --
-            .chain(fx.colorgradesimple)                                           --
-        ,
 
         post_processing = moonshine(arena_w, arena_h, fx.godsray) --
             .chain(fx.chromasep)                                  --

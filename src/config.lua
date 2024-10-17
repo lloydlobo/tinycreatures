@@ -49,12 +49,12 @@ M = {
     -- FLAGS
 
     IS_CREATURE_FOLLOW_PLAYER = true,
-    IS_CREATURE_FUSION_ENABLED = false, --- FIXME: Assertion fails in `simulate.lua`
+    IS_CREATURE_FUSION_ENABLED = not true, --- FIXME: Assertion fails in `simulate.lua`
     IS_CREATURE_SWARM_ENABLED = true,
-    IS_GAME_SLOW = false,
-    IS_GRUG_BRAIN = true,                           --- Whether to complicate life and the codebase.
-    IS_PLAYER_INVULNERABLE = false,
-    IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = false, --- Flags if fired projectile should wrap around arena.
+    IS_GAME_SLOW = not true,
+    IS_GRUG_BRAIN = not true,                          --- Whether to complicate life and the codebase.
+    IS_PLAYER_INVULNERABLE = not true,
+    IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = not true, --- Flags if fired projectile should wrap around arena.
 
     -- Math constants (to fiddle with for random discoveries)
 
