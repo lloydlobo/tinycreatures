@@ -1411,9 +1411,10 @@ function love.load()
 
         post_processing = moonshine(arena_w, arena_h, fx.godsray) --
             .chain(fx.chromasep)                                  --
+            .chain(fx.glow)                                       -- fancy
             .chain(fx.crt)                                        --
-            .chain(fx.vignette)                                   --
             .chain(fx.colorgradesimple)                           --
+            .chain(fx.vignette)                                   --
         ,
     }
 
@@ -1444,8 +1445,8 @@ function love.load()
     --- @field lens_dirt {enable:boolean}
     --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
     local graphics_config = {
-        bloom_intensity = { enable = false, amount = 1 }, --- For `fx.glow`.
-        chromatic_abberation = { enable = true, mode = 'default' },
+        bloom_intensity = { enable = true, amount = 0.550 }, --- For `fx.glow`.
+        chromatic_abberation = { enable = true, mode = 'minimal' },
         curved_monitor = { enable = true, amount = PHI },
         filmgrain = { enable = false, amount = PHI_INV },
         lens_dirt = { enable = false },                        --- unimplemented
@@ -1454,8 +1455,8 @@ function love.load()
     if graphics_config.bloom_intensity.enable then
         local amount = graphics_config.bloom_intensity.amount
         local defaults = { min_luma = 0.7, strength = 5 }
-        shaders.post_processing.glow.min_luma = defaults.min_luma * amount * 1000
-        shaders.post_processing.glow.strength = defaults.strength * amount * -100
+        shaders.post_processing.glow.min_luma = defaults.min_luma * amount
+        shaders.post_processing.glow.strength = defaults.strength * amount
     end
 
     if graphics_config.chromatic_abberation.enable then
