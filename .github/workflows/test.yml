@@ -21,10 +21,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.4 lua5.4-dev luarocks
 
+      - name: Set up LuaRocks path
+        run: |
+          eval "$(luarocks path --bin)"
+
       - name: Install dependencies
         run: |
-          luarocks install busted
-          luarocks install luassert
+          luarocks install busted --local
+          luarocks install luassert --local
 
       - name: Run tests
         run: |
