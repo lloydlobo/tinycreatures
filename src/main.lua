@@ -1597,20 +1597,27 @@ function love.load()
         local creature_scale = 1
         local speed_multiplier = 1
 
-        creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
-            {
-                speed = 90 * speed_multiplier,
-                radius = math.ceil(15 * creature_scale)
-            }, {
-            speed = 70 * speed_multiplier,
-            radius = math.ceil(30 * creature_scale)
-        }, {
-            speed = 50 * speed_multiplier,
-            radius = math.ceil(50 * creature_scale)
-        }, {
-            speed = 20 * speed_multiplier,
-            radius = math.ceil(80 * creature_scale)
-        } }
+        local is_golden = true -- offers satisfying resolution of evolution from large size to smaller
+        if is_golden then
+            local MAX_CREATURE_SIZE = 80
+            local MAX_CREATURE_SPEED = 96
+
+            --- @type Stage[] # Size decreases as stage progresses.
+            creature_evolution_stages = {
+                { speed = math.floor(MAX_CREATURE_SPEED * (PHI_INV ^ 0) * speed_multiplier), radius = math.floor(MAX_CREATURE_SIZE * (PHI_INV ^ 3) * creature_scale) },
+                { speed = math.floor(MAX_CREATURE_SPEED * (PHI_INV ^ 1) * speed_multiplier), radius = math.floor(MAX_CREATURE_SIZE * (PHI_INV ^ 2) * creature_scale) },
+                { speed = math.floor(MAX_CREATURE_SPEED * (PHI_INV ^ 2) * speed_multiplier), radius = math.floor(MAX_CREATURE_SIZE * (PHI_INV ^ 1) * creature_scale) },
+                { speed = math.floor(MAX_CREATURE_SPEED * (PHI_INV ^ 3) * speed_multiplier), radius = math.floor(MAX_CREATURE_SIZE * (PHI_INV ^ 0) * creature_scale) },
+            }
+        else
+            --- @type Stage[] # Size decreases as stage progresses.
+            creature_evolution_stages = {
+                { speed = 90 * speed_multiplier, radius = math.ceil(15 * creature_scale) },
+                { speed = 70 * speed_multiplier, radius = math.ceil(30 * creature_scale) },
+                { speed = 50 * speed_multiplier, radius = math.ceil(50 * creature_scale) },
+                { speed = 20 * speed_multiplier, radius = math.ceil(80 * creature_scale) }
+            }
+        end
         do -- Test `creature_evolution_stages`.
             local max_creature_mutation_count = 0
             for i = 1, #creature_evolution_stages do
