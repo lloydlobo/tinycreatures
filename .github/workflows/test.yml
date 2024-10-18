@@ -21,4 +21,4 @@ jobs:
 
       - name: Enter Nix shell and run tests
         run: |
-          nix-shell --run "busted src/tests/*.lua"
+          nix-shell shell.nix --run "busted src/tests/*.lua"
