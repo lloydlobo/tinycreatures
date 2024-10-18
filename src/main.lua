@@ -1284,7 +1284,13 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
+    if config.IS_GAME_SLOW then
+        shaders.background_shader(function()
     draw_background_shader(alpha)
+        end)
+    else
+        draw_background_shader(alpha)
+    end
     draw_screenshake_fx(alpha)
     draw_creatures(alpha)
     draw_player_health_bar(alpha)
@@ -1392,16 +1398,16 @@ function love.load()
         ,
 
 
-        post_processing = moonshine(arena_w, arena_h, fx.godsray) --
-            .chain(fx.chromasep)                                  --
-            .chain(fx.glow)                                       -- fancy
-            .chain(fx.crt)                                        --
-            .chain(fx.colorgradesimple)                           --
-            .chain(fx.vignette)                                   --
+        post_processing = moonshine(arena_w, arena_h, fx.godsray)   --
+            .chain(fx.chromasep)                                    --
+            .chain(config.IS_GAME_SLOW and fx.glow or fx.chromasep) -- fancy
+            .chain(fx.crt)                                          --
+            .chain(fx.colorgradesimple)                             --
+            .chain(fx.vignette)                                     --
         ,
     }
 
-    if true then
+    if config.IS_GAME_SLOW then
         shaders.background_shader.pixelate.size = { 4, 4 }    -- Default: {5, 5}
         shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0
 
@@ -1435,11 +1441,13 @@ function love.load()
         lens_dirt = { enable = false },                        --- unimplemented
         scanlines = { enable = not true, mode = 'horizontal' } -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
     }
+    if config.IS_GAME_SLOW then
     if graphics_config.bloom_intensity.enable then
         local amount = graphics_config.bloom_intensity.amount
         local defaults = { min_luma = 0.7, strength = 5 }
         shaders.post_processing.glow.min_luma = defaults.min_luma * amount
         shaders.post_processing.glow.strength = defaults.strength * amount
+        end
     end
 
     if graphics_config.chromatic_abberation.enable then
