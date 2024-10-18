@@ -1,33 +1,62 @@
-if arg[1] == '' then --
-    error 'Please run `busted tests/*.lua`'
-end
-
 assert = require 'luassert'
 local common = require '../common'
+require 'busted'
 
-describe('get sign', function()
-    it('should get positive sign for positive numbers', function()
-        assert.are.equal(1, common.sign(1))
+if arg[1] == '' then --
+    error 'Please run `busted tests/*.lua`.'
+end
+
+describe('module "common" functions', function()
+    describe('get sign', function()
+        it('should get positive sign for positive numbers', function()
+            assert.are.equal(1, common.sign(1))
+        end)
+        it('should get negative sign for negative numbers', function()
+            assert.are.equal(-1, common.sign(-1))
+        end)
     end)
-    it('should get negative sign for negative numbers', function()
-        assert.are.equal(-1, common.sign(-1))
+
+    describe('get interpolated value', function()
+        it('should lerp midpoint', function()
+            assert.are.equal(5, common.lerp(0, 10, 0.5))
+            assert.are.equal(5.5, common.lerp(1, 10, 0.5))
+        end)
+        it('should correctly interpolate with lerp', function()
+            assert.are.equal(common.lerp(0, 10, 0.5), 5)
+            assert.are.equal(common.lerp(10, 20, 0.25), 12.5)
+        end)
+        it('should interpolate colors with lerp_rbg', function()
+            local dst = { 0, 0, 0 }
+            local src1 = { 1, 0, 0 }
+            local src2 = { 0, 1, 0 }
+            common.lerp_rbg(dst, src1, src2, 0.5)
+            assert.are.same(dst, { 0.5, 0.5, 0 })
+        end)
+    end)
+
+    describe('get manhattan_distance', function()
+        it('should get approx distance between two points', function()
+            assert.are.equal(0, common.manhattan_distance { x1 = 0, y1 = 0, x2 = 0, y2 = 0 })
+            assert.are.equal(2, common.manhattan_distance { x1 = -1, y1 = -1, x2 = 0, y2 = 0 })
+            assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = -1, y2 = -1 })
+            assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = 1, y2 = 1 })
+            assert.are.equal(2, common.manhattan_distance { x1 = 1, y1 = 1, x2 = 0, y2 = 0 })
+        end)
     end)
 end)
 
-describe('get interpolated value', function()
-    it('should lerp midpoint', function()
-        assert.are.equal(5, common.lerp(0, 10, 0.5))
-    end)
-    it('should lerp midpoint', function()
-        assert.are.equal(5.5, common.lerp(1, 10, 0.5))
-    end)
-end)
-
-describe('get manhattan_distance', function()
-    it('should get approx distance between two points', function()
-        assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = 1, y2 = 1 })
-        assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = -1, y2 = -1 })
-        assert.are.equal(2, common.manhattan_distance { x1 = 1, y1 = 1, x2 = 0, y2 = 0 })
-        assert.are.equal(2, common.manhattan_distance { x1 = -1, y1 = -1, x2 = 0, y2 = 0 })
+describe('module "common" datastructures', function()
+    describe('enumerations', function()
+        it('should have correct status values', function()
+            assert.are.equal(common.Status.active, 1)
+            assert.are.equal(common.Status.not_active, 0)
+            assert.are.equal(common.Status.active == 1, true)
+            assert.are.equal(common.Status.not_active == 0, true)
+        end)
+        it('should have correct health transition values', function()
+            assert.are.equal(common.HealthTransitions.none, -1)
+            assert.are.equal(common.HealthTransitions.healing, 0)
+            assert.are.equal(common.HealthTransitions.healthy, 1)
+        end)
     end)
 end)
