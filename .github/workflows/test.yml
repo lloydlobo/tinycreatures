@@ -16,9 +16,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Nix
-        uses: cachix/install-nix-action@v22
-
-      - name: Enter Nix shell and run tests
+      - name: Install Nix
         run: |
-          nix-shell shell.nix --run "busted src/tests/*.lua"
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+
+      - name: Setup Nix Environment
+        run: |
+          nix-env -iA nixpkgs.luarocks nixpkgs.busted nixpkgs.luassert
+
+      - name: Run tests
+        run: |
+          busted src/tests/*.lua
