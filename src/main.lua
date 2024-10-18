@@ -1169,11 +1169,11 @@ function update_and_draw_player_shield_collectible(alpha)
     end
 end
 
--- bigger parallax entities go slow?
--- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 4)
-local PARALLAX_OFFSET_FACTOR_X = 0.05 * PHI_INV -- NOTE: Should be lower to avoid puking
-local PARALLAX_OFFSET_FACTOR_Y = 0.05 * PHI_INV
+local IS_PARALLAX_TARGET_PLAYER = true
+local MAX_PARALLAX_ENTITIES = config.IS_GAME_SLOW and (2 ^ 8) or (2 ^ 4)
+-- bigger parallax entities go slow? or closer to the screen goes slow?
+local PARALLAX_OFFSET_FACTOR_X = ((config.IS_GAME_SLOW and 0.05 or PHI_INV ^ 6) * PHI_INV)
+local PARALLAX_OFFSET_FACTOR_Y = ((config.IS_GAME_SLOW and 0.05 or PHI_INV ^ 7) * PHI_INV) -- WARN: Y Should be lower than X to avoid nausea/puking
 local parallax_entity_depth = {}
 local parallax_entity_frames = {}
 local parallax_entity_is_active = {}
@@ -1181,32 +1181,40 @@ local parallax_entity_pos_x = {} -- without arena_w
 local parallax_entity_pos_y = {} -- without arena_h
 local parallax_entity_radius = {}
 for i = 1, MAX_PARALLAX_ENTITIES do
-    parallax_entity_depth[i] = love.math.random(2, 12)
+    parallax_entity_depth[i] = config.IS_GAME_SLOW and love.math.random(2, 12) or love.math.random(1, 3)
     parallax_entity_frames[i] = love.math.random(7, 12)
     parallax_entity_is_active[i] = true
     parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
     parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
-    parallax_entity_radius[i] = love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5)
+    parallax_entity_radius[i] = (config.IS_GAME_SLOW and
+        love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5) or
+        love.math.random(1, 3)
+    )
 end
 assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
     'Assert count of parallax entity is a perfect square')
-local offset_x = 0
-local offset_y = 0
+local offset_x                    = 0
+local offset_y                    = 0
 local parallax_entity_alpha_color = ({ 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
-local sign1 = ({ -1, 1 })[love.math.random(1, 2)]
-local sign2 = ({ -8, 8 })[love.math.random(1, 2)]
-
+local sign1                       = ({ -1, 1 })[love.math.random(1, 2)]
+local sign2                       = ({ -3, 3 })[love.math.random(1, 2)]
+local amplitude_x_factor          = 0.618 ^ 17
 function update_background_shader(dt)
     local alpha = dt_accum * config.FIXED_DT_INV
     local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
     local smoothValue = common.lerper.smoothstep(a, b, t)
 
     local freq = (common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), .5))
-    local star_vel_x = .001 * 5 * freq * dt
-    local star_vel_y = math.abs(0.6 * 8 * freq) * dt
+    star_vel_x = 1 --- FIXME: TEMPORARY GLOBAL
+    do             -- Oscillate the x position using a sine function
+        local oscillate_amplitude_x = amplitude_x_factor * love.math.random(1, PHI)
+        local oscillate_frequency_x = love.math.random(PHI, 0)
+        star_vel_x = star_vel_x * math.sin(game_timer_t * oscillate_frequency_x) * oscillate_amplitude_x * dt
+    end
+    local star_vel_y = math.abs(PHI_INV * 1.25 * freq) * dt
 
     for i = 1, MAX_PARALLAX_ENTITIES, 4 do
-        if config.IS_GRUG_BRAIN then
+        if config.IS_GRUG_BRAIN and config.IS_GAME_SLOW then
             if screenshake.duration > 0 then
                 star_vel_x = (star_vel_x - common.lerper['smoothstep'](star_vel_x * (-love.math.random(-4, 4)), star_vel_x * love.math.random(-4, 4), smoothValue))
                 star_vel_y = (star_vel_y - common.lerper['smoothstep'](star_vel_y * (-love.math.random(-0.5, 2.5)), star_vel_y * love.math.random(0, 8), smoothValue))
@@ -1235,36 +1243,31 @@ function draw_background_shader(alpha)
     local dx = 0
     local dy = 0
 
-    local is_follow_player_parallax = not true
-    if is_follow_player_parallax then
+    if IS_PARALLAX_TARGET_PLAYER then
         offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
         offset_y = cs.player_y / arena_h
         dx = offset_x * PARALLAX_OFFSET_FACTOR_X
         dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
-        if config.debug.is_development then
-            LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
-        end
+        -- if config.debug.is_development then
+        --     LG.print(tostring(star_vel_x), 100, 100)
+        --     LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
+        -- end
     end
 
-    shaders.background_shader(function()
+    LG.setColor(common.Color.creature_healed_parallax)
         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
-            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i])
             LG.circle('fill', (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w,
                 (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, parallax_entity_radius[i])
-            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 1])
             LG.circle('fill', (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w,
                 (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h,
                 parallax_entity_radius[i + 1])
-            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 2])
             LG.circle('fill', (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w,
                 (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h,
                 parallax_entity_radius[i + 2])
-            LG.setColor(.8, .8, .8, parallax_entity_alpha_color / parallax_entity_depth[i + 3])
             LG.circle('fill', (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w,
                 (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h,
                 parallax_entity_radius[i + 3])
         end
-    end)
 end
 
 function draw_screenshake_fx(alpha)
