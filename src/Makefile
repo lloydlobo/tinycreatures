@@ -8,3 +8,9 @@ run:
 
 watch:
 	find -name '*.lua' | entr -crs 'date; make run; echo exit status $?'
+
+test-busted:
+	busted tests/*.lua
+
+watch-busted:
+	find -name '*.lua' | entr -crs 'date; make test-busted; echo exit status $?'
