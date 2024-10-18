@@ -2,17 +2,18 @@ assert = require 'luassert'
 local common = require '../common'
 require 'busted'
 
-if arg[1] == '' then --
-    error 'Please run `busted tests/*.lua`.'
-end
+if arg[1] == '' then error 'Please run `busted tests/*.lua`.' end
 
-describe('module "common" functions', function()
+describe('common - functions', function()
     describe('get sign', function()
         it('should get positive sign for positive numbers', function()
             assert.are.equal(1, common.sign(1))
         end)
         it('should get negative sign for negative numbers', function()
             assert.are.equal(-1, common.sign(-1))
+        end)
+        it('should not return zero for zero input', function() -- edge case
+            assert.are.equal(1, common.sign(0))
         end)
     end)
 
@@ -25,12 +26,35 @@ describe('module "common" functions', function()
             assert.are.equal(common.lerp(0, 10, 0.5), 5)
             assert.are.equal(common.lerp(10, 20, 0.25), 12.5)
         end)
+        it('should return start when t is 0', function() -- edge case
+            assert.are.equal(0, common.lerp(0, 10, 0))
+        end)
+        it('should return end when t is 1', function() -- edge case
+            assert.are.equal(10, common.lerp(0, 10, 1))
+        end)
+    end)
+
+    describe('mutate destination table with interpolated rgb value', function()
         it('should interpolate colors with lerp_rbg', function()
             local dst = { 0, 0, 0 }
             local src1 = { 1, 0, 0 }
             local src2 = { 0, 1, 0 }
             common.lerp_rbg(dst, src1, src2, 0.5)
             assert.are.same(dst, { 0.5, 0.5, 0 })
+        end)
+        it('should return src1 when t is 0', function()
+            local dst = { 0, 0, 0 }
+            local src1 = { 1, 0, 0 }
+            local src2 = { 0, 1, 0 }
+            common.lerp_rbg(dst, src1, src2, 0)
+            assert.are.same(dst, src1)
+        end)
+        it('should return src2 when t is 1', function()
+            local dst = { 0, 0, 0 }
+            local src1 = { 1, 0, 0 }
+            local src2 = { 0, 1, 0 }
+            common.lerp_rbg(dst, src1, src2, 1)
+            assert.are.same(dst, src2)
         end)
     end)
 
@@ -45,7 +69,7 @@ describe('module "common" functions', function()
     end)
 end)
 
-describe('module "common" datastructures', function()
+describe('common - datastructures', function()
     describe('enumerations', function()
         it('should have correct status values', function()
             assert.are.equal(common.Status.active, 1)
