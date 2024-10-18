@@ -1170,29 +1170,29 @@ function update_and_draw_player_shield_collectible(alpha)
 end
 
 local IS_PARALLAX_TARGET_PLAYER = true
-local MAX_PARALLAX_ENTITIES = config.IS_GAME_SLOW and (2 ^ 8) or (2 ^ 4)
+local MAX_PARALLAX_ENTITIES = not config.IS_GAME_SLOW and (2 ^ 8) or (2 ^ 4)
 -- Bigger parallax entities go slow? or closer to the screen goes slow?
 local PARALLAX_OFFSET_FACTOR_X = ((config.IS_GAME_SLOW and 0.05 or PHI_INV ^ 6) * PHI_INV)
 local PARALLAX_OFFSET_FACTOR_Y = ((config.IS_GAME_SLOW and 0.05 or PHI_INV ^ 7) * PHI_INV) -- WARN: Y Should be lower than X to avoid nausea/puking
 local parallax_entity_depth = {}
 local parallax_entity_frames = {}
 local parallax_entity_is_active = {}
-local parallax_entity_pos_x = {} -- without arena_w
-local parallax_entity_pos_y = {} -- without arena_h
+local parallax_entity_pos_x = {}                                                     -- without arena_w
+local parallax_entity_pos_y = {}                                                     -- without arena_h
 local parallax_entity_radius = {}
-local parallax_entity_quads = {} --- Array to store quad indices for each entity
+local parallax_entity_quads = {}                                                     --- Array to store quad indices for each entity
 
+local parallax_texture_path = ("resources/texture/tinycreatures_20241015134217.png") --- HACK: Add curved (bowl) depth, by using crt'd screenshot of previous gameplay.... decent results --with least effort
 -- Load texture and create quads.
-local texture_path = "resources/texture/tinycreatures_20241015134217.png"
-local parallax_texture = LG.newImage(texture_path or 'resources/texture/parallax_texture.png')
-local quads = {}
-local quad_size = 16 -- Each quad is 16x16 pixels
-local texture_width = parallax_texture:getWidth()
-local texture_height = parallax_texture:getHeight()
-for y = 0, texture_height - quad_size, quad_size do
-    for x = 0, texture_width - quad_size, quad_size do
-        local quad = LG.newQuad(x, y, quad_size, quad_size, texture_width, texture_height)
-        table.insert(quads, quad)
+local parallax_texture = LG.newImage(parallax_texture_path or 'resources/texture/parallax_texture.png')
+local parallax_quads = {}
+local parallax_quad_size = 16 -- Each quad is 16x16 pixels
+local parallax_texture_width = parallax_texture:getWidth()
+local parallax_texture_height = parallax_texture:getHeight()
+for y = 0, parallax_texture_height - parallax_quad_size, parallax_quad_size do
+    for x = 0, parallax_texture_width - parallax_quad_size, parallax_quad_size do
+        local quad = (LG.newQuad(x, y, parallax_quad_size, parallax_quad_size, parallax_texture_width, parallax_texture_height))
+        table.insert(parallax_quads, quad)
     end
 end
 
@@ -1201,10 +1201,10 @@ for i = 1, MAX_PARALLAX_ENTITIES do
     parallax_entity_depth[i] = config.IS_GAME_SLOW and love.math.random(2, 12) or love.math.random(1, 3)
     parallax_entity_frames[i] = love.math.random(7, 12)
     parallax_entity_is_active[i] = true
-    parallax_entity_pos_x[i] = love.math.random()          --- 0.0..1.0
-    parallax_entity_pos_y[i] = love.math.random()          --- 0.0..1.0
+    parallax_entity_pos_x[i] = love.math.random()                   --- 0.0..1.0
+    parallax_entity_pos_y[i] = love.math.random()                   --- 0.0..1.0
     parallax_entity_radius[i] = (config.IS_GAME_SLOW and love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5) or love.math.random(1, 3))
-    parallax_entity_quads[i] = love.math.random(1, #quads) -- Randomly assign a quad to each entity
+    parallax_entity_quads[i] = love.math.random(1, #parallax_quads) -- Randomly assign a quad to each entity
 end
 if #parallax_entity_pos_x ~= (math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x)) then
     error(
@@ -1212,42 +1212,45 @@ if #parallax_entity_pos_x ~= (math.sqrt(#parallax_entity_pos_x) * math.sqrt(#par
         2)
 end
 
-local amplitude_x_factor          = 0.618 ^ 17
-local offset_x                    = 0
-local offset_y                    = 0
-local parallax_entity_alpha_color = ({ 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
-local sign1                       = ({ -1, 1 })[love.math.random(1, 2)]
-local sign2                       = ({ -3, 3 })[love.math.random(1, 2)]
+-- DOING: Create parallax texture spritebatch that uses quads.
+local parallax_texture_sprite_batch = LG.newSpriteBatch(parallax_texture, MAX_PARALLAX_ENTITIES)
+
+local parallax_amplitude_x_factor   = 0.618 ^ 17
+local parallax_entity_alpha_color   = ({ 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
+local parallax_offset_x             = 0
+local parallax_offset_y             = 0
+local parallax_smoothstep_sign1     = ({ -1, 1 })[love.math.random(1, 2)]
+local parallax_smoothstep_sign2     = ({ -3, 3 })[love.math.random(1, 2)]
 
 function update_background_shader(dt)
     local alpha = dt_accum * config.FIXED_DT_INV
-    local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
+    local a, b, t = parallax_smoothstep_sign1 * 0.003 * alpha, parallax_smoothstep_sign2 * 0.03 * alpha,
+        math.sin(0.003 * alpha)
     local smoothValue = common.lerper.smoothstep(a, b, t)
     local freq = (common.lerper['smoothstep'](common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), .5))
 
-    star_vel_x = 1 --- FIXME: TEMPORARY GLOBAL
-    do             -- Oscillate the x position using a sine function
-        local oscillate_amplitude_x = amplitude_x_factor * love.math.random(1, PHI)
+    local vel_x = 1 --- FIXME: TEMPORARY GLOBAL (debugging for smooth curves)
+    do              -- Oscillate the x position using a sine function
+        local oscillate_amplitude_x = parallax_amplitude_x_factor * love.math.random(1, PHI)
         local oscillate_frequency_x = love.math.random(PHI, 0)
-        star_vel_x = star_vel_x * math.sin(game_timer_t * oscillate_frequency_x) * oscillate_amplitude_x * dt
+        vel_x = vel_x * math.sin(game_timer_t * oscillate_frequency_x) * oscillate_amplitude_x * dt
     end
-    local star_vel_y = math.abs(PHI_INV * 1.25 * freq) * dt
+    local vel_y = math.abs(PHI_INV * 1.25 * freq) * dt
 
     for i = 1, MAX_PARALLAX_ENTITIES, 4 do
         if (config.IS_GRUG_BRAIN and config.IS_GAME_SLOW) and (screenshake.duration > 0) then
-                star_vel_x = (star_vel_x - common.lerper['smoothstep'](star_vel_x * (-love.math.random(-4, 4)), star_vel_x * love.math.random(-4, 4), smoothValue))
-                star_vel_y = (star_vel_y - common.lerper['smoothstep'](star_vel_y * (-love.math.random(-0.5, 2.5)), star_vel_y * love.math.random(0, 8), smoothValue))
+            vel_x = (vel_x - common.lerper['smoothstep'](vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue))
+            vel_y = (vel_y - common.lerper['smoothstep'](vel_y * (-love.math.random(-0.5, 2.5)), vel_y * love.math.random(0, 8), smoothValue))
         end
+        parallax_entity_pos_x[i] = parallax_entity_pos_x[i] - math.sin(parallax_entity_depth[i] * vel_x)
+        parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] - math.sin(parallax_entity_depth[i + 1] * vel_x)
+        parallax_entity_pos_x[i + 2] = parallax_entity_pos_x[i + 2] - math.sin(parallax_entity_depth[i + 2] * vel_x)
+        parallax_entity_pos_x[i + 3] = parallax_entity_pos_x[i + 3] - math.sin(parallax_entity_depth[i + 3] * vel_x)
 
-        parallax_entity_pos_x[i] = parallax_entity_pos_x[i] - math.sin(parallax_entity_depth[i] * star_vel_x)
-        parallax_entity_pos_x[i + 1] = parallax_entity_pos_x[i + 1] - math.sin(parallax_entity_depth[i + 1] * star_vel_x)
-        parallax_entity_pos_x[i + 2] = parallax_entity_pos_x[i + 2] - math.sin(parallax_entity_depth[i + 2] * star_vel_x)
-        parallax_entity_pos_x[i + 3] = parallax_entity_pos_x[i + 3] - math.sin(parallax_entity_depth[i + 3] * star_vel_x)
-
-        parallax_entity_pos_y[i] = parallax_entity_pos_y[i] - (star_vel_y / parallax_entity_depth[i])
-        parallax_entity_pos_y[i + 1] = parallax_entity_pos_y[i + 1] - (star_vel_y / parallax_entity_depth[i + 1])
-        parallax_entity_pos_y[i + 2] = parallax_entity_pos_y[i + 2] - (star_vel_y / parallax_entity_depth[i + 2])
-        parallax_entity_pos_y[i + 3] = parallax_entity_pos_y[i + 3] - (star_vel_y / parallax_entity_depth[i + 3])
+        parallax_entity_pos_y[i] = parallax_entity_pos_y[i] - (vel_y / parallax_entity_depth[i])
+        parallax_entity_pos_y[i + 1] = parallax_entity_pos_y[i + 1] - (vel_y / parallax_entity_depth[i + 1])
+        parallax_entity_pos_y[i + 2] = parallax_entity_pos_y[i + 2] - (vel_y / parallax_entity_depth[i + 2])
+        parallax_entity_pos_y[i + 3] = parallax_entity_pos_y[i + 3] - (vel_y / parallax_entity_depth[i + 3])
 
         if parallax_entity_pos_y[i] < 0 then parallax_entity_pos_y[i] = 1 end
         if parallax_entity_pos_y[i + 1] < 0 then parallax_entity_pos_y[i + 1] = 1 end
@@ -1262,50 +1265,85 @@ function draw_background_shader(alpha)
     local dx = 0
     local dy = 0
     if IS_PARALLAX_TARGET_PLAYER then
-        offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
-        offset_y = cs.player_y / arena_h
-        dx = offset_x * PARALLAX_OFFSET_FACTOR_X
-        dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
+        parallax_offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
+        parallax_offset_y = cs.player_y / arena_h
+        dx = parallax_offset_x * PARALLAX_OFFSET_FACTOR_X
+        dy = parallax_offset_y * PARALLAX_OFFSET_FACTOR_Y
         -- if config.debug.is_development then
-        --     LG.print(tostring(star_vel_x), 100, 100)
         --     LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * .5 + 16 * 1)
         -- end
     end
 
     LG.setColor(common.Color.creature_healed_parallax)
+
     local is_quads = true
     if is_quads then
-        local is_draw_batch = true
-        if is_draw_batch then
-            for i = 1, MAX_PARALLAX_ENTITIES, 4 do -- `4` -> 280:(drawcallsbatch) and 27:(drawcalls)
-                LG.draw(parallax_texture, quads[parallax_entity_quads[i]],
+        local is_draw_quads_batch_of_4 = true
+        if is_draw_quads_batch_of_4 then
+            local is_sprite_batch = true
+            if is_sprite_batch then
+                parallax_texture_sprite_batch:clear()
+                for i = 1, MAX_PARALLAX_ENTITIES, 4 do -- `4` TEMPORARY -> 145:(drawcallsbatch) and 27:(drawcalls)
+                    parallax_texture_sprite_batch:add(parallax_quads[parallax_entity_quads[i]],
                     (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w,
                     (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, 0, 1, 1,
-                    quad_size * .5,
-                    quad_size * .5)
-                LG.draw(parallax_texture, quads[parallax_entity_quads[i + 1]],
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    parallax_texture_sprite_batch:add(parallax_quads[parallax_entity_quads[i + 1]],
                     (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w,
                     (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h, 0, 1, 1,
-                    quad_size * .5,
-                    quad_size * .5)
-                LG.draw(parallax_texture, quads[parallax_entity_quads[i + 2]],
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    parallax_texture_sprite_batch:add(parallax_quads[parallax_entity_quads[i + 2]],
                     (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w,
                     (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h, 0, 1, 1,
-                    quad_size * .5,
-                    quad_size * .5)
-                LG.draw(parallax_texture, quads[parallax_entity_quads[i + 3]],
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    parallax_texture_sprite_batch:add(parallax_quads[parallax_entity_quads[i + 3]],
                     (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w,
                     (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h, 0, 1, 1,
-                    quad_size * .5,
-                    quad_size * .5)
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                end
+                parallax_texture_sprite_batch:flush()
+                LG.draw(parallax_texture_sprite_batch)
+            else
+                for i = 1, MAX_PARALLAX_ENTITIES, 4 do -- `4` TEMPORARY -> 280:(drawcallsbatch) and 27:(drawcalls)
+                    LG.draw(parallax_texture, parallax_quads[parallax_entity_quads[i]],
+                        (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w,
+                        (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, 0, 1, 1,
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    LG.draw(parallax_texture, parallax_quads[parallax_entity_quads[i + 1]],
+                        (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w,
+                        (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h, 0, 1, 1,
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    LG.draw(parallax_texture, parallax_quads[parallax_entity_quads[i + 2]],
+                        (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w,
+                        (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h, 0, 1, 1,
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                    LG.draw(parallax_texture, parallax_quads[parallax_entity_quads[i + 3]],
+                        (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w,
+                        (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h, 0, 1, 1,
+                        parallax_quad_size * .5, parallax_quad_size * .5)
+                end
             end
         else
+            local is_sprite_batch = true
+            if is_sprite_batch then
+                parallax_texture_sprite_batch:clear()
+                for i = 1, MAX_PARALLAX_ENTITIES, 1 do -- `1` TEMPORARY -> 145:(drawcallsbatch) and 27:(drawcalls)
+                    local quad = parallax_quads[parallax_entity_quads[i]]
+                    local pos_x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
+                    local pos_y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
+                    parallax_texture_sprite_batch:add(quad, pos_x, pos_y, 0, 1, 1, parallax_quad_size * .5,
+                        parallax_quad_size * .5)
+                end
+                parallax_texture_sprite_batch:flush()
+                LG.draw(parallax_texture_sprite_batch)
+        else
             for i = 1, MAX_PARALLAX_ENTITIES, 1 do -- `1` TEMPORARY -> 280:(drawcallsbatch) and 27:(drawcalls)
-                local quad = quads[parallax_entity_quads[i]]
+                    local quad = parallax_quads[parallax_entity_quads[i]]
                 local pos_x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
                 local pos_y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
-
-                LG.draw(parallax_texture, quad, pos_x, pos_y, 0, 1, 1, quad_size * .5, quad_size * .5) -- draw with center pivot
+                    LG.draw(parallax_texture, quad, pos_x, pos_y, 0, 1, 1, parallax_quad_size * .5,
+                        parallax_quad_size * .5) -- draw with center pivot
+                end
             end
         end
     else
