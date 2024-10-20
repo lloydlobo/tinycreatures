@@ -5,10 +5,15 @@ name: format
 on:
   push:
     branches:
-      - main
+      - '*' # Runs on any branch when changes are pushed
     paths:
       - '**.lua'
-
+  pull_request:
+    branches:
+      - '*' # Runs when a PR targets any branch
+    paths:
+      - '**.lua'
+      
 jobs:
   postprocessing:
     runs-on: ubuntu-latest
