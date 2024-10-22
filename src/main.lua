@@ -1714,6 +1714,7 @@ function love.load()
 end
 
 function love.update(dt)
+    if config.debug.is_development then require('lurker').update() end
     -- #1 Handle music and sound logic.
     if not music_bgm:isPlaying() then
         love.audio.play(music_bgm)

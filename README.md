@@ -1,5 +1,7 @@
 # Tiny Blood Cells
 
+[![Lua Tests](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml) • [![format](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml)
+
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
 ![tinycreatures_20241017121242](static/screencasts/tinycreatures_20241017121242.gif)
