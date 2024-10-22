@@ -22,9 +22,9 @@ jobs:
 
       - name: Format with Stylua
         uses: JohnnyMorganz/stylua-action@v4
-        # with:
+        with:
+          version: v0.16.1
         #   token: ${{ secrets.GITHUB_TOKEN }}
-        #   version: v0.16.1
         #   args: ./lua
 
       - uses: stefanzweifel/git-auto-commit-action@v5
