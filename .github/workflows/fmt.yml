@@ -23,6 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Add a debug step to list files
+      - name: List files
+        run: ls -R
+
       - name: Format with Stylua
         uses: JohnnyMorganz/stylua-action@v4
         with:
