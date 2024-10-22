@@ -27,7 +27,7 @@ jobs:
         uses: JohnnyMorganz/stylua-action@v4
         with:
           version: v0.16.1
-          args: 'src/**/*.lua'
+          args: '**/*.lua' # Adjusted path for all Lua files
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: stefanzweifel/git-auto-commit-action@v5
