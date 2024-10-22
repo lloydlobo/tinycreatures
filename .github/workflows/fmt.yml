@@ -21,11 +21,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Format with Stylua
-        uses: JohnnyMorganz/stylua-action@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          version: v0.16.1
-          args: ./lua
+        uses: JohnnyMorganz/stylua-action@v4
+        # with:
+        #   token: ${{ secrets.GITHUB_TOKEN }}
+        #   version: v0.16.1
+        #   args: ./lua
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
