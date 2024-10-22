@@ -1,53 +1,87 @@
 # Copied from hrsh7th/nvim-cmp/.github/workflows/format.yaml
-
-name: format
-
+name: Lua Tests
 on:
   push:
     branches:
       - '*' # Runs on any branch when changes are pushed
-    paths:
-      - '**.lua'
   pull_request:
     branches:
       - '*' # Runs when a PR targets any branch
-    paths:
-      - '**.lua'
-
-permissions:
-  contents: write
-
 jobs:
-  postprocessing:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      # Add a debug step to list files
-      - name: List files
-        run: ls -R
-
-      - name: Debug List Lua files
-        run: find . -name "*.lua"
-
-      # - name: Format with Stylua
-      #   uses: JohnnyMorganz/stylua-action@v4
-      #   with:
-      #     version: v0.16.1
-      #     args: 'src/*.lua'
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #
-
-      - name: Format with Stylua
-        uses: JohnnyMorganz/stylua-action@v4
-        with:
-          version: v0.16.1
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: '**/*.lua'
-        working-directory: src
-
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Format with stylua"
-
-
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install Lua
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.3 liblua5.3-dev
+      
+      - name: Install LuaRocks
+        run: |
+          wget https://luarocks.org/releases/luarocks-3.8.0.tar.gz
+          tar zxpf luarocks-3.8.0.tar.gz
+          cd luarocks-3.8.0
+          ./configure --with-lua-include=/usr/include/lua5.3
+          make
+          sudo make install
+      
+      - name: Install dependencies
+        run: |
+          sudo luarocks install luacheck
+          sudo luarocks install lua-format
+          sudo luarocks install busted
+          sudo luarocks install luassert
+      
+      - name: Lint
+        run: |
+          luacheck src/
+      
+      - name: Check formatting
+        run: |
+          find src -name "*.lua" -exec lua-format -i {} \;
+          git diff --exit-code || (echo "Formatting check failed. Please run lua-format locally" && exit 1)
+      
+      - name: Run tests
+        run: |
+          busted src/tests/*.lua
+#
+# name: format
+#
+# on:
+#   push:
+#     branches:
+#       - '*' # Runs on any branch when changes are pushed
+#     paths:
+#       - '**.lua'
+#   pull_request:
+#     branches:
+#       - '*' # Runs when a PR targets any branch
+#     paths:
+#       - '**.lua'
+#
+# permissions:
+#   contents: write
+#
+# jobs:
+#   postprocessing:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#
+#       # Add a debug step to list files
+#       - name: List files
+#         run: ls -R
+#
+#       - name: Format with Stylua
+#         uses: JohnnyMorganz/stylua-action@v4
+#         with:
+#           version: v0.16.1
+#           args: 'src/*.lua'
+#           token: ${{ secrets.GITHUB_TOKEN }}
+#
+#       - uses: stefanzweifel/git-auto-commit-action@v5
+#         with:
+#           commit_message: "Format with stylua"
