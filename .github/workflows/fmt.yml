@@ -13,7 +13,10 @@ on:
       - '*' # Runs when a PR targets any branch
     paths:
       - '**.lua'
-      
+
+permissions:
+  contents: write
+
 jobs:
   postprocessing:
     runs-on: ubuntu-latest
@@ -24,8 +27,8 @@ jobs:
         uses: JohnnyMorganz/stylua-action@v4
         with:
           version: v0.16.1
+          args: 'src/**/*.lua'
           token: ${{ secrets.GITHUB_TOKEN }}
-        #   args: ./lua
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
