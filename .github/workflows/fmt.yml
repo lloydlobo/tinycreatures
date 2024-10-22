@@ -24,7 +24,7 @@ jobs:
         uses: JohnnyMorganz/stylua-action@v4
         with:
           version: v0.16.1
-        #   token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
         #   args: ./lua
 
       - uses: stefanzweifel/git-auto-commit-action@v5
