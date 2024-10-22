@@ -27,13 +27,27 @@ jobs:
       - name: List files
         run: ls -R
 
+      - name: Debug List Lua files
+        run: find . -name "*.lua"
+
+      # - name: Format with Stylua
+      #   uses: JohnnyMorganz/stylua-action@v4
+      #   with:
+      #     version: v0.16.1
+      #     args: 'src/*.lua'
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #
+
       - name: Format with Stylua
         uses: JohnnyMorganz/stylua-action@v4
         with:
           version: v0.16.1
-          args: 'src/*.lua'
           token: ${{ secrets.GITHUB_TOKEN }}
+          args: '**/*.lua'
+        working-directory: src
 
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Format with stylua"
+
+
