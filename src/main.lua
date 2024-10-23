@@ -425,7 +425,11 @@ function update_player_entity_projectiles_this_frame(dt)
         local temp_hit_counter_this_frame = 0 -- for double hit sfx
         for laser_index = 1, #cs.lasers_x do
                 if not (cs.lasers_is_active[laser_index] == common.Status.active) then goto continue_not_is_active_laser end
-                laser_circle = { x = cs.lasers_x[laser_index], y = cs.lasers_y[laser_index], radius = config.LASER_RADIUS }
+                laser_circle = {
+                        x = cs.lasers_x[laser_index],
+                        y = cs.lasers_y[laser_index],
+                        radius = config.LASER_RADIUS,
+                }
                 for creature_index = 1, TOTAL_CREATURES_CAPACITY do
                         if not (cs.creatures_is_active[creature_index] == common.Status.active) then goto continue_not_is_active_creature end
                         local curr_stage_id = cs.creatures_evolution_stage[creature_index]
@@ -499,6 +503,7 @@ function respawn_next_shield()
                 player_shield_collectible_pos_y = love.math.random() * arena_h
         end
 end
+
 function update_player_shield_collectible_this_frame(dt)
         local COLLECTIBLE_SHIELD_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 3
         if curr_state.player_health < config.MAX_PLAYER_HEALTH then --
@@ -507,7 +512,11 @@ function update_player_shield_collectible_this_frame(dt)
 
         local is_player_increment_shield = is_intersect_circles {
                 a = { x = curr_state.player_x, y = curr_state.player_y, radius = config.PLAYER_RADIUS },
-                b = { x = player_shield_collectible_pos_x or 0, y = player_shield_collectible_pos_y or 0, radius = COLLECTIBLE_SHIELD_RADIUS },
+                b = {
+                        x = player_shield_collectible_pos_x or 0,
+                        y = player_shield_collectible_pos_y or 0,
+                        radius = COLLECTIBLE_SHIELD_RADIUS,
+                },
         }
         if (player_shield_collectible_pos_x ~= nil and player_shield_collectible_pos_y ~= nil) and is_player_increment_shield then
                 if curr_state.player_health < config.MAX_PLAYER_HEALTH then curr_state.player_health = curr_state.player_health + 1 end
@@ -1194,6 +1203,7 @@ function draw_background_shader(alpha)
                 _draw_background_shader(alpha)
         end
 end
+
 --- TODO: simulate fireworks like animation of entities
 function _draw_background_shader(alpha)
         local cs = curr_state
@@ -1435,7 +1445,7 @@ function love.load()
                 shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 2)
         end
         if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-                shaders.post_processing.vignette.radius = 0.8 + 0.1 -- avoid health bar at the top
+                shaders.post_processing.vignette.radius = 0.8 + 0.15 -- avoid health bar at the top
                 -- shaders.post_processing.vignette.softness = (0.5 + 0.2)
                 -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
                 -- shaders.post_processing.vignette.color = common.Color.background
@@ -1608,6 +1618,8 @@ function love.load()
                         curr_state.creatures_is_active[i] = common.Status.active
                         curr_state.creatures_vel_x[i] = 0
                         curr_state.creatures_vel_y[i] = 0
+                        -- Avoid creature spawning at window corners. (when value is 0)
+                        -- FIXME: Ensure creature doesn't intersect with player at new level load
                         do
                                 curr_state.creatures_x[i] = love.math.random(32, arena_w - 32)
                                 curr_state.creatures_y[i] = love.math.random(32, arena_h - 32)
