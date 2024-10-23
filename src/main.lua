@@ -1140,7 +1140,7 @@ end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 8)
+local MAX_PARALLAX_ENTITIES = (2 ^ 6)
 local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
 local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
 local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
@@ -1152,12 +1152,12 @@ local parallax_entity_pos_y = {} -- without arena_h
 local parallax_entity_radius = {}
 for i = 1, MAX_PARALLAX_ENTITIES do
         local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
-        parallax_entity_radius[i] = math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
+        parallax_entity_radius[i] = (config.IS_GAME_SLOW and 0.16 or 0.16) * math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
         parallax_entity_depth[i] = depth
         parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
         parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
 end
-if true then
+if not true then
         assert(
                 #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
                 'Assert count of parallax entity is a perfect square'
@@ -1165,9 +1165,9 @@ if true then
 end
 local offset_x = 0
 local offset_y = 0
-local parallax_entity_alpha_color = ({ (PHI_INV ^ 2) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
+local parallax_entity_alpha_color = ({ (PHI_INV ^ (config.IS_GAME_SLOW and -1 or 4)) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
 local sign1 = ({ -1, 1 })[love.math.random(1, 2)]
-local sign2 = ({ -8, 8 })[love.math.random(1, 2)]
+local sign2 = ({ -3, 3 })[love.math.random(1, 2)]
 
 function update_background_shader(dt)
         local alpha = dt_accum * config.FIXED_DT_INV
@@ -1175,7 +1175,7 @@ function update_background_shader(dt)
         local smoothValue = smoothstep(a, b, t)
         local freq = (smoothstep(common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
         local vel_x = 0.001 * 5 * freq * dt
-        local vel_y = math.abs(0.6 * 8 * freq) * dt
+        local vel_y = math.abs(0.4 * 8 * freq) * dt
         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
                 if config.IS_GRUG_BRAIN and screenshake.duration > 0 then
                         vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
@@ -1196,6 +1196,62 @@ function update_background_shader(dt)
         end
 end
 
+-- draw calls 2474 for (2^8 entities)
+-- function _draw_background_shader(alpha)
+--         local cs = curr_state
+--         local dx = 0
+--         local dy = 0
+--         local is_follow_player_parallax = true
+--         if is_follow_player_parallax then
+--                 offset_x = cs.player_x / arena_w
+--                 offset_y = cs.player_y / arena_h
+--                 dx = offset_x * PARALLAX_OFFSET_FACTOR_X
+--                 dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
+--         end
+--         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
+--                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i])
+--                 LG.circle( 'fill', (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w, (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, parallax_entity_radius[i])
+--                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 1]) LG.circle( 'fill', (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w, (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h, parallax_entity_radius[i + 1])
+--                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 2]) LG.circle( 'fill', (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w, (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h, parallax_entity_radius[i + 2])
+--                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 3]) LG.circle( 'fill', (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w, (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h, parallax_entity_radius[i + 3])
+--         end
+-- end
+
+-- draw calls 162 for (2^8 entities)
+function _draw_background_shader(alpha)
+        --- MAYBE: simulate fireworks like animation of entities
+        local cs = curr_state
+        local dx = 0
+        local dy = 0
+
+        local is_follow_player_parallax = true
+        if is_follow_player_parallax then
+                offset_x = cs.player_x / arena_w -- FIXME: should lerp on wrap
+                offset_y = cs.player_y / arena_h
+                dx = offset_x * PARALLAX_OFFSET_FACTOR_X
+                dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
+        end
+
+        -- Clear and update sprite batch
+        sprite_batch:clear()
+
+        for i = 1, MAX_PARALLAX_ENTITIES do
+                local x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
+                local y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
+                local point_alpha = parallax_entity_alpha_color / parallax_entity_depth[i]
+                local scale = parallax_entity_radius[i] / 4 -- Scale based on original circle radius
+
+                -- Add sprite to batch with position, rotation, scale and color
+                sprite_batch:setColor(0.8, 0.8, 0.8, point_alpha)
+                sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
+        end
+
+        -- Reset color before drawing
+        love.graphics.setColor(1, 1, 1, 1)
+        -- Draw all sprites in one batch
+        love.graphics.draw(sprite_batch)
+end
+
 function draw_background_shader(alpha)
         if config.IS_GAME_SLOW then
                 shaders.background_shader(function() _draw_background_shader(alpha) end)
@@ -1204,53 +1260,34 @@ function draw_background_shader(alpha)
         end
 end
 
---- TODO: simulate fireworks like animation of entities
-function _draw_background_shader(alpha)
-        local cs = curr_state
-        local dx = 0
-        local dy = 0
+-- Constants for point size and maximum entities
+local MAX_POINTS = MAX_PARALLAX_ENTITIES -- Using your existing constant
+local POINT_SIZE = 8 -- Adjust based on your needs
 
-        local is_follow_player_parallax = true
-        if is_follow_player_parallax then
-                offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
-                offset_y = cs.player_y / arena_h
-                dx = offset_x * PARALLAX_OFFSET_FACTOR_X
-                dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
-                if config.debug.is_development then
-                        LG.print(string.format('scroll offset dx,dy: %.4f, %.4f.', dx, dy), arena_w - 256, arena_h * 0.5 + 16 * 1)
-                end
-        end
+function init_background_points()
+        -- -- Initialize the point batch
+        -- point_batch = love.graphics.newPointBatch(nil, MAX_POINTS, 'dynamic')
 
-        for i = 1, MAX_PARALLAX_ENTITIES, 4 do
-                LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i])
-                LG.circle(
-                        'fill',
-                        (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w,
-                        (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h,
-                        parallax_entity_radius[i]
-                )
-                LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 1])
-                LG.circle(
-                        'fill',
-                        (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w,
-                        (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h,
-                        parallax_entity_radius[i + 1]
-                )
-                LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 2])
-                LG.circle(
-                        'fill',
-                        (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w,
-                        (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h,
-                        parallax_entity_radius[i + 2]
-                )
-                LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 3])
-                LG.circle(
-                        'fill',
-                        (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w,
-                        (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h,
-                        parallax_entity_radius[i + 3]
-                )
+        -- -- Store point sizes in a separate array since PointBatch doesn't support varying sizes
+        -- point_sizes = {}
+        -- for i = 1, MAX_POINTS do
+        --         point_sizes[i] = parallax_entity_radius[i]
+        -- end
+        -- Create a small circle image to use in our sprite batch
+        function create_circle_image(radius, r, g, b, a)
+                local diameter = radius * 2
+                local canvas = love.graphics.newCanvas(diameter, diameter)
+                love.graphics.setCanvas(canvas)
+                love.graphics.clear()
+                love.graphics.setColor(r or 1, g or 1, b or 1, a or 1)
+                love.graphics.circle('fill', radius, radius, radius)
+                love.graphics.setCanvas()
+                return love.graphics.newImage(canvas:newImageData())
         end
+        -- Create circle image for our sprite batch
+        circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
+        -- Initialize the sprite batch
+        sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
 end
 
 ---@diagnostic disable-next-line: unused-local
@@ -1350,12 +1387,12 @@ function love.load()
         local fx = moonshine.effects
         shaders = { --- @type Shader
                 background_shader = moonshine(arena_w, arena_h, fx.chromasep)
-                        .chain(fx.pixelate)
-                        .chain(fx.godsray)
-                        .chain(fx.fastgaussianblur)
-                        .chain(fx.desaturate)
-                        .chain(fx.vignette)
-                        .chain(fx.colorgradesimple),
+                        -- .chain(fx.pixelate)
+                        -- .chain(fx.godsray)
+                        -- .chain(fx.fastgaussianblur)
+                        -- .chain(fx.desaturate)
+                        .chain(fx.colorgradesimple)
+                        .chain(fx.vignette),
                 post_processing = moonshine(arena_w, arena_h, fx.godsray)
                         .chain(fx.chromasep)
                         .chain(fx.glow)
@@ -1365,15 +1402,19 @@ function love.load()
         }
 
         if true then
-                shaders.background_shader.pixelate.size = { 4, 4 } -- Default: {5, 5}
-                shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0
+                if not true then
+                        shaders.background_shader.pixelate.size = { 4, 4 } -- Default: {5, 5}
+                        shaders.background_shader.pixelate.feedback = PHI_INV -- Default: 0
+                end
 
-                shaders.background_shader.godsray.decay = ({ 0.80, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
-                shaders.background_shader.godsray.density = 0.15 -- WARN: Performance Hog!
-                shaders.background_shader.godsray.exposure = ({ 0.32, 0.125, 0.25 })[config.CURRENT_THEME]
-                shaders.background_shader.godsray.light_position = { 0.50, -0.99 } -- twice the height above ((rays from top))
-                shaders.background_shader.godsray.samples = 32 -- lower sample helps to spread out rays
-                shaders.background_shader.godsray.weight = ({ 0.65, 0.45, 0.65 })[config.CURRENT_THEME]
+                if not true then
+                        shaders.background_shader.godsray.decay = ({ 0.80, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
+                        shaders.background_shader.godsray.density = 0.15 -- WARN: Performance Hog!
+                        shaders.background_shader.godsray.exposure = ({ 0.32, 0.125, 0.25 })[config.CURRENT_THEME]
+                        shaders.background_shader.godsray.light_position = { 0.50, -0.99 } -- twice the height above ((rays from top))
+                        shaders.background_shader.godsray.samples = 48 -- lower sample helps to spread out rays
+                        shaders.background_shader.godsray.weight = ({ 0.65, 0.45, 0.65 })[config.CURRENT_THEME]
+                end
 
                 shaders.background_shader.chromasep.angle = 180 -- 180 light from above reflects rays downwards
                 shaders.background_shader.chromasep.radius = 3
@@ -1535,6 +1576,7 @@ function love.load()
 
         is_debug_hud_enabled = false --- Toggled by keys event.
         function reset_game()
+                init_background_points()
                 -- MUTATE GLOBAL VARS0
                 INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
                 do -- FIXME: ^^^ Avoiding exponential-like (not really) overpopulation
