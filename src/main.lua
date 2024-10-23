@@ -654,9 +654,9 @@ function draw_player_direction_ray(alpha)
                 local ease = 1
                 ray_x = (ray_x + ray_vel_x * config.AIR_RESISTANCE) % arena_w
                 ray_y = (ray_y + ray_vel_y * config.AIR_RESISTANCE) % arena_h
-                LG.line(cs.player_x-1, cs.player_y-1, ray_x-1, ray_y-1)
+                LG.line(cs.player_x - 1, cs.player_y - 1, ray_x - 1, ray_y - 1)
                 LG.line(cs.player_x, cs.player_y, ray_x, ray_y)
-                LG.line(cs.player_x+1, cs.player_y+1, ray_x+1, ray_y+1)
+                LG.line(cs.player_x + 1, cs.player_y + 1, ray_x + 1, ray_y + 1)
         else -- jump to dot
                 local last_ray_radius_if_multiple_rays = 2
                 for i = -1, 1, 1 do
