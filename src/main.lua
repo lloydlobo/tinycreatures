@@ -626,7 +626,7 @@ function draw_player_trail(alpha)
 end
 
 local RAY_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 0.5
-local RAY_COLOR = common.Color.player_dash_neonblue_modifier
+local RAY_COLOR = { 0.6, 0.6, 0.6, 0.15 }
 
 --- Excellent for predicting visually where player might end up.. like a lookahead (great for dodge!)
 function draw_player_direction_ray(alpha)
@@ -654,7 +654,9 @@ function draw_player_direction_ray(alpha)
                 local ease = 1
                 ray_x = (ray_x + ray_vel_x * config.AIR_RESISTANCE) % arena_w
                 ray_y = (ray_y + ray_vel_y * config.AIR_RESISTANCE) % arena_h
+                LG.line(cs.player_x-1, cs.player_y-1, ray_x-1, ray_y-1)
                 LG.line(cs.player_x, cs.player_y, ray_x, ray_y)
+                LG.line(cs.player_x+1, cs.player_y+1, ray_x+1, ray_y+1)
         else -- jump to dot
                 local last_ray_radius_if_multiple_rays = 2
                 for i = -1, 1, 1 do
@@ -1129,23 +1131,32 @@ end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 4)
-local PARALLAX_OFFSET_FACTOR_X = 0.05 * PHI_INV -- NOTE: Should be lower to avoid puking
-local PARALLAX_OFFSET_FACTOR_Y = 0.05 * PHI_INV
+local MAX_PARALLAX_ENTITIES = (2 ^ 8)
+local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
+local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
+local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
+local PARALLAX_OFFSET_FACTOR_Y = 0.075 * PHI_INV
+
 local parallax_entity_depth = {}
 local parallax_entity_pos_x = {} -- without arena_w
 local parallax_entity_pos_y = {} -- without arena_h
 local parallax_entity_radius = {}
 for i = 1, MAX_PARALLAX_ENTITIES do
-        parallax_entity_depth[i] = love.math.random(2, 12)
+        local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
+        parallax_entity_radius[i] = math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
+        parallax_entity_depth[i] = depth
         parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
         parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
-        parallax_entity_radius[i] = (0.125 * love.math.random(config.PLAYER_RADIUS * PHI_INV / 4, config.PLAYER_RADIUS * PHI * 2.5))
 end
-assert(#parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x), 'Assert count of parallax entity is a perfect square')
+if true then
+        assert(
+                #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
+                'Assert count of parallax entity is a perfect square'
+        )
+end
 local offset_x = 0
 local offset_y = 0
-local parallax_entity_alpha_color = ({ 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
+local parallax_entity_alpha_color = ({ (PHI_INV ^ 2) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
 local sign1 = ({ -1, 1 })[love.math.random(1, 2)]
 local sign2 = ({ -8, 8 })[love.math.random(1, 2)]
 
@@ -1189,7 +1200,7 @@ function _draw_background_shader(alpha)
         local dx = 0
         local dy = 0
 
-        local is_follow_player_parallax = not true
+        local is_follow_player_parallax = true
         if is_follow_player_parallax then
                 offset_x = cs.player_x / arena_w -- TODO: should lerp on wrap
                 offset_y = cs.player_y / arena_h
@@ -1312,19 +1323,10 @@ function love.load()
 
                 -- Credits: --   Lupus Nocte: http://link.epidemicsound.com/LUPUS YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
                 music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') -- stream and loop background music
-                music_bgm:setFilter {
-                        type = 'lowpass',
-                        volume = 1,
-                        highgain = 1,
-                }
-                if config.debug.is_development then
-                        music_bgm:setFilter {
-                                type = 'bandpass',
-                                lowgain = 1,
-                        }
-                end
+                music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 1 }
+                if config.debug.is_development then music_bgm:setFilter { type = 'bandpass', lowgain = 1 } end
                 music_bgm:setVolume(0.9)
-                music_bgm:setPitch(1.11) -- one octave lower
+                music_bgm:setPitch(1.00) -- one octave lower
                 music_bgm:setVolume(1 - (2 * (3 / 16)))
                 if config.debug.is_development then music_bgm:setVolume(music_bgm:getVolume() * 0.125) end
                 -- Master volume
@@ -1670,7 +1672,7 @@ function love.draw()
                 end
                 LG.origin() -- Reverse any previous calls to love.graphics.
         end)
-        draw_hud()
+        if is_debug_hud_enabled then draw_hud() end
         if is_debug_hud_enabled then draw_debug_hud() end
 end
 

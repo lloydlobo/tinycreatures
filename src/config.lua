@@ -66,11 +66,11 @@ M = {
         -- DEBUGGING FLAGS
 
         debug = {
-                is_assert = true,
-                is_development = true,
+                is_assert = not true,
+                is_development = not true,
                 is_test = true,
                 is_trace_entities = not true,
-                is_trace_hud = true,
+                is_trace_hud = not true,
         },
 
         Theme = Theme, -- FIXME: Shouldn't this be in common.lua?
