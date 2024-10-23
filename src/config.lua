@@ -20,7 +20,7 @@ local _fixed_fps = 60
 local _phi = 1.618
 local _phi_inv = 0.618
 local _player_acceleration = ({ 150, 200, 300 })[speed_mode]
-local _player_radius = (32 * 1.0) - 10
+local _player_radius = (32 * 0.61) - 4
 
 M = {
         -- CONFIGURATIONS

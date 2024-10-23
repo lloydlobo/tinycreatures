@@ -201,6 +201,21 @@ local function is_intersect_circles(ab)
         return (dx * dx + dy * dy <= ab_dist * ab_dist)
 end
 
+--- @type fun(opts: { a: Circle, b: Circle, tolerance_factor: number } ): boolean
+--- tolerance = 1.0: exact check (original behavior)
+--- tolerance > 1.0: more forgiving (e.g., 1.1 gives 10% more leeway)
+--- tolerance < 1.0: stricter check (e.g., 0.9 requires 10% more overlap)
+local function is_intersect_circles_tolerant(opts)
+        if config.debug.is_assert then assert(opts.tolerance_factor >= 0.0 and opts.tolerance_factor <= 1.0) end
+        local dx = (opts.a.x - opts.b.x)
+        local dy = (opts.a.y - opts.b.y)
+        local ab_dist = opts.a.radius + opts.b.radius
+
+        local lhs = dx * dx + dy * dy
+        local rhs = ab_dist * ab_dist
+        return (lhs <= rhs * opts.tolerance_factor)
+end
+
 function find_inactive_creature_index()
         for i = 1, TOTAL_CREATURES_CAPACITY do
                 if curr_state.creatures_is_active[i] == common.Status.not_active then return i end
@@ -570,9 +585,16 @@ function update_creatures_this_frame(dt)
                 cs.creatures_y[i] = y
 
                 -- Player collision with creature.
+                local is_intersect_with_grace = true
                 creature_circle = { x = x, y = y, radius = stage.radius }
+                if is_intersect_with_grace then
+                        if is_intersect_circles_tolerant { a = player_circle, b = creature_circle, tolerance_factor = (1 - PHI_INV) } then
+                                player_damage_status_actions(damage_player_fetch_status())
+                        end
+                else
                 if is_intersect_circles { a = player_circle, b = creature_circle } then --
                         player_damage_status_actions(damage_player_fetch_status())
+                        end
                 end
 
                 ::continue::
