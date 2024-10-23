@@ -1605,8 +1605,10 @@ function love.load()
                         curr_state.creatures_is_active[i] = common.Status.active
                         curr_state.creatures_vel_x[i] = 0
                         curr_state.creatures_vel_y[i] = 0
-                        curr_state.creatures_x[i] = 0
-                        curr_state.creatures_y[i] = 0
+                        do
+                                curr_state.creatures_x[i] = love.math.random(32, arena_w - 32)
+                                curr_state.creatures_y[i] = love.math.random(32, arena_h - 32)
+                        end
                 end
 
                 copy_game_state(prev_state, curr_state)
