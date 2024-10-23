@@ -26,7 +26,7 @@ local smoothstep = common.lerper['smoothstep']
 
 --- NOTE: This is used by `game_level` to mutate `initial_large_creatures` these are mutated after
 ---       each level::: i can't bother changing case as of now... will do when time permits??
-local CONSTANT_INITIAL_LARGE_CREATURES = (2 ^ 0) -- WARN: Any more than this, and levels above 50 lag
+local CONSTANT_INITIAL_LARGE_CREATURES = (2 ^ 2) -- WARN: Any more than this, and levels above 50 lag
 do
         INITIAL_LARGE_CREATURES = (2 ^ 0) --- @type integer # This count excludes the initial ancestor count.
         EXPECTED_FINAL_HEALED_CREATURE_COUNT = ((INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES) --- @type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
@@ -1525,8 +1525,11 @@ function love.load()
 
         is_debug_hud_enabled = false --- Toggled by keys event.
         function reset_game()
-                -- MUTATE GLOBAL VARS
+                -- MUTATE GLOBAL VARS0
                 INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
+                do -- FIXME: ^^^ Avoiding exponential-like (not really) overpopulation
+                        INITIAL_LARGE_CREATURES = math.floor(CONSTANT_INITIAL_LARGE_CREATURES * (game_level ^ (1 / 4)))
+                end
                 do -- AUTO-UPDATE
                         ---@type integer # This count excludes the initial ancestor count.
                         EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
