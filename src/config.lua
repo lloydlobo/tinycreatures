@@ -34,6 +34,7 @@ M = {
         LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[speed_mode], --- 256|512|768
         LASER_RADIUS = math.floor(_player_radius * _phi_inv),
         MAX_GAME_LEVELS = 2 ^ 6, -- > 64
+        MAX_CREATURE_RADIUS = 80,
         MAX_LASER_CAPACITY = 2 ^ 5, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
         MAX_PLAYER_HEALTH = 3,
         MAX_PLAYER_TRAIL_COUNT = -4 + math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
@@ -50,7 +51,7 @@ M = {
 
         IS_CREATURE_FOLLOW_PLAYER = true,
         IS_CREATURE_FUSION_ENABLED = not true, --- FIXME: Assertion fails in `simulate.lua`
-        IS_CREATURE_SWARM_ENABLED = true,
+        IS_CREATURE_SWARM_ENABLED = not true,
         IS_GAME_SLOW = not true,
         IS_GRUG_BRAIN = not true, --- Whether to complicate life and the codebase.
         IS_PLAYER_INVULNERABLE = not true,
