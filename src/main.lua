@@ -1349,55 +1349,71 @@ function love.load()
         arena_h = gh
         arena_w = gw
         do -- Music time
+                local on_hit_play_coin = not true
+                if on_hit_play_coin then
                 sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
                 sound_creature_healed_1:setPitch(1.50) -- tuned close to `music_bgm`'s key
                 sound_creature_healed_1:setVolume(0.625)
-
                 sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
                 sound_creature_healed_2:setPitch(1.50) -- tuned close to `music_bgm`'s key
                 sound_creature_healed_2:setVolume(0.625)
+                        sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_fire_combo_hit:setPitch(0.85)
+                        sound_fire_combo_hit:setVolume(PHI_INV)
+                else
+                        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/wip/laser_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_1:setVolume(1)
+                        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/wip/laser_final_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_2:setVolume(1)
+                        sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/wip/laser_explosion_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_fire_combo_hit:setVolume(PHI_INV)
+                end
 
                 sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
                 sound_guns_turn_off:setEffect 'bandpass'
+                sound_guns_turn_off:setVolume(PHI_INV)
 
                 sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_interference:setVolume(PHI_INV)
 
                 sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
                 sound_fire_projectile:setPitch(1.15)
-                sound_fire_projectile:setVolume(1)
-
-                sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-                sound_fire_combo_hit:setPitch(0.85)
-                sound_fire_combo_hit:setVolume(0.9)
+                sound_fire_projectile:setVolume(PHI_INV)
 
                 sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
                 sound_player_engine:setPitch(0.6)
                 sound_player_engine:setVolume(0.5)
-                sound_player_engine:setFilter {
-                        type = 'lowpass',
-                        volume = 1,
-                        highgain = (3 * 0.5),
-                }
-                sound_player_engine:setVolume(1)
+                sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
+                sound_player_engine:setVolume(PHI_INV ^ 2)
 
                 sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
                 sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+
+                sound_pickup_holy = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
+                sound_pickup_holy:setVolume(0.9) -- 90% of ordinary volume
+                -- sound_pickup_holy:setPitch(0.5) -- one octave lower
+                sound_pickup_holy:setVolume(0.6)
+                sound_pickup_holy:play() -- PLAY AT GAME START once
+
+                --- Audio Drone
                 sound_atmosphere_tense = love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static') -- Credit to DASK: Retro
+                sound_atmosphere_tense:setVolume(PHI_INV ^ 2)
 
-                sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
-                sound_pickup:setVolume(0.9) -- 90% of ordinary volume
-                sound_pickup:setPitch(0.5) -- one octave lower
-                sound_pickup:setVolume(0.6)
-                sound_pickup:play() -- PLAY AT GAME START once
-
-                -- Credits: --   Lupus Nocte: http://link.epidemicsound.com/LUPUS YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
-                music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') -- stream and loop background music
+                --- Background Music Credit:
+                ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
+                ---     • [YouTube Link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC)
+                --- Note: `stream` option ─ stream and loop background music
+                music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream')
                 music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 1 }
                 if config.debug.is_development then music_bgm:setFilter { type = 'bandpass', lowgain = 1 } end
                 music_bgm:setVolume(0.9)
                 music_bgm:setPitch(1.00) -- one octave lower
+                if config.debug.is_development then
+                        music_bgm:setVolume(music_bgm:getVolume() * 0.025)
+                else
                 music_bgm:setVolume(1 - (2 * (3 / 16)))
-                if config.debug.is_development then music_bgm:setVolume(music_bgm:getVolume() * 0.125) end
+                end
+
                 -- Master volume
                 love.audio.setVolume(not config.debug.is_development and 1.0 or 0.35) -- volume # number # 1.0 is max and 0.0 is off.
         end
