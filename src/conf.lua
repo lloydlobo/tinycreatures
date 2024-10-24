@@ -20,7 +20,7 @@
 --  2^ 9 -->  512
 --  2^ 8 -->  256
 
-local scale = 1.28 -- 0.75|1.00|1.28
+local scale = 1.00 -- 0.75|1.00|1.28
 local sx, sy = scale, scale
 gw = 800 * sx
 gh = 450 * sy

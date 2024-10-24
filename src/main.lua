@@ -425,6 +425,7 @@ end
 
 function update_player_entity_projectiles_this_frame(dt)
         local cs = curr_state
+
         -- #region Update laser positions.
         for laser_index = 1, #cs.lasers_x do
                 if cs.lasers_is_active[laser_index] == common.Status.active then
@@ -449,29 +450,32 @@ function update_player_entity_projectiles_this_frame(dt)
                         end
                 end
         end
-        laser_fire_timer = laser_fire_timer - dt -- Update fire cooldown timer.
+
+        -- Update fire cooldown timer.
+        laser_fire_timer = laser_fire_timer - dt
         -- #endregion
 
         -- #region Handle laser collisions.
         local laser_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
-        local creature_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
 
-        local temp_hit_counter_this_frame = 0 -- for double hit sfx
+        local creature_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
+        local stages = creature_evolution_stages --- @type Stage[]
+        local temp_hit_counter_this_frame = 0 --- @type integer Count hits for double hit sfx.
         for laser_index = 1, #cs.lasers_x do
-                if not (cs.lasers_is_active[laser_index] == common.Status.active) then goto continue_not_is_active_laser end
-                laser_circle = {
-                        x = cs.lasers_x[laser_index],
-                        y = cs.lasers_y[laser_index],
-                        radius = config.LASER_RADIUS,
-                }
+                if not (cs.lasers_is_active[laser_index] == common.Status.active) then --[[]]
+                        goto continue_not_is_active_laser
+                end
+                laser_circle = { x = cs.lasers_x[laser_index], y = cs.lasers_y[laser_index], radius = config.LASER_RADIUS }
                 for creature_index = 1, TOTAL_CREATURES_CAPACITY do
-                        if not (cs.creatures_is_active[creature_index] == common.Status.active) then goto continue_not_is_active_creature end
-                        local curr_stage_id = cs.creatures_evolution_stage[creature_index]
-                        if config.debug.is_assert then assert(curr_stage_id >= 1 and curr_stage_id <= #creature_evolution_stages, curr_stage_id) end
+                        if not (cs.creatures_is_active[creature_index] == common.Status.active) then --[[]]
+                                goto continue_not_is_active_creature
+                        end
+                        local curr_stage_id = cs.creatures_evolution_stage[creature_index] --- @type integer
+                        if config.debug.is_assert then assert(curr_stage_id >= 1 and curr_stage_id <= #stages, curr_stage_id) end
                         creature_circle = {
                                 x = cs.creatures_x[creature_index],
                                 y = cs.creatures_y[creature_index],
-                                radius = creature_evolution_stages[curr_stage_id].radius,
+                                radius = stages[curr_stage_id].radius,
                         }
                         if is_intersect_circles { a = creature_circle, b = laser_circle } then
                                 temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
@@ -480,6 +484,7 @@ function update_player_entity_projectiles_this_frame(dt)
                                 -- Deactivate projectile if touch creature.
                                 cs.lasers_is_active[laser_index] = common.Status.not_active
                                 laser_intersect_creature_counter = laser_intersect_creature_counter + 1
+
                                 if curr_stage_id == 1 then
                                         laser_intersect_final_creature_counter = laser_intersect_final_creature_counter + 1
                                         local choices = { sound_creature_healed_1, sound_creature_healed_2 }
@@ -493,15 +498,16 @@ function update_player_entity_projectiles_this_frame(dt)
 
                                 -- Split the creature into two smaller ones.
                                 if curr_stage_id > 1 then
-                                        local new_stage_id = curr_stage_id - 1 -- note: initial stage is `#creature_evolution_stages`
+                                        -- Note: initial stage is `#creature_evolution_stages`.
+                                        local new_stage_id = curr_stage_id - 1
                                         cs.creatures_evolution_stage[creature_index] = new_stage_id
-                                        for _ = 1, 2 do
+                                        for i = 1, 2 do
                                                 local new_creature_index = find_inactive_creature_index()
-                                                if new_creature_index then
+                                                if new_creature_index ~= nil then
                                                         spawn_new_creature(new_creature_index, creature_index, new_stage_id)
                                                 else
                                                         if config.debug.is_trace_entities then
-                                                                print('Failed to spawn more creatures.\n', 'curr_stage_id:', curr_stage_id, 'i:', i)
+                                                                print('Failed to spawn more creatures.\n', 'stage:', curr_stage_id, 'i:', i)
                                                         end
                                                         break -- Yeet outta this loop if we can't spawn anymore.
                                                 end
@@ -555,7 +561,7 @@ function update_player_shield_collectible_this_frame(dt)
         if is_shield_spawned and is_player_increment_shield then
                 if cs.player_health < config.MAX_PLAYER_HEALTH then
                         cs.player_health = cs.player_health + 1
-                        sound_pickup_holy:play()
+                        sound_pickup_shield:play() -- SFX
                 end
                 if config.debug.is_assert then assert(cs.player_health <= config.MAX_PLAYER_HEALTH) end
                 -- Make shield `not is_active`.
@@ -569,16 +575,18 @@ function update_creatures_this_frame(dt)
         if config.IS_CREATURE_SWARM_ENABLED then simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY) end
 
         local cs = curr_state
+
         -- FIXME: HOW TO FIX THIS ANOMALY? (SHOULD BE `FIXED_DT_INV`)
         local weird_alpha = dt_accum * config.FIXED_DT
+
         local player_circle = { x = cs.player_x, y = cs.player_y, radius = config.PLAYER_RADIUS } ---@type Circle
         local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
 
+        local stages = creature_evolution_stages
         for i = 1, TOTAL_CREATURES_CAPACITY do
-                if config.debug.is_assert then
-                        if cs.creatures_health[i] == common.HealthTransitions.healthy then assert(cs.creatures_is_active[i] == common.Status.not_active) end
+                if config.debug.is_assert and (cs.creatures_health[i] == common.HealthTransitions.healthy) then
+                        assert(cs.creatures_is_active[i] == common.Status.not_active)
                 end
-
                 if not (cs.creatures_is_active[i] == common.Status.active) then
                         local health = cs.creatures_health[i]
                         local is_slow_heal = true
@@ -594,10 +602,12 @@ function update_creatures_this_frame(dt)
                 end
 
                 -- Update active creature
-                if config.IS_CREATURE_FOLLOW_PLAYER then simulate.simulate_creature_follows_player(dt, i) end
+                if config.IS_CREATURE_FOLLOW_PLAYER then --
+                        simulate.simulate_creature_follows_player(dt, i)
+                end
                 local creature_stage_id = cs.creatures_evolution_stage[i] --- @type integer
-                if config.debug.is_assert then assert(creature_stage_id >= 1 and creature_stage_id <= #creature_evolution_stages) end
-                local stage = creature_evolution_stages[creature_stage_id] --- @type Stage
+                if config.debug.is_assert then assert(creature_stage_id >= 1 and creature_stage_id <= #stages) end
+                local stage = stages[creature_stage_id] --- @type Stage
                 local angle = cs.creatures_angle[i] --- @type number
                 local speed_x = lerp(stage.speed, cs.creatures_vel_x[i], weird_alpha)
                 local speed_y = lerp(stage.speed, cs.creatures_vel_y[i], weird_alpha)
@@ -607,15 +617,9 @@ function update_creatures_this_frame(dt)
                 cs.creatures_y[i] = y
 
                 -- Player collision with creature.
-                local is_intersect_with_grace = true
                 creature_circle = { x = x, y = y, radius = stage.radius }
                 if is_intersect_circles_tolerant { a = player_circle, b = creature_circle, tolerance_factor = COLLISION_TOLERANCE.INNER_70 } then
-                                player_damage_status_actions(damage_player_fetch_status())
-                        end
-                else
-                        if is_intersect_circles { a = player_circle, b = creature_circle } then --
-                                player_damage_status_actions(damage_player_fetch_status())
-                        end
+                        player_damage_status_actions(damage_player_fetch_status())
                 end
 
                 ::continue::
@@ -1104,21 +1108,23 @@ function play_player_engine_sound(dt, movekind)
         local cs = curr_state
         sound_player_engine:play()
         sound_player_engine:setVelocity(cs.player_vel_x, cs.player_vel_y, 1)
-        -- Stop overlapping sound waves by making the consecutive one softer
-        local curr_pos = sound_player_engine:tell 'samples'
-        local last_pos = sound_player_engine:getDuration 'samples'
-        if movekind == EngineMoveKind.forward then
-                sound_player_engine:setVolume(1.3)
-                sound_player_engine:setAirAbsorption(dt) --- LOL (: warble effect due to using variable dt
-        elseif movekind == EngineMoveKind.backward then
-                sound_player_engine:setVolume(0.8)
-                sound_player_engine:setAirAbsorption(0) --- LOL (: warble effect due to using variable dt
-        elseif curr_pos >= PHI_INV * last_pos and curr_pos <= 0.99 * last_pos then
-                sound_player_engine:setVolume(movekind == EngineMoveKind.forward and 0.6 or 0.7)
-                sound_player_engine:setAirAbsorption(10) --- LOL (: warble effect due to using variable dt
-        elseif curr_pos > 0.99 * last_pos then
-                sound_player_engine:setVolume(1)
-                sound_player_engine:setAirAbsorption(20) --- LOL (: warble effect due to using variable dt
+        if config.IS_GRUG_BRAIN then
+                -- Stop overlapping sound waves by making the consecutive one softer
+                local curr_pos = sound_player_engine:tell 'samples'
+                local last_pos = sound_player_engine:getDuration 'samples'
+                if movekind == EngineMoveKind.forward then
+                        sound_player_engine:setVolume(1.3)
+                        sound_player_engine:setAirAbsorption(dt) --- LOL (: warble effect due to using variable dt
+                elseif movekind == EngineMoveKind.backward then
+                        sound_player_engine:setVolume(0.8)
+                        sound_player_engine:setAirAbsorption(0) --- LOL (: warble effect due to using variable dt
+                elseif curr_pos >= PHI_INV * last_pos and curr_pos <= 0.99 * last_pos then
+                        sound_player_engine:setVolume(movekind == EngineMoveKind.forward and 0.6 or 0.7)
+                        sound_player_engine:setAirAbsorption(10) --- LOL (: warble effect due to using variable dt
+                elseif curr_pos > 0.99 * last_pos then
+                        sound_player_engine:setVolume(1)
+                        sound_player_engine:setAirAbsorption(20) --- LOL (: warble effect due to using variable dt
+                end
         end
 end
 
@@ -1349,55 +1355,77 @@ function love.load()
         arena_h = gh
         arena_w = gw
         do -- Music time
-                sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-                sound_creature_healed_1:setPitch(1.50) -- tuned close to `music_bgm`'s key
-                sound_creature_healed_1:setVolume(0.625)
+                local on_hit_play_coin = not true
+                if on_hit_play_coin then
+                        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_1:setPitch(1.50) -- tuned close to `music_bgm`'s key
+                        sound_creature_healed_1:setVolume(0.625)
+                        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_2:setPitch(1.50) -- tuned close to `music_bgm`'s key
+                        sound_creature_healed_2:setVolume(0.625)
+                        sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_fire_combo_hit:setPitch(0.85)
+                        sound_fire_combo_hit:setVolume(PHI_INV)
+                else
+                        sound_creature_healed_1 = love.audio.newSource('resources/audio/sfx/wip/laser_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_1:setVolume(1)
+                        sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/wip/laser_final_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_creature_healed_2:setVolume(1)
+                        sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/wip/laser_explosion_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                        sound_fire_combo_hit:setVolume(PHI_INV)
+                end
 
-                sound_creature_healed_2 = love.audio.newSource('resources/audio/sfx/statistics_pickup_coin3_1.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-                sound_creature_healed_2:setPitch(1.50) -- tuned close to `music_bgm`'s key
-                sound_creature_healed_2:setVolume(0.625)
+                sound_pickup_shield = love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static') -- stream and loop background music
+                sound_pickup_shield:setVolume(1)
+
+                sound_pickup_holy = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
+                sound_pickup_holy:setVolume(0.9) -- 90% of ordinary volume
+                sound_pickup_holy:setPitch(0.5) -- one octave lower
+                sound_pickup_holy:setVolume(0.6)
+                sound_pickup_holy:play() -- PLAY AT GAME START once
 
                 sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
                 sound_guns_turn_off:setEffect 'bandpass'
+                sound_guns_turn_off:setVolume(PHI_INV)
 
                 sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_interference:setVolume(PHI_INV)
 
                 sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
                 sound_fire_projectile:setPitch(1.15)
-                sound_fire_projectile:setVolume(1)
-
-                sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-                sound_fire_combo_hit:setPitch(0.85)
-                sound_fire_combo_hit:setVolume(0.9)
+                sound_fire_projectile:setVolume(PHI_INV)
 
                 sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
                 sound_player_engine:setPitch(0.6)
                 sound_player_engine:setVolume(0.5)
-                sound_player_engine:setFilter {
-                        type = 'lowpass',
-                        volume = 1,
-                        highgain = (3 * 0.5),
-                }
-                sound_player_engine:setVolume(1)
+                sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
+                sound_player_engine:setVolume(PHI_INV ^ 8)
 
                 sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_upgrade:setVolume(PHI_INV)
+
                 sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_ui_menu_select:setVolume(PHI_INV)
+
+                --- Audio Drone
                 sound_atmosphere_tense = love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static') -- Credit to DASK: Retro
+                sound_atmosphere_tense:setVolume(PHI_INV ^ 4)
 
-                sound_pickup = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
-                sound_pickup:setVolume(0.9) -- 90% of ordinary volume
-                sound_pickup:setPitch(0.5) -- one octave lower
-                sound_pickup:setVolume(0.6)
-                sound_pickup:play() -- PLAY AT GAME START once
-
-                -- Credits: --   Lupus Nocte: http://link.epidemicsound.com/LUPUS YouTube link: https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC
-                music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream') -- stream and loop background music
+                --- Background Music Credit:
+                ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
+                ---     • [YouTube Link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC)
+                --- Note: `stream` option ─ stream and loop background music
+                music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream')
                 music_bgm:setFilter { type = 'lowpass', volume = 1, highgain = 1 }
                 if config.debug.is_development then music_bgm:setFilter { type = 'bandpass', lowgain = 1 } end
                 music_bgm:setVolume(0.9)
                 music_bgm:setPitch(1.00) -- one octave lower
-                music_bgm:setVolume(1 - (2 * (3 / 16)))
-                if config.debug.is_development then music_bgm:setVolume(music_bgm:getVolume() * 0.125) end
+                if config.debug.is_development then
+                        music_bgm:setVolume(music_bgm:getVolume() * 0.025)
+                else
+                        music_bgm:setVolume(1 - (2 * (3 / 16)))
+                end
+
                 -- Master volume
                 love.audio.setVolume(not config.debug.is_development and 1.0 or 0.35) -- volume # number # 1.0 is max and 0.0 is off.
         end
@@ -1725,7 +1753,10 @@ function love.load()
 end
 
 function love.update(dt)
-        if config.debug.is_development then require('lurker').update() end
+        if config.debug.is_development then -- FIXME: Maybe make stuff global that are not hot-reloading?
+                require('lurker').update()
+        end
+
         -- #1 Handle music and sound logic.
         if not music_bgm:isPlaying() then love.audio.play(music_bgm) end
         local is_every_10_second = (math.floor(game_timer_t) % 10) == 0
