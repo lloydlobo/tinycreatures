@@ -201,10 +201,27 @@ local function is_intersect_circles(ab)
         return (dx * dx + dy * dy <= ab_dist * ab_dist)
 end
 
---- @type fun(opts: { a: Circle, b: Circle, tolerance_factor: number } ): boolean
+--- @enum COLLISION_TOLERANCE
+local COLLISION_TOLERANCE = {
+        OUTER_50 = 1.5,
+        OUTER_40 = 1.4,
+        OUTER_30 = 1.3,
+        OUTER_20 = 1.2,
+        OUTER_10 = 1.1,
+        EXACT = 1.0,
+        INNER_10 = 0.9,
+        INNER_20 = 0.8,
+        INNER_30 = 0.7,
+        INNER_40 = 0.6,
+        INNER_50 = 0.5,
+        INNER_60 = 0.4,
+        INNER_70 = 0.3,
+}
+
 --- tolerance = 1.0: exact check (original behavior)
 --- tolerance > 1.0: more forgiving (e.g., 1.1 gives 10% more leeway)
 --- tolerance < 1.0: stricter check (e.g., 0.9 requires 10% more overlap)
+--- @type fun(opts: { a: Circle, b: Circle, tolerance_factor: number|COLLISION_TOLERANCE } ): boolean
 local function is_intersect_circles_tolerant(opts)
         if config.debug.is_assert then assert(opts.tolerance_factor >= 0.0 and opts.tolerance_factor <= 1.0) end
         local dx = (opts.a.x - opts.b.x)
@@ -216,6 +233,8 @@ local function is_intersect_circles_tolerant(opts)
         return (lhs <= rhs * opts.tolerance_factor)
 end
 
+--- @return integer|nil
+--- @nodiscard
 function find_inactive_creature_index()
         for i = 1, TOTAL_CREATURES_CAPACITY do
                 if curr_state.creatures_is_active[i] == common.Status.not_active then return i end
@@ -520,23 +539,26 @@ function respawn_next_shield()
 end
 
 function update_player_shield_collectible_this_frame(dt)
+        local cs = curr_state
         local COLLECTIBLE_SHIELD_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 3
-        if curr_state.player_health < config.MAX_PLAYER_HEALTH then --
+        if cs.player_health < config.MAX_PLAYER_HEALTH then --
                 respawn_next_shield()
         end
-
-        local is_player_increment_shield = is_intersect_circles {
-                a = { x = curr_state.player_x, y = curr_state.player_y, radius = config.PLAYER_RADIUS },
-                b = {
-                        x = player_shield_collectible_pos_x or 0,
-                        y = player_shield_collectible_pos_y or 0,
-                        radius = COLLECTIBLE_SHIELD_RADIUS,
-                },
+        local pos_x = player_shield_collectible_pos_x
+        local pos_y = player_shield_collectible_pos_y
+        local is_shield_spawned = (pos_x ~= nil and pos_y ~= nil)
+        local is_player_increment_shield = is_intersect_circles_tolerant {
+                a = { x = cs.player_x, y = cs.player_y, radius = config.PLAYER_RADIUS },
+                b = { x = pos_x or 0, y = pos_y or 0, radius = COLLECTIBLE_SHIELD_RADIUS },
+                tolerance_factor = COLLISION_TOLERANCE.OUTER_50, -- avoid player to not "miss it by an inch"
         }
-        if (player_shield_collectible_pos_x ~= nil and player_shield_collectible_pos_y ~= nil) and is_player_increment_shield then
-                if curr_state.player_health < config.MAX_PLAYER_HEALTH then curr_state.player_health = curr_state.player_health + 1 end
-                if config.debug.is_assert then assert(curr_state.player_health <= config.MAX_PLAYER_HEALTH) end
-                -- make shield `not is_active`
+        if is_shield_spawned and is_player_increment_shield then
+                if cs.player_health < config.MAX_PLAYER_HEALTH then
+                        cs.player_health = cs.player_health + 1
+                        sound_pickup_holy:play()
+                end
+                if config.debug.is_assert then assert(cs.player_health <= config.MAX_PLAYER_HEALTH) end
+                -- Make shield `not is_active`.
                 player_shield_collectible_pos_x = nil --- @type number|nil
                 player_shield_collectible_pos_y = nil --- @type number|nil
         end
@@ -587,8 +609,7 @@ function update_creatures_this_frame(dt)
                 -- Player collision with creature.
                 local is_intersect_with_grace = true
                 creature_circle = { x = x, y = y, radius = stage.radius }
-                if is_intersect_with_grace then
-                        if is_intersect_circles_tolerant { a = player_circle, b = creature_circle, tolerance_factor = (1 - PHI_INV) } then
+                if is_intersect_circles_tolerant { a = player_circle, b = creature_circle, tolerance_factor = COLLISION_TOLERANCE.INNER_70 } then
                                 player_damage_status_actions(damage_player_fetch_status())
                         end
                 else
