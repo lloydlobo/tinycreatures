@@ -592,8 +592,8 @@ function update_creatures_this_frame(dt)
                                 player_damage_status_actions(damage_player_fetch_status())
                         end
                 else
-                if is_intersect_circles { a = player_circle, b = creature_circle } then --
-                        player_damage_status_actions(damage_player_fetch_status())
+                        if is_intersect_circles { a = player_circle, b = creature_circle } then --
+                                player_damage_status_actions(damage_player_fetch_status())
                         end
                 end
 
@@ -811,7 +811,6 @@ function draw_player_health_bar(alpha)
 
                 -- Draw invulnerability timer
                 local invulnerability_bar_height = bar_height * PHI_INV * 0.5
-                -- LG.setColor(common.Color.creature_healed) -- red
                 LG.setColor(0.95, 0.95, 0.95, 0.1) -- white
                 LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
 
@@ -829,7 +828,9 @@ end
 function draw_player_shield_collectible(alpha)
         local COLLECTIBLE_SHIELD_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 3
         local is_spawned_shield = (player_shield_collectible_pos_x ~= nil and player_shield_collectible_pos_y ~= nil)
-        if not is_spawned_shield then return end
+        if not is_spawned_shield then -- exists
+                return
+        end
 
         local glowclr = common.Color.player_dash_pink_modifier
         local freq = 127 -- Hz
@@ -842,22 +843,33 @@ function draw_player_shield_collectible(alpha)
         local fxclr = common.Color.player_entity
         LG.setColor(fxclr[1], fxclr[2], fxclr[3], 0.2)
         LG.circle('fill', player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
+
         LG.setColor(1, 1, 1, 0.2)
         draw_plus_icon(player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
-
         LG.setColor(fxclr)
         LG.circle('fill', player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+
         LG.setColor(1, 1, 1)
         draw_plus_icon(player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+
         LG.setColor(1, 1, 1) -- reset
+end
+
+function _draw_active_projectile(i, alpha)
+        local pos_x = curr_state.lasers_x[i]
+        local pos_y = curr_state.lasers_y[i]
+        if prev_state.lasers_is_active[i] == common.Status.active then
+                pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
+                pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
+        end
+        LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
 end
 
 function draw_projectiles(alpha)
         local is_beserker = love.keyboard.isDown('lshift', 'rshift')
         local is_dash = love.keyboard.isDown 'x'
-
         -- Draw player player fired projectiles
-        if is_beserker then -- @BESERKER_MODE
+        if is_beserker then
                 LG.setColor(common.Color.player_beserker_modifier)
         elseif is_dash then
                 LG.setColor(common.Color.player_dash_neonblue_modifier)
@@ -865,24 +877,84 @@ function draw_projectiles(alpha)
                 LG.setColor(common.Color.player_entity_firing_projectile)
         end
         for i = 1, #curr_state.lasers_x do
-                if curr_state.lasers_is_active[i] == common.Status.active then
-                        local pos_x = curr_state.lasers_x[i]
-                        local pos_y = curr_state.lasers_y[i]
-                        if prev_state.lasers_is_active[i] == common.Status.active then
-                                pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
-                                pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
-                        end
+                if curr_state.lasers_is_active[i] == common.Status.active then --
+                        _draw_active_projectile(i, alpha)
+                end
+        end
+end
 
-                        if not config.IS_GRUG_BRAIN then
-                                LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
+function _draw_active_creature(i, alpha)
+        local curr_x = curr_state.creatures_x[i]
+        local curr_y = curr_state.creatures_y[i]
+
+        local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
+        local radius = evolution_stage.radius --- @type integer
+
+        -- Draw swarm behavior glitch circumference effect (blur-haze) on this creature.
+        if config.IS_CREATURE_SWARM_ENABLED then -- note: better to use a wave shader for ripples
+                local tolerance = evolution_stage.speed
+                if math.abs(curr_state.creatures_vel_x[i] - prev_state.creatures_vel_x[i]) >= tolerance then
+                        local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
+                        local segment_distortion_amplitude = 2
+                        local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
+
+                        local is_draw_segment = false
+                        local distort_radius = lerp(radius - 1, radius + (is_draw_segment and 1 + segment_distortion or 2), alpha)
+                        -- FIXME: swarm range ─ should be evolution_stage.radius specific
+                        if is_draw_segment then
+                                LG.setColor(common.Color.creature_infected_rgba)
+                                LG.circle('line', curr_x, curr_y, distort_radius, segments)
                         else
-                                if i % 3 == 0 then
-                                        LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
-                                else
-                                        local target = config.LASER_RADIUS * (1 + alpha)
-                                        local tween = math.sin(alpha) * 0.03 * PHI_INV -- prevent `sin` spikes with 0.03
-                                        if config.debug.is_assert then assert(tween >= 0 and tween <= 1) end
-                                        LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS + (target - config.LASER_RADIUS) * tween)
+                                LG.setColor(0.5, 0.6, 0.5, 0.05)
+                                LG.circle('line', curr_x, curr_y, distort_radius)
+                        end
+                        LG.setColor(common.Color.creature_infected) --- reset color
+                end
+        end
+
+        -- Draw this creature.
+        LG.setColor(common.Color.creature_infected)
+        LG.circle('fill', curr_x, curr_y, radius)
+end
+
+function _draw_non_active_creature(i, alpha)
+        local curr_x = curr_state.creatures_x[i]
+        local curr_y = curr_state.creatures_y[i]
+
+        local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
+
+        -- Automatically disappear when the `find_inactive_creature_index` looks them up and then
+        -- `spawn_new_creature` mutates them.
+        local is_not_moving = prev_state.creatures_x[i] ~= curr_x and prev_state.creatures_y[i] ~= curr_y
+        local corner_offset = config.PLAYER_RADIUS + evolution_stage.radius
+
+        local health = curr_state.creatures_health[i]
+        local is_away_from_corner = curr_x >= 0 + corner_offset
+                and curr_x <= arena_w - corner_offset
+                and curr_y >= 0 + corner_offset
+                and curr_y <= arena_h - corner_offset
+        local is_healing = (curr_state.creatures_is_active[i] == common.Status.not_active)
+                and health > common.HealthTransitions.healing
+                and health <= common.HealthTransitions.healthy
+        if (is_away_from_corner or is_not_moving) and is_healing then
+                LG.setColor(common.Color.creature_healed)
+                LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
+
+                -- Draw final creature evolution on successful healing.
+                local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV)
+                if smooth_alpha < config.PHI_INV then --- avoid janky alpha fluctuations per game basis
+                        local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
+                        local juice_frequency_damper = lerp(0.25, 0.125, alpha)
+                        local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
+                        local radius = evolution_stage.radius * radius_factor
+                        LG.setColor(common.Color.creature_healing)
+                        LG.circle('fill', curr_x, curr_y, radius)
+
+                        -- Draw `+` icon indicating score increment.
+                        LG.setColor(1, 1, 1)
+                        for dy = -1, 1 do
+                                for dx = -1, 1 do
+                                        draw_plus_icon(curr_x + dx, curr_y + dy, radius)
                                 end
                         end
                 end
@@ -891,86 +963,21 @@ end
 
 function draw_creatures(alpha)
         for i = 1, #curr_state.creatures_x do
-                local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
-                -- PERF: Split data into active_creatures and not_active_creatures
                 if curr_state.creatures_is_active[i] == common.Status.active then
-                        local curr_x = curr_state.creatures_x[i]
-                        local curr_y = curr_state.creatures_y[i]
-                        local radius = evolution_stage.radius --- @type integer
-                        -- Draw swarm behavior glitch circumference effect (blur-haze) on this creature.
-                        if config.IS_CREATURE_SWARM_ENABLED then -- note: better to use a wave shader for ripples
-                                local tolerance = evolution_stage.speed
-                                if math.abs(curr_state.creatures_vel_x[i] - prev_state.creatures_vel_x[i]) >= tolerance then
-                                        local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
-                                        local segment_distortion_amplitude = 2
-                                        local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
-
-                                        local is_draw_segment = false
-                                        local distort_radius = lerp(radius - 1, radius + (is_draw_segment and 1 + segment_distortion or 2), alpha)
-                                        -- FIXME: swarm range ─ should be evolution_stage.radius specific
-                                        if is_draw_segment then
-                                                LG.setColor(common.Color.creature_infected_rgba)
-                                                LG.circle('line', curr_x, curr_y, distort_radius, segments)
-                                        else
-                                                LG.setColor(0.5, 0.6, 0.5, 0.05)
-                                                LG.circle('line', curr_x, curr_y, distort_radius)
-                                        end
-                                        LG.setColor(common.Color.creature_infected) --- reset color
-                                end
-                        end
-                        -- Draw this creature.
-                        LG.setColor(common.Color.creature_infected)
-                        LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
+                        _draw_active_creature(i, alpha)
                 else
-                        local curr_x = curr_state.creatures_x[i]
-                        local curr_y = curr_state.creatures_y[i]
-                        -- Automatically disappear when the `find_inactive_creature_index` looks them up and then `spawn_new_creature` mutates them.
-                        local is_not_moving = prev_state.creatures_x[i] ~= curr_x and prev_state.creatures_y[i] ~= curr_y
-                        local corner_offset = config.PLAYER_RADIUS + evolution_stage.radius
-                        local is_away_from_corner = (
-                                curr_x >= 0 + corner_offset
-                                and curr_x <= arena_w - corner_offset
-                                and curr_y >= 0 + corner_offset
-                                and curr_y <= arena_h - corner_offset
-                        )
-                        if is_away_from_corner or is_not_moving then
-                                local health = curr_state.creatures_health[i]
-                                local is_healing = (
-                                        (curr_state.creatures_is_active[i] == common.Status.not_active)
-                                        and health > common.HealthTransitions.healing
-                                        and health <= common.HealthTransitions.healthy
-                                )
-                                if is_healing then
-                                        LG.setColor(common.Color.creature_healed)
-                                        LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
-                                        -- Draw final creature evolution on successful healing.
-                                        local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV) --- Avoid janky alpha fluctuations per game basis
-                                        if smooth_alpha < config.PHI_INV then
-                                                local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
-                                                local juice_frequency_damper = lerp(0.25, 0.125, alpha)
-                                                local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
-                                                local radius = evolution_stage.radius * radius_factor
-                                                LG.setColor(common.Color.creature_healing)
-                                                LG.circle('fill', curr_x, curr_y, radius)
-                                                -- Draw `+` icon indicating score increment.
-                                                LG.setColor(1, 1, 1)
-                                                for dy = -1, 1 do
-                                                        for dx = -1, 1 do
-                                                                draw_plus_icon(curr_x + dx, curr_y + dy, radius)
-                                                        end
-                                                end
-                                        end
-                                end
-                        end
+                        _draw_non_active_creature(i, alpha)
                 end
         end
 end
 
 function draw_plus_icon(x_, y_, size_, linewidth)
         local half_size = size_ * 0.5
+
         -- horizontal
         LG.setLineWidth(linewidth or 2)
         LG.line(x_ - half_size, y_, x_ + half_size, y_)
+
         -- vertical
         LG.line(x_, y_ - half_size, x_, y_ + half_size)
 end
@@ -1008,7 +1015,7 @@ function draw_hud()
                         (arena_h * 0.5) - 1 * pos_y + hud_h + pad_y
                 )
         end
-        LG.setColor(1, 1, 1) -- reset color to avoid leaking debug hud text color into post-processing shader.
+        LG.setColor(1, 1, 1) -- reset color
 end
 
 function draw_debug_hud()
@@ -1024,7 +1031,9 @@ function draw_debug_hud()
         local dt = love.timer.getDelta()
         local active_counter = 0 --- @type integer
         for _, value in ipairs(cs.creatures_is_active) do
-                if value == common.Status.active then active_counter = active_counter + 1 end
+                if value == common.Status.active then --
+                        active_counter = active_counter + 1
+                end
         end
 
         LG.setColor(common.Color.text_debug_hud)
@@ -1280,36 +1289,6 @@ function draw_background_shader(alpha)
         else
                 _draw_background_shader(alpha)
         end
-end
-
--- Constants for point size and maximum entities
-local MAX_POINTS = MAX_PARALLAX_ENTITIES -- Using your existing constant
-local POINT_SIZE = 8 -- Adjust based on your needs
-
-function init_background_points()
-        -- -- Initialize the point batch
-        -- point_batch = love.graphics.newPointBatch(nil, MAX_POINTS, 'dynamic')
-
-        -- -- Store point sizes in a separate array since PointBatch doesn't support varying sizes
-        -- point_sizes = {}
-        -- for i = 1, MAX_POINTS do
-        --         point_sizes[i] = parallax_entity_radius[i]
-        -- end
-        -- Create a small circle image to use in our sprite batch
-        function create_circle_image(radius, r, g, b, a)
-                local diameter = radius * 2
-                local canvas = love.graphics.newCanvas(diameter, diameter)
-                love.graphics.setCanvas(canvas)
-                love.graphics.clear()
-                love.graphics.setColor(r or 1, g or 1, b or 1, a or 1)
-                love.graphics.circle('fill', radius, radius, radius)
-                love.graphics.setCanvas()
-                return love.graphics.newImage(canvas:newImageData())
-        end
-        -- Create circle image for our sprite batch
-        circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
-        -- Initialize the sprite batch
-        sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
 end
 
 ---@diagnostic disable-next-line: unused-local
@@ -1597,6 +1576,26 @@ function love.load()
         end
 
         is_debug_hud_enabled = false --- Toggled by keys event.
+
+        -- Create a small circle image to use in our sprite batch.
+        local function create_circle_image(radius, r, g, b, a)
+                local diameter = radius * 2
+                local canvas = LG.newCanvas(diameter, diameter)
+                LG.setCanvas(canvas)
+                LG.clear()
+                LG.setColor(r or 1, g or 1, b or 1, a or 1)
+                LG.circle('fill', radius, radius, radius)
+                LG.setCanvas()
+                return LG.newImage(canvas:newImageData())
+        end
+
+        local function init_background_points()
+                -- Create circle image for our sprite batch
+                circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
+                -- Initialize the sprite batch
+                sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
+        end
+
         function reset_game()
                 init_background_points()
                 -- MUTATE GLOBAL VARS0
