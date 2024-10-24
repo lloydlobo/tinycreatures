@@ -1215,12 +1215,12 @@ end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 7)
-local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
+local MAX_PARALLAX_ENTITIES = (2 ^ 5)
+local PARALLAX_ENTITY_MAX_DEPTH = 4 --- @type integer
 local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
 local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
 local PARALLAX_OFFSET_FACTOR_Y = 0.075 * PHI_INV
-local _PARALLAX_ENTITY_RADIUS_FACTOR = 1 * (config.IS_GAME_SLOW and 2 or 1) -- some constant
+local _PARALLAX_ENTITY_RADIUS_FACTOR = 2 * PHI * (config.IS_GAME_SLOW and 2 or 1) -- some constant
 
 local parallax_entity_depth = {} --- @type number[]
 local parallax_entity_pos_x = {} --- @type number[] without arena_w world coordinate scaling
@@ -1253,7 +1253,7 @@ function update_background_shader(dt)
         local smoothValue = smoothstep(a, b, t)
         local freq = (smoothstep(common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
         local vel_x = 0.001 * 5 * freq * dt
-        local vel_y = math.abs(0.4 * 8 * freq) * dt
+        local vel_y = 4 * math.abs(0.4 * 8 * freq) * dt
         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
                 if config.IS_GRUG_BRAIN and screenshake.duration > 0 then
                         vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
@@ -1301,7 +1301,8 @@ function _draw_background_shader(alpha)
                 local scale = radius * thirty_two_inv -- Scale based on original circle radius as 32 was parallax entity image size
                 local origin_x = radius
                 local origin_y = radius
-                background_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
+                -- background_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
+                background_parallax_sprite_batch:setColor(0.025, 0.015, 0.10, point_alpha)
                 background_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
         end
         LG.setColor(1, 1, 1, 1) -- Reset color before drawing
@@ -1525,19 +1526,18 @@ function love.load()
                 -- shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
 
                 local is_default = false -- Choices: dark .125|light .325
-                shaders.post_processing.godsray.exposure = (is_default and 0.25 or ({ 0.40, 0.12, 0.25 })[config.CURRENT_THEME])
-                shaders.post_processing.godsray.decay = (is_default and 0.95 or ({ 0.550, 0.69, 0.70 })[config.CURRENT_THEME]) -- Choices: dark .60|light .75
-
+                shaders.post_processing.godsray.exposure = (is_default and 0.25 or ({ 0.20, 0.12, 0.25 })[config.CURRENT_THEME])
+                shaders.post_processing.godsray.decay = (is_default and 0.95 or ({ 0.75, 0.69, 0.70 })[config.CURRENT_THEME]) -- Choices: dark .60|light .75
                 shaders.post_processing.godsray.density = (is_default and 0.15 or 0.15)
                 shaders.post_processing.godsray.weight = (is_default and 0.50 or ({ 0.50, 0.45, 0.65 })[config.CURRENT_THEME])
                 shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-                shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 2)
+                shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 3)
         end
         if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-                shaders.post_processing.vignette.radius = 0.8 + 0.15 -- avoid health bar at the top
-                -- shaders.post_processing.vignette.softness = (0.5 + 0.2)
+                shaders.post_processing.vignette.radius = 0.8 -- avoid health bar at the top
+                shaders.post_processing.vignette.softness = (0.5 + 0.2)
                 -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
-                -- shaders.post_processing.vignette.color = common.Color.background
+                shaders.post_processing.vignette.color = common.Color.background
         end
 
         -- can put a fadeout timer for infected -> healed creatures as achievement with color change

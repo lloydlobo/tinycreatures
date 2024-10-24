@@ -36,28 +36,41 @@ M.CreatureStageColor = { { 0.75, 0.1, 0.3 }, { 0.70, 0.2, 0.3 }, { 0.70, 0.3, 0.
 local ordia_blue = { 0.06, 0.16, 0.38 }
 --- @enum Color
 M.Color = {
+        --{
+        -- background = ({ { 0.005, 0.005, 0.005 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- dark waters low_light ─ exposure: 0.0625, decay: 0.60
+        -- creature_infected = ({ { 0.7, 0.5, 0.2 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+        -- creature_healed = { 0.75, 0.75, 0.75 },
+        --}
+
+        --{
+        background = ({ { 0.06, 0.16, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
         -- background = ({ { 0.06, 0.16, 0.38 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
+        -- creature_infected = ({ { 0.05, 0.09, 0.23 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+        creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+        creature_healed = { 0.45, 0.45, 0.75 },
+        --}
+
+        -- creature_infected = ({ { 0.25, 0.9, 0.6 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+        -- creature_infected = (({ { 0.76, 0.05, 0.25 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- red low_light
+
+        -- creature_infected = (({ { 0.25, 0.9, 0.6 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- green low_light
+        -- creature_infected = (({ { 0.46, 0.16, 0.19 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- magenta low_light
+        -- creature_infected = (({ { 0.65, 1.00, 0.60 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- beserk low_light
+        -- creature_infected = (({ { 0.86, 0.40, 0.55 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- red low_light
+        -- creature_infected = { 0.2, 0.9, 0.6 }, -- green (works with all themes)
+        -- creature_infected = { 0.75, 0.1, 0.3 },
+
         -- background = { 0.4, 0.4, 0.4 },-- exposure: 0.0625, decay: 0.60
         -- background = { 0.75, 0.75, 0.75 }, -- exposure: 0.325, decay: 0.75
         -- background = { 0.9, 0.9, 0.9 }, -- exposure: 0.325, decay: 0.75
         -- creature_healed = { 0.85, 0.85, 0.85 },
         -- creature_healing = { 0.95, 0.4, 0.6 }, --- (pink)
-        -- creature_infected = { 0.2, 0.9, 0.6 }, -- green (works with all themes)
-        -- creature_infected = { 0.75, 0.1, 0.3 },
         -- creature_infected_rgba = { 0.75, 0.1, 0.3, 0.5 },
         -- player_beserker_modifier = { 0.9, 0.9, 0.4 },                          --- Enhanced abilities, when either of shift key is pressed.
         -- player_entity = { 0.3, 0.3, 0.3 }, --- The dark backdrop (galaxy like) of the eye. (charcoal)
         -- player_entity_firing_projectile = { 155 / 255, 190 / 255, 128 / 255 }, -- green mint
         -- player_entity_firing_projectile = { 230 / 255, 230 / 255, 250 / 255 }, -- lavender
-        background = ({ { 0.005, 0.005, 0.005 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- dark waters low_light ─ exposure: 0.0625, decay: 0.60
-        creature_healed = { 0.75, 0.75, 0.75 },
         creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
-        creature_infected = ({ { 0.7, 0.5, 0.2 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
-        -- creature_infected = (({ { 0.25, 0.9, 0.6 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- green low_light
-        -- creature_infected = (({ { 0.76, 0.05, 0.25 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- red low_light
-        -- creature_infected = (({ { 0.46, 0.16, 0.19 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- magenta low_light
-        -- creature_infected = (({ { 0.65, 1.00, 0.60 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- beserk low_light
-        -- creature_infected = (({ { 0.86, 0.40, 0.55 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME]), -- red low_light
         creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
         player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
         player_beserker_modifier = { 155 / 255, 190 / 255, 128 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
