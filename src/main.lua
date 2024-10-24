@@ -21,8 +21,11 @@ local simulate = require 'simulate'
 local LG = love.graphics
 
 local PHI, PHI_INV = config.PHI, config.PHI_INV
-local lerp = common.lerp
-local smoothstep = common.lerper['smoothstep']
+
+-- local lerp = common.lerp
+-- local smoothstep = common.lerper['smoothstep']
+local lerp = lume.lerp
+local smoothstep = lume.smooth
 
 --- NOTE: This is used by `game_level` to mutate `initial_large_creatures` these are mutated after
 ---       each level::: i can't bother changing case as of now... will do when time permits??
@@ -423,7 +426,7 @@ function update_player_trails_this_frame(dt)
         player_trails_index = (player_trails_index % config.MAX_PLAYER_TRAIL_COUNT) + 1
 end
 
-function update_player_entity_projectiles_this_frame(dt)
+function update_player_fired_projectiles_this_frame(dt)
         local cs = curr_state
 
         -- #region Update laser positions.
@@ -881,31 +884,68 @@ function draw_player_shield_collectible(alpha)
 end
 
 function _draw_active_projectile(i, alpha)
+        local scale = 1 --- Scale based on original circle radius
+        local origin_x = 4
+        local origin_y = 4
+
         local pos_x = curr_state.lasers_x[i]
         local pos_y = curr_state.lasers_y[i]
         if prev_state.lasers_is_active[i] == common.Status.active then
                 pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
         end
-        LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
+        -- FIXME: Will this cause issue with the spritebatch's usage set to 'static' instead of 'dynamic'?
+        laser_sprite_batch:add(pos_x, pos_y, 0, scale, scale, origin_x, origin_y)
+        -- LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
 end
+--[[ -- Clear and update sprite batch
+        background_parallax_sprite_batch:clear()
 
-function draw_projectiles(alpha)
-        local is_beserker = love.keyboard.isDown('lshift', 'rshift')
-        local is_dash = love.keyboard.isDown 'x'
-        -- Draw player player fired projectiles
-        if is_beserker then
-                LG.setColor(common.Color.player_beserker_modifier)
-        elseif is_dash then
-                LG.setColor(common.Color.player_dash_neonblue_modifier)
-        else
-                LG.setColor(common.Color.player_entity_firing_projectile)
+        for i = 1, MAX_PARALLAX_ENTITIES do
+                local x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
+                local y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
+                local point_alpha = parallax_entity_alpha_color / parallax_entity_depth[i]
+                local scale = parallax_entity_radius[i] / 4 -- Scale based on original circle radius
+
+                -- Add sprite to batch with position, rotation, scale and color
+                background_parallax_sprite_batch:setColor(0.8, 0.8, 0.8, point_alpha)
+                background_parallax_sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
         end
+
+        -- Reset color before drawing
+        love.graphics.setColor(1, 1, 1, 1)
+        -- Draw all sprites in one batch
+        love.graphics.draw(background_parallax_sprite_batch) ]]
+
+--- @enum PLAYER_ACTION
+local PLAYER_ACTION = {
+        BESERKER = 'BESERKER',
+        DASH = 'DASH',
+        FIRE = 'FIRE',
+}
+
+--- @type table<PLAYER_ACTION, [number, number, number]>
+local PROJECTILE_TO_PLAYER_ACTION_MAP = {
+        [PLAYER_ACTION.BESERKER] = common.Color.player_beserker_modifier,
+        [PLAYER_ACTION.DASH] = common.Color.player_dash_neonblue_modifier,
+        [PLAYER_ACTION.FIRE] = common.Color.player_entity_firing_projectile,
+}
+
+function draw_player_fired_projectiles(alpha)
+        laser_sprite_batch:clear()
         for i = 1, #curr_state.lasers_x do
                 if curr_state.lasers_is_active[i] == common.Status.active then --
                         _draw_active_projectile(i, alpha)
                 end
         end
+
+        local player_action = ( --[[@type PLAYER_ACTION]]
+                love.keyboard.isDown('lshift', 'rshift') and PLAYER_ACTION.BESERKER --[[ beserker has higher priority than dash ]]
+                or love.keyboard.isDown 'x' and PLAYER_ACTION.DASH --[[ dash has high priorityh than fire ]]
+                or PLAYER_ACTION.FIRE
+        )
+        LG.setColor(PROJECTILE_TO_PLAYER_ACTION_MAP[player_action])
+        LG.draw(laser_sprite_batch)
 end
 
 function _draw_active_creature(i, alpha)
@@ -1191,7 +1231,7 @@ function update_game(dt) ---@param dt number # Fixed delta time.
         update_player_vulnerability_timer_this_frame(dt)
         update_player_position_this_frame(dt)
         update_player_trails_this_frame(dt)
-        update_player_entity_projectiles_this_frame(dt)
+        update_player_fired_projectiles_this_frame(dt)
         update_player_shield_collectible_this_frame(dt)
         update_creatures_this_frame(dt)
 end
@@ -1337,7 +1377,7 @@ function draw_game(alpha)
         draw_screenshake_fx(alpha)
         draw_creatures(alpha)
         draw_player_health_bar(alpha)
-        draw_projectiles(alpha)
+        draw_player_fired_projectiles(alpha)
         draw_player_shield_collectible(alpha)
         draw_player_trail(alpha)
         draw_player_direction_ray(alpha)
@@ -1643,6 +1683,9 @@ function love.load()
                 circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
                 -- Initialize the sprite batch
                 sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
+        local function make_laser_sprite_batch()
+                local laser_circle_image = create_circle_image(config.LASER_RADIUS)
+                return love.graphics.newSpriteBatch(laser_circle_image, config.MAX_LASER_CAPACITY, 'static')
         end
 
         function reset_game()
@@ -1688,6 +1731,7 @@ function love.load()
                 prev_state.player_x = arena_w * 0.5
                 prev_state.player_y = arena_h * 0.5
 
+                laser_sprite_batch = make_laser_sprite_batch() --- @type love.SpriteBatch
                 for i = 1, config.MAX_PLAYER_TRAIL_COUNT do
                         player_trails_x[i] = 0
                         player_trails_y[i] = 0
