@@ -43,11 +43,18 @@ M.Color = {
         --}
 
         --{
-        background = ({ { 0.06, 0.16, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
+        -- GREENNNNN
+        background = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
+        creature_healed = { 0.45, 0.52, 0.45 },
+        creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+
+        -- BLUUEUUEUE
+        -- background = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
+        -- creature_healed = { 0.45, 0.45, 0.75 },
+        -- creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+
         -- background = ({ { 0.06, 0.16, 0.38 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
         -- creature_infected = ({ { 0.05, 0.09, 0.23 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
-        creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
-        creature_healed = { 0.45, 0.45, 0.75 },
         --}
 
         -- creature_infected = ({ { 0.25, 0.9, 0.6 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
