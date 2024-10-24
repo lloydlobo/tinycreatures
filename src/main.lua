@@ -1238,29 +1238,32 @@ end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 6)
+local MAX_PARALLAX_ENTITIES = (2 ^ 7)
 local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
 local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
 local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
 local PARALLAX_OFFSET_FACTOR_Y = 0.075 * PHI_INV
+local _PARALLAX_ENTITY_RADIUS_FACTOR = (config.IS_GAME_SLOW and 0.32 or 0.16) -- some constant
 
-local parallax_entity_depth = {}
-local parallax_entity_pos_x = {} -- without arena_w
-local parallax_entity_pos_y = {} -- without arena_h
-local parallax_entity_radius = {}
-for i = 1, MAX_PARALLAX_ENTITIES do
-        local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
-        parallax_entity_radius[i] = (config.IS_GAME_SLOW and 0.16 or 0.16) * math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
-        parallax_entity_depth[i] = depth
-        parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
-        parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
+local parallax_entity_depth = {} --- @type number[]
+local parallax_entity_pos_x = {} --- @type number[] without arena_w world coordinate scaling
+local parallax_entity_pos_y = {} --- @type number[] without arena_h world coordinate scaling
+local parallax_entity_radius = {} --- @type number[]
+-- Initialize parallax entities
+do
+        for i = 1, MAX_PARALLAX_ENTITIES do
+                parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
+                parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
+                local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
+                parallax_entity_depth[i] = depth
+                parallax_entity_radius[i] = _PARALLAX_ENTITY_RADIUS_FACTOR * math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
+        end
+        if not true then
+                local condition = #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x)
+                assert(condition, 'Assert count of parallax entity is a perfect square')
+        end
 end
-if not true then
-        assert(
-                #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
-                'Assert count of parallax entity is a perfect square'
-        )
-end
+
 local offset_x = 0
 local offset_y = 0
 local parallax_entity_alpha_color = ({ (PHI_INV ^ (config.IS_GAME_SLOW and -1 or 4)) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
@@ -1269,7 +1272,7 @@ local sign2 = ({ -3, 3 })[love.math.random(1, 2)]
 
 function update_background_shader(dt)
         local alpha = dt_accum * config.FIXED_DT_INV
-        local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
+        local a, b, t = (sign1 * 0.003 * alpha), (sign2 * 0.03 * alpha), math.sin(0.003 * alpha)
         local smoothValue = smoothstep(a, b, t)
         local freq = (smoothstep(common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
         local vel_x = 0.001 * 5 * freq * dt
@@ -1294,30 +1297,10 @@ function update_background_shader(dt)
         end
 end
 
--- draw calls 2474 for (2^8 entities)
--- function _draw_background_shader(alpha)
---         local cs = curr_state
---         local dx = 0
---         local dy = 0
---         local is_follow_player_parallax = true
---         if is_follow_player_parallax then
---                 offset_x = cs.player_x / arena_w
---                 offset_y = cs.player_y / arena_h
---                 dx = offset_x * PARALLAX_OFFSET_FACTOR_X
---                 dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
---         end
---         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i])
---                 LG.circle( 'fill', (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w, (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, parallax_entity_radius[i])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 1]) LG.circle( 'fill', (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w, (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h, parallax_entity_radius[i + 1])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 2]) LG.circle( 'fill', (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w, (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h, parallax_entity_radius[i + 2])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 3]) LG.circle( 'fill', (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w, (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h, parallax_entity_radius[i + 3])
---         end
--- end
-
--- draw calls 162 for (2^8 entities)
+--- without sprite batch:        draw calls 2474 for (2^8 entities)
+--- with sprite batch:           draw calls 162 for (2^8 entities)
+--- TODO: simulate fireworks like animation of entities
 function _draw_background_shader(alpha)
-        --- MAYBE: simulate fireworks like animation of entities
         local cs = curr_state
         local dx = 0
         local dy = 0
@@ -1331,23 +1314,24 @@ function _draw_background_shader(alpha)
         end
 
         -- Clear and update sprite batch
-        sprite_batch:clear()
+        background_parallax_sprite_batch:clear()
 
         for i = 1, MAX_PARALLAX_ENTITIES do
-                local x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
-                local y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
-                local point_alpha = parallax_entity_alpha_color / parallax_entity_depth[i]
-                local scale = parallax_entity_radius[i] / 4 -- Scale based on original circle radius
+                local depth_inv = parallax_entity_depth[i]
+                local x = (parallax_entity_pos_x[i] - (dx * depth_inv)) * arena_w
+                local y = (parallax_entity_pos_y[i] - (dy * depth_inv)) * arena_h
+                local point_alpha = parallax_entity_alpha_color * depth_inv
+                local scale = parallax_entity_radius[i] * 0.25 -- Scale based on original circle radius
 
                 -- Add sprite to batch with position, rotation, scale and color
-                sprite_batch:setColor(0.8, 0.8, 0.8, point_alpha)
-                sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
+                background_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
+                background_parallax_sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
         end
 
         -- Reset color before drawing
         love.graphics.setColor(1, 1, 1, 1)
         -- Draw all sprites in one batch
-        love.graphics.draw(sprite_batch)
+        love.graphics.draw(background_parallax_sprite_batch)
 end
 
 function draw_background_shader(alpha)
@@ -1678,18 +1662,17 @@ function love.load()
                 return LG.newImage(canvas:newImageData())
         end
 
-        local function init_background_points()
-                -- Create circle image for our sprite batch
-                circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
-                -- Initialize the sprite batch
-                sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
+        local function make_background_points()
+                local circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
+                return love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'static')
+        end
+
         local function make_laser_sprite_batch()
                 local laser_circle_image = create_circle_image(config.LASER_RADIUS)
                 return love.graphics.newSpriteBatch(laser_circle_image, config.MAX_LASER_CAPACITY, 'static')
         end
 
         function reset_game()
-                init_background_points()
                 -- MUTATE GLOBAL VARS0
                 INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
                 do -- FIXME: ^^^ Avoiding exponential-like (not really) overpopulation
@@ -1731,7 +1714,9 @@ function love.load()
                 prev_state.player_x = arena_w * 0.5
                 prev_state.player_y = arena_h * 0.5
 
+                background_parallax_sprite_batch = make_background_points() --- @type love.SpriteBatch
                 laser_sprite_batch = make_laser_sprite_batch() --- @type love.SpriteBatch
+
                 for i = 1, config.MAX_PLAYER_TRAIL_COUNT do
                         player_trails_x[i] = 0
                         player_trails_y[i] = 0
