@@ -20,7 +20,7 @@ local _fixed_fps = 60
 local _phi = 1.618
 local _phi_inv = 0.618
 local _player_acceleration = ({ 150, 200, 300 })[speed_mode]
-local _player_radius = (32 * 1.0) - 10
+local _player_radius = (32 * 0.61) - 4
 
 M = {
         -- CONFIGURATIONS
@@ -51,7 +51,7 @@ M = {
         IS_CREATURE_FOLLOW_PLAYER = true,
         IS_CREATURE_FUSION_ENABLED = not true, --- FIXME: Assertion fails in `simulate.lua`
         IS_CREATURE_SWARM_ENABLED = true,
-        IS_GAME_SLOW = true,
+        IS_GAME_SLOW = not true,
         IS_GRUG_BRAIN = not true, --- Whether to complicate life and the codebase.
         IS_PLAYER_INVULNERABLE = not true,
         IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = not true, --- Flags if fired projectile should wrap around arena.
