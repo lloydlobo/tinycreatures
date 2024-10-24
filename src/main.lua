@@ -899,10 +899,6 @@ local PROJECTILE_TO_PLAYER_ACTION_MAP = {
 }
 
 function _draw_active_projectile(i, alpha)
-        local scale = 1 --- Scale based on original circle radius
-        local origin_x = 4
-        local origin_y = 4
-
         local pos_x = curr_state.lasers_x[i]
         local pos_y = curr_state.lasers_y[i]
         if prev_state.lasers_is_active[i] == common.Status.active then
@@ -916,6 +912,10 @@ function _draw_active_projectile(i, alpha)
                 or love.keyboard.isDown 'x' and PLAYER_ACTION.DASH --[[ dash has high priorityh than fire ]]
                 or PLAYER_ACTION.FIRE
         )
+        -- Add sprite to batch with position, rotation, scale and color
+        local scale = 1 --- Scale based on original `LASER_RADIUS`.
+        local origin_x = config.LASER_RADIUS
+        local origin_y = config.LASER_RADIUS
         laser_sprite_batch:setColor(PROJECTILE_TO_PLAYER_ACTION_MAP[player_action])
         laser_sprite_batch:add(pos_x, pos_y, 0, scale, scale, origin_x, origin_y)
 end
@@ -931,24 +931,6 @@ function draw_player_fired_projectiles(alpha)
         LG.draw(laser_sprite_batch) -- Draw all sprites in one batch
 end
 
---[[ -- Clear and update sprite batch
-        background_parallax_sprite_batch:clear()
-
-        for i = 1, MAX_PARALLAX_ENTITIES do
-                local x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
-                local y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
-                local point_alpha = parallax_entity_alpha_color / parallax_entity_depth[i]
-                local scale = parallax_entity_radius[i] / 4 -- Scale based on original circle radius
-
-                -- Add sprite to batch with position, rotation, scale and color
-                background_parallax_sprite_batch:setColor(0.8, 0.8, 0.8, point_alpha)
-                background_parallax_sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
-        end
-
-        -- Reset color before drawing
-        love.graphics.setColor(1, 1, 1, 1)
-        -- Draw all sprites in one batch
-        love.graphics.draw(background_parallax_sprite_batch) ]]
 local MAX_CREATURE_RADIUS_INV = 1 / config.MAX_CREATURE_RADIUS
 function _draw_active_creature(i, alpha)
         local cs = curr_state
@@ -956,11 +938,12 @@ function _draw_active_creature(i, alpha)
         local curr_y = cs.creatures_y[i]
         local evolution_stage = creature_evolution_stages[cs.creatures_evolution_stage[i]] --- @type Stage
         local radius = evolution_stage.radius --- @type integer
-        -- LG.setColor(common.Color.creature_infected)
-        -- LG.circle('fill', curr_x, curr_y, radius)
+        -- Add sprite to batch with position, rotation, scale and color
         local scale = radius * MAX_CREATURE_RADIUS_INV
+        local origin_x = radius
+        local origin_y = radius
         creatures_sprite_batch:setColor(common.Color.creature_infected) -- !!!! can this paint them individually with set color
-        creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, 4, 4) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
+        creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 end
 
 function _draw_non_active_creature(i, alpha)
@@ -985,12 +968,11 @@ function _draw_non_active_creature(i, alpha)
                 and health > common.HealthTransitions.healing
                 and health <= common.HealthTransitions.healthy
         if (is_away_from_corner or is_not_moving) and is_healing then
-                -- LG.setColor(common.Color.creature_healed)
-                -- LG.circle('fill', curr_x, curr_y, radius)
-                do
-                        creatures_sprite_batch:setColor(common.Color.creature_healed) -- !!!! can this paint them individually with set color
-                        creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, 4, 4) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
-                end
+                -- Add sprite to batch with position, rotation, scale and color
+                local origin_x = radius
+                local origin_y = radius
+                creatures_sprite_batch:setColor(common.Color.creature_healed) -- !!!! can this paint them individually with set color
+                creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
                 -- PERF: Use a different sprite batch for healed departing creature
                 -- THIS LEADS TO +1000 batch calls
@@ -1238,7 +1220,7 @@ local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
 local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
 local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
 local PARALLAX_OFFSET_FACTOR_Y = 0.075 * PHI_INV
-local _PARALLAX_ENTITY_RADIUS_FACTOR = (config.IS_GAME_SLOW and 0.32 or 0.16) -- some constant
+local _PARALLAX_ENTITY_RADIUS_FACTOR = 1 * (config.IS_GAME_SLOW and 2 or 1) -- some constant
 
 local parallax_entity_depth = {} --- @type number[]
 local parallax_entity_pos_x = {} --- @type number[] without arena_w world coordinate scaling
@@ -1295,6 +1277,7 @@ end
 --- without sprite batch:        draw calls 2474 for (2^8 entities)
 --- with sprite batch:           draw calls 162 for (2^8 entities)
 --- TODO: simulate fireworks like animation of entities
+local thirty_two_inv = 1 / 32
 function _draw_background_shader(alpha)
         local cs = curr_state
         local dx = 0
@@ -1309,14 +1292,17 @@ function _draw_background_shader(alpha)
         background_parallax_sprite_batch:clear() -- Clear and update sprite batch
         for i = 1, MAX_PARALLAX_ENTITIES do
                 local depth_inv = parallax_entity_depth[i]
+                local radius = parallax_entity_radius[i]
                 local x = (parallax_entity_pos_x[i] - (dx * depth_inv)) * arena_w
                 local y = (parallax_entity_pos_y[i] - (dy * depth_inv)) * arena_h
                 local point_alpha = parallax_entity_alpha_color * depth_inv
-                local scale = parallax_entity_radius[i] * 0.25 -- Scale based on original circle radius
 
                 -- Add sprite to batch with position, rotation, scale and color
+                local scale = radius * thirty_two_inv -- Scale based on original circle radius as 32 was parallax entity image size
+                local origin_x = radius
+                local origin_y = radius
                 background_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
-                background_parallax_sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
+                background_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
         end
         LG.setColor(1, 1, 1, 1) -- Reset color before drawing
         LG.draw(background_parallax_sprite_batch) -- Draw all sprites in one batch
@@ -1650,8 +1636,8 @@ function love.load()
                 return LG.newImage(canvas:newImageData())
         end
 
-        local function make_background_points()
-                local circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
+        local function make_background_parallax_entities_sprite_batch()
+                local circle_image = create_circle_image(32) -- if 4 -> Base size of 8 pixels diameter
                 return love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'static')
         end
 
@@ -1708,7 +1694,7 @@ function love.load()
                 prev_state.player_y = arena_h * 0.5
 
                 do
-                        background_parallax_sprite_batch = make_background_points() --- @type love.SpriteBatch
+                        background_parallax_sprite_batch = make_background_parallax_entities_sprite_batch() --- @type love.SpriteBatch
                         creatures_sprite_batch = make_creatures_sprite_batch() --- @type love.SpriteBatch
                         laser_sprite_batch = make_laser_sprite_batch() --- @type love.SpriteBatch
                 end

@@ -33,9 +33,9 @@ M = {
         LASER_FIRE_TIMER_LIMIT = _phi_inv * ({ 0.21, 0.16, 0.14 })[speed_mode], --- Reduce this to increase fire rate.
         LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[speed_mode], --- 256|512|768
         LASER_RADIUS = math.floor(_player_radius * _phi_inv),
-        MAX_GAME_LEVELS = 2 ^ 6, -- > 64
         MAX_CREATURE_RADIUS = 80,
-        MAX_LASER_CAPACITY = 2 ^ 5, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
+        MAX_GAME_LEVELS = 2 ^ 6, -- > 64
+        MAX_LASER_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
         MAX_PLAYER_HEALTH = 3,
         MAX_PLAYER_TRAIL_COUNT = -4 + math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
         PLAYER_ACCELERATION = 3 * ({ 150, 200, 300 })[speed_mode],
