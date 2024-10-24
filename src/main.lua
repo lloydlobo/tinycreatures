@@ -555,7 +555,7 @@ function update_player_shield_collectible_this_frame(dt)
         if is_shield_spawned and is_player_increment_shield then
                 if cs.player_health < config.MAX_PLAYER_HEALTH then
                         cs.player_health = cs.player_health + 1
-                        sound_pickup_holy:play()
+                        sound_pickup_shield:play() -- SFX
                 end
                 if config.debug.is_assert then assert(cs.player_health <= config.MAX_PLAYER_HEALTH) end
                 -- Make shield `not is_active`.
@@ -1104,6 +1104,7 @@ function play_player_engine_sound(dt, movekind)
         local cs = curr_state
         sound_player_engine:play()
         sound_player_engine:setVelocity(cs.player_vel_x, cs.player_vel_y, 1)
+        if config.IS_GRUG_BRAIN then
         -- Stop overlapping sound waves by making the consecutive one softer
         local curr_pos = sound_player_engine:tell 'samples'
         local last_pos = sound_player_engine:getDuration 'samples'
@@ -1119,6 +1120,7 @@ function play_player_engine_sound(dt, movekind)
         elseif curr_pos > 0.99 * last_pos then
                 sound_player_engine:setVolume(1)
                 sound_player_engine:setAirAbsorption(20) --- LOL (: warble effect due to using variable dt
+                end
         end
 end
 
@@ -1369,6 +1371,15 @@ function love.load()
                         sound_fire_combo_hit:setVolume(PHI_INV)
                 end
 
+                sound_pickup_shield = love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static') -- stream and loop background music
+                sound_pickup_shield:setVolume(1)
+
+                sound_pickup_holy = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
+                sound_pickup_holy:setVolume(0.9) -- 90% of ordinary volume
+                sound_pickup_holy:setPitch(0.5) -- one octave lower
+                sound_pickup_holy:setVolume(0.6)
+                sound_pickup_holy:play() -- PLAY AT GAME START once
+
                 sound_guns_turn_off = love.audio.newSource('resources/audio/sfx/machines_guns_turn_off.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
                 sound_guns_turn_off:setEffect 'bandpass'
                 sound_guns_turn_off:setVolume(PHI_INV)
@@ -1384,20 +1395,17 @@ function love.load()
                 sound_player_engine:setPitch(0.6)
                 sound_player_engine:setVolume(0.5)
                 sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
-                sound_player_engine:setVolume(PHI_INV ^ 2)
+                sound_player_engine:setVolume(PHI_INV ^ 8)
 
                 sound_upgrade = love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-                sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_upgrade:setVolume(PHI_INV)
 
-                sound_pickup_holy = love.audio.newSource('resources/audio/sfx/pickup_holy.wav', 'static') -- stream and loop background music
-                sound_pickup_holy:setVolume(0.9) -- 90% of ordinary volume
-                -- sound_pickup_holy:setPitch(0.5) -- one octave lower
-                sound_pickup_holy:setVolume(0.6)
-                sound_pickup_holy:play() -- PLAY AT GAME START once
+                sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+                sound_ui_menu_select:setVolume(PHI_INV)
 
                 --- Audio Drone
                 sound_atmosphere_tense = love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static') -- Credit to DASK: Retro
-                sound_atmosphere_tense:setVolume(PHI_INV ^ 2)
+                sound_atmosphere_tense:setVolume(PHI_INV ^ 4)
 
                 --- Background Music Credit:
                 ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
