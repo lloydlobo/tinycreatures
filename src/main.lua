@@ -1624,20 +1624,42 @@ function love.load()
                 wait = 0.0,
         }
 
+        do
         local _creature_scale = 1
         local _speed_multiplier = 1.25
-        creature_evolution_stages = { ---@type Stage[] # Size decreases as stage progresses.
-                { speed = 90 * _speed_multiplier, radius = math.ceil(15 * _creature_scale) },
-                { speed = 70 * _speed_multiplier, radius = math.ceil(30 * _creature_scale) },
-                { speed = 50 * _speed_multiplier, radius = math.ceil(50 * _creature_scale) },
-                { speed = 20 * _speed_multiplier, radius = math.ceil(80 * _creature_scale) },
+
+                ---@type Stage[] # Size decreases as stage progresses.
+                creature_evolution_stages = {
+                        {
+                                speed = math.min(config.MAX_CREATURE_SPEED, math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 3.8) * _speed_multiplier)),
+                                radius = math.max(config.MIN_CREATURE_RADIUS, math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 5) * _creature_scale)),
+                        },
+                        {
+                                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 3) * _speed_multiplier),
+                                radius = math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 3) * _creature_scale)
+                        },
+                        {
+                                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 2) * _speed_multiplier),
+                                radius = math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 2) * _creature_scale)
+                        },
+                        {
+                                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 0) * _speed_multiplier),
+                                radius = math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 0) * _creature_scale)
+                        },
         }
         do -- Test `creature_evolution_stages`.
                 local max_creature_mutation_count = 0
                 for i = 1, #creature_evolution_stages do
                         max_creature_mutation_count = max_creature_mutation_count + i
+                                local stage = creature_evolution_stages[i]
+                                local speed = stage.speed
+                                local radius = stage.radius
+                                assert(speed > config.MIN_CREATURE_SPEED and speed <= config.MAX_CREATURE_SPEED)
+                                assert(radius >= config.MIN_CREATURE_RADIUS and radius <= config.MAX_CREATURE_RADIUS)
                 end
-                assert(max_creature_mutation_count == 10, 'Assert 1 creature (ancestor) »»mutates»» into ten creatures including itself.')
+                        assert(max_creature_mutation_count == 10,
+                                'Assert 1 creature (ancestor) »»mutates»» into ten creatures including itself.')
+                end
         end
 
         is_debug_hud_enabled = not true --- Toggled by keys event.
