@@ -4,7 +4,7 @@
 
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
-![tinycreatures_20241023184744](static/screencasts/tinycreatures_20241023184744.gif)
+![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
 
 > Initially built during a game jam for Ludum Dare 56's Tiny Creatures theme.
 
@@ -32,6 +32,7 @@ Visit the official Ludum Dare 56 page for this game: [Ludum Dare 56 Entry](https
       - [Other](#other)
     - [Key Enumerations](#key-enumerations)
   - [Credits](#credits)
+    - [Inspirations](#inspirations)
     - [Testers](#testers)
     - [Resources](#resources)
       - [Sound Effects](#sound-effects)
@@ -131,6 +132,7 @@ This game evolved from the starter template ported from an _Asteroids_ tutorial 
 #### Other
 
 - [REAPER](https://www.reaper.fm/) ─ Digital Audio Workstation
+- [sfxr.me](https://sfxr.me/) ─ Jsfxr is an online 8 bit sound maker and sfx generator.
 - [ezgif](https://ezgif.com) ─ GIF optimizer and compressor
 
 <details>
@@ -151,6 +153,13 @@ This game evolved from the starter template ported from an _Asteroids_ tutorial 
 ---
 
 ## Credits
+
+### Inspirations
+
+- PewPew
+- Orbia
+- Ordia
+- ...
 
 ### Testers
 
@@ -192,6 +201,7 @@ This project is open source under the MIT License. See the LICENSE file for more
 ![tinycreatures_202410141048](static/screencasts/tinycreatures_202410141048.gif)
 ![tinycreatures_20241017121242](static/screencasts/tinycreatures_20241017121242.gif)
 ![tinycreatures_20241023184744](static/screencasts/tinycreatures_20241023184744.gif)
+![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
 
 </details>
 
