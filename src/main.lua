@@ -51,7 +51,7 @@ local graphics_config = {
 -- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
 
 -- `vec2 uvs` is for LOVE quads
-local background_gradient_shader_code = [[
+local glsl_gradient_shader_code = [[
 extern vec2 screen;
 
 vec4 effect(vec4 color, Image image, vec2 uvs, vec2 screen_coords) {
@@ -1473,7 +1473,7 @@ function love.load()
                         .chain(fx.colorgradesimple)
                         .chain(fx.vignette),
         }
-        background_gradient_shader = LG.newShader(background_gradient_shader_code)
+        glsl_gradient_shader = LG.newShader(glsl_gradient_shader_code)
 
         if true then
                 if not true then
@@ -1819,9 +1819,9 @@ function love.draw()
         local alpha = dt_accum * config.FIXED_DT_INV --- @type number
         shaders.post_processing(function()
                 do
-                        LG.setShader(background_gradient_shader)
+                        LG.setShader(glsl_gradient_shader)
                         LG.rectangle("fill", 0, 0, arena_w, arena_h)                                 --- draw background fill, else background color shows up (maybe use LG.clearBackground())
-                        background_gradient_shader:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
+                        glsl_gradient_shader:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
                         do
                                 draw_background_shader(alpha)
                         end
