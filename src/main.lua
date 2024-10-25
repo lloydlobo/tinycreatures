@@ -54,6 +54,23 @@ local graphics_config = {
         scanlines = { enable = not true, mode = 'horizontal' }, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
 }
 
+-- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
+local background_gradient_shader_code = [[
+
+extern vec2 screen;
+
+/* uvs for LOVE quads */
+vec4 effect(vec4 color, Image image, vec2 uvs, vec2 screen_coords) {
+        vec4 pixel = Texel(image, uvs);
+
+        vec2 sc = vec2(screen_coords.x / screen.x, screen_coords.y / screen.y);
+
+        return vec4(sc, 1.0, 1.0) * pixel;
+}
+
+]]
+
+
 function test_timer_basic_usage()
         local isInvincible = true -- grant the player 5 seconds of invulnerability
         Timer.after(5, function()
@@ -227,7 +244,7 @@ local COLLISION_TOLERANCE = {
 --- tolerance < 1.0: stricter check (e.g., 0.9 requires 10% more overlap)
 --- @type fun(opts: { a: Circle, b: Circle, tolerance_factor: number|COLLISION_TOLERANCE } ): boolean
 local function is_intersect_circles_tolerant(opts)
-        if config.debug.is_assert then assert(opts.tolerance_factor >= 0.0 and opts.tolerance_factor <= 1.0) end
+        if config.debug.is_assert then assert(opts.tolerance_factor >= 0.0 and opts.tolerance_factor <= 2.0) end
         local dx = (opts.a.x - opts.b.x)
         local dy = (opts.a.y - opts.b.y)
         local ab_dist = opts.a.radius + opts.b.radius
@@ -1243,7 +1260,7 @@ end
 
 local offset_x = 0
 local offset_y = 0
-local parallax_entity_alpha_color = ({ (PHI_INV ^ (config.IS_GAME_SLOW and -1 or 4)) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
+local parallax_entity_alpha_color = ({ (PHI_INV ^ (config.IS_GAME_SLOW and -1 or -1)) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
 local sign1 = ({ -1, 1 })[love.math.random(1, 2)]
 local sign2 = ({ -3, 3 })[love.math.random(1, 2)]
 
@@ -1332,8 +1349,6 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-        draw_background_shader(alpha)
-        draw_screenshake_fx(alpha)
         draw_creatures(alpha)
         draw_player_health_bar(alpha)
         draw_player_fired_projectiles(alpha)
@@ -1444,11 +1459,12 @@ function love.load()
                         .chain(fx.vignette),
                 post_processing = moonshine(arena_w, arena_h, fx.godsray)
                         .chain(fx.chromasep)
-                        .chain(fx.glow)
+                        -- .chain(fx.glow)
                         .chain(fx.crt)
                         .chain(fx.colorgradesimple)
                         .chain(fx.vignette),
         }
+        background_gradient_shader = LG.newShader(background_gradient_shader_code)
 
         if true then
                 if not true then
@@ -1478,8 +1494,8 @@ function love.load()
         if graphics_config.bloom_intensity.enable then
                 local amount = graphics_config.bloom_intensity.amount
                 local defaults = { min_luma = 0.7, strength = 5 }
-                shaders.post_processing.glow.min_luma = defaults.min_luma * amount
-                shaders.post_processing.glow.strength = defaults.strength * amount
+                -- shaders.post_processing.glow.min_luma = defaults.min_luma * amount
+                -- shaders.post_processing.glow.strength = defaults.strength * amount
         end
 
         if graphics_config.chromatic_abberation.enable then
@@ -1637,7 +1653,7 @@ function love.load()
         end
 
         local function make_background_parallax_entities_sprite_batch()
-                local circle_image = create_circle_image(32) -- if 4 -> Base size of 8 pixels diameter
+                local circle_image = create_circle_image(32, 0.025, 0.15, 0.10, 0.2)  -- if 4 -> Base size of 8 pixels diameter
                 return love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'static')
         end
 
@@ -1800,20 +1816,31 @@ function love.draw()
 
         local alpha = dt_accum * config.FIXED_DT_INV --- @type number
 
-        -- • Objects that are partially off the edge of the screen can be seen on the other side.
-        -- • Coordinate system is translated to different positions and
-        --   everything is drawn at each position around the screen and
-        --   in the center.
-        -- • Draw off-screen object partially wrap around without glitch
         shaders.post_processing(function()
-                for y = -1, 1 do
-                        for x = -1, 1 do
-                                LG.origin()
-                                LG.translate(x * arena_w, y * arena_h)
-                                draw_game(alpha)
+                do
+                        draw_screenshake_fx(alpha)
+
+                        LG.setShader(background_gradient_shader)
+                        LG.rectangle("fill",0,0,arena_w,arena_h)
+                        background_gradient_shader:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
+
+                        draw_background_shader(alpha)
+                        LG.setShader() -- reset
+
+                        -- • Objects that are partially off the edge of the screen can be seen on the other side.
+                        -- • Coordinate system is translated to different positions and
+                        --   everything is drawn at each position around the screen and
+                        --   in the center.
+                        -- • Draw off-screen object partially wrap around without glitch
+                        for y = -1, 1 do
+                                for x = -1, 1 do
+                                        LG.origin()
+                                        LG.translate(x * arena_w, y * arena_h)
+                                        draw_game(alpha)
+                                end
                         end
+                        LG.origin() -- Reverse any previous calls to love.graphics.
                 end
-                LG.origin() -- Reverse any previous calls to love.graphics.
         end)
         if is_debug_hud_enabled then draw_hud() end
         if is_debug_hud_enabled then draw_debug_hud() end
