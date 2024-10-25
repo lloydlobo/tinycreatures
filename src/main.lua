@@ -30,12 +30,6 @@ local smoothstep = lume.smooth
 --- MOVE THIS TO CONFIG.LUA
 --- NOTE: This is used by `game_level` to mutate `initial_large_creatures` these are mutated after
 ---       each level::: i can't bother changing case as of now... will do when time permits??
-local CONSTANT_INITIAL_LARGE_CREATURES = (2 ^ 2) -- WARN: Any more than this, and levels above 50 lag
-do
-        INITIAL_LARGE_CREATURES = (2 ^ 0) --- @type integer # This count excludes the initial ancestor count.
-        EXPECTED_FINAL_HEALED_CREATURE_COUNT = ((INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES) --- @type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
-        TOTAL_CREATURES_CAPACITY = (2 * (INITIAL_LARGE_CREATURES ^ 2))
-end
 
 --- Public API shader graphics config.
 --- @class GraphicsConfig
@@ -48,26 +42,27 @@ end
 local graphics_config = {
         bloom_intensity = { enable = true, amount = 0.05 }, --- For `fx.glow`.
         chromatic_abberation = { enable = true, mode = 'minimal' },
-        curved_monitor = { enable = true, amount = PHI },
-        filmgrain = { enable = false, amount = PHI_INV },
-        lens_dirt = { enable = false }, --- unimplemented
+        curved_monitor = { enable = not true, amount = PHI },
+        filmgrain = { enable = not true, amount = PHI_INV },
+        lens_dirt = { enable = not true }, --- unimplemented
         scanlines = { enable = not true, mode = 'horizontal' }, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
 }
 
 -- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
-local background_gradient_shader_code = [[
 
+-- `vec2 uvs` is for LOVE quads
+local background_gradient_shader_code = [[
 extern vec2 screen;
 
-/* uvs for LOVE quads */
 vec4 effect(vec4 color, Image image, vec2 uvs, vec2 screen_coords) {
         vec4 pixel = Texel(image, uvs);
-
         vec2 sc = vec2(screen_coords.x / screen.x, screen_coords.y / screen.y);
-
-        return vec4(sc, 1.0, 1.0) * pixel;
+        //return vec4(sc, 1.0, 1.0) * pixel; // default
+        return vec4(1.0, sc[0], sc[1], 1.0) * pixel; // redpinkyello
+        //return vec4(sc[0],sc[1], 1.0, 1.0) * pixel; // blueishpink
+        //return vec4(sc[0], 1.0, sc[1], 1.0) * pixel; // greenishyellow
+        //return vec4(sc[0]+0.3, 0.4, sc[1]+0.2, 1.0) * pixel; // purple yellowish
 }
-
 ]]
 
 
@@ -75,7 +70,7 @@ function test_timer_basic_usage()
         local isInvincible = true -- grant the player 5 seconds of invulnerability
         Timer.after(5, function()
                 print('isInvincible', isInvincible)
-                isInvincible = false
+                isInvincible = not true
                 print('isInvincible', isInvincible)
         end)
 
@@ -257,7 +252,7 @@ end
 --- @return integer|nil
 --- @nodiscard
 function find_inactive_creature_index()
-        for i = 1, TOTAL_CREATURES_CAPACITY do
+        for i = 1, config.TOTAL_CREATURES_CAPACITY do
                 if curr_state.creatures_is_active[i] == common.Status.not_active then return i end
         end
 
@@ -292,7 +287,7 @@ end
 
 function count_active_creatures()
         local counter = 0
-        for i = 1, TOTAL_CREATURES_CAPACITY do
+        for i = 1, config.TOTAL_CREATURES_CAPACITY do
                 if curr_state.creatures_is_active[i] == common.Status.active then counter = counter + 1 end
         end
 
@@ -487,7 +482,7 @@ function update_player_fired_projectiles_this_frame(dt)
                         goto continue_not_is_active_laser
                 end
                 laser_circle = { x = cs.lasers_x[laser_index], y = cs.lasers_y[laser_index], radius = config.LASER_RADIUS }
-                for creature_index = 1, TOTAL_CREATURES_CAPACITY do
+                for creature_index = 1, config.TOTAL_CREATURES_CAPACITY do
                         if not (cs.creatures_is_active[creature_index] == common.Status.active) then --[[]]
                                 goto continue_not_is_active_creature
                         end
@@ -593,7 +588,7 @@ end
 
 function update_creatures_this_frame(dt)
         -- note: better to use a wave shader for ripples
-        if config.IS_CREATURE_SWARM_ENABLED then simulate.simulate_creatures_swarm_behavior(dt, TOTAL_CREATURES_CAPACITY) end
+        if config.IS_CREATURE_SWARM_ENABLED then simulate.simulate_creatures_swarm_behavior(dt, config.TOTAL_CREATURES_CAPACITY) end
 
         local cs = curr_state
 
@@ -604,7 +599,7 @@ function update_creatures_this_frame(dt)
         local creature_circle = { x = 0, y = 0, radius = 0 } ---@type Circle # hope for cache-locality
 
         local stages = creature_evolution_stages
-        for i = 1, TOTAL_CREATURES_CAPACITY do
+        for i = 1, config.TOTAL_CREATURES_CAPACITY do
                 if config.debug.is_assert and (cs.creatures_health[i] == common.HealthTransitions.healthy) then
                         assert(cs.creatures_is_active[i] == common.Status.not_active)
                 end
@@ -649,8 +644,8 @@ function update_creatures_this_frame(dt)
         -- Player won!
         if count_active_creatures() == 0 then
                 if config.debug.is_assert then
-                        local cond = (EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter)
-                        pcall(assert, cond, EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter)
+                        local cond = (config.EXPECTED_FINAL_HEALED_CREATURE_COUNT == laser_intersect_creature_counter)
+                        pcall(assert, cond, config.EXPECTED_FINAL_HEALED_CREATURE_COUNT .. ' , ' .. laser_intersect_creature_counter)
                 end
                 sound_upgrade:play()
                 game_level = (game_level % config.MAX_GAME_LEVELS) + 1
@@ -789,14 +784,14 @@ function draw_player(alpha)
                         inertia_x = curr_state.player_vel_x + math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
                         inertia_y = curr_state.player_vel_y + math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
                 end
-                local is_reversing = false
+                local is_reversing = not true
                 if love.keyboard.isDown('down', 's') then
                         is_reversing = true
                         reverse_damp_dist = 0.5
                         inertia_x = curr_state.player_vel_x - math.cos(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
                         inertia_y = curr_state.player_vel_y - math.sin(curr_state.player_rot_angle) * config.PLAYER_ACCELERATION * game_timer_dt
                 else
-                        is_reversing = false
+                        is_reversing = not true
                 end
                 inertia_x = curr_state.player_vel_x * config.AIR_RESISTANCE
                 inertia_y = curr_state.player_vel_y * config.AIR_RESISTANCE
@@ -1360,6 +1355,8 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
+        draw_screenshake_fx(alpha)
+
         draw_creatures(alpha)
         draw_player_health_bar(alpha)
         draw_player_fired_projectiles(alpha)
@@ -1464,14 +1461,15 @@ function love.load()
                 background_shader = moonshine(arena_w, arena_h, fx.chromasep)
                         -- .chain(fx.pixelate)
                         -- .chain(fx.godsray)
-                        -- .chain(fx.fastgaussianblur)
+                        .chain(fx.fastgaussianblur)
                         -- .chain(fx.desaturate)
                         .chain(fx.colorgradesimple)
                         .chain(fx.vignette),
                 post_processing = moonshine(arena_w, arena_h, fx.godsray)
                         .chain(fx.chromasep)
                         -- .chain(fx.glow)
-                        .chain(fx.crt)
+                        -- .chain(fx.crt)
+
                         .chain(fx.colorgradesimple)
                         .chain(fx.vignette),
         }
@@ -1502,12 +1500,12 @@ function love.load()
                 end
         end
 
-        if graphics_config.bloom_intensity.enable then
-                local amount = graphics_config.bloom_intensity.amount
-                local defaults = { min_luma = 0.7, strength = 5 }
-                -- shaders.post_processing.glow.min_luma = defaults.min_luma * amount
-                -- shaders.post_processing.glow.strength = defaults.strength * amount
-        end
+        -- if graphics_config.bloom_intensity.enable then
+        --         local amount = graphics_config.bloom_intensity.amount
+        --         local defaults = { min_luma = 0.7, strength = 5 }
+        --         shaders.post_processing.glow.min_luma = defaults.min_luma * amount
+        --         shaders.post_processing.glow.strength = defaults.strength * amount
+        -- end
 
         if graphics_config.chromatic_abberation.enable then
                 local mode_settings = {
@@ -1546,25 +1544,18 @@ function love.load()
         end
 
         if true then
-                -- shaders.post_processing.godsray.exposure = is_default and 0.25 or ({ 0.520, 0.125, 0.25 })[config.CURRENT_THEME]
-                -- shaders.post_processing.godsray.decay = is_default and 0.95 or ({ 0.48, 0.69, 0.70 })[config.CURRENT_THEME] -- Choices: dark .60|light .75
-                -- shaders.post_processing.godsray.density = is_default and 0.15 or 0.15 -- PERFORMANCE HOG
-                -- shaders.post_processing.godsray.weight = is_default and 0.50 or ({ 0.38, 0.45, 0.65 })[config.CURRENT_THEME]
-                -- shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-
-                local is_default = false -- Choices: dark .125|light .325
-                shaders.post_processing.godsray.exposure = (is_default and 0.25 or ({ 0.20, 0.12, 0.25 })[config.CURRENT_THEME])
-                shaders.post_processing.godsray.decay = (is_default and 0.95 or ({ 0.75, 0.69, 0.70 })[config.CURRENT_THEME]) -- Choices: dark .60|light .75
-                shaders.post_processing.godsray.density = (is_default and 0.15 or 0.15)
-                shaders.post_processing.godsray.weight = (is_default and 0.50 or ({ 0.50, 0.45, 0.65 })[config.CURRENT_THEME])
+                shaders.post_processing.godsray.decay = ({ 0.75, 0.69, 0.70 })[config.CURRENT_THEME]
+                shaders.post_processing.godsray.density = 0.15
+                shaders.post_processing.godsray.exposure =  ({ 0.20, 0.12, 0.25 })[config.CURRENT_THEME]
                 shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-                shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 3)
+                shaders.post_processing.godsray.samples = (config.IS_GAME_SLOW and 8 ^ 2 or math.floor(8 ^ 1.68)) --- 64 | 32 `(default: 70)`
+                shaders.post_processing.godsray.weight = ({ 0.50, 0.45, 0.65 })[config.CURRENT_THEME]
         end
         if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-                shaders.post_processing.vignette.radius = 0.8 -- avoid health bar at the top
+                shaders.post_processing.vignette.radius = 0.8+0.1 -- avoid health bar at the top
                 shaders.post_processing.vignette.softness = (0.5 + 0.2)
-                -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
-                shaders.post_processing.vignette.color = common.Color.background
+                shaders.post_processing.vignette.opacity = 0.5 + 0.1-- + 0.3
+                -- shaders.post_processing.vignette.color = common.Color.background
         end
 
         -- can put a fadeout timer for infected -> healed creatures as achievement with color change
@@ -1649,7 +1640,7 @@ function love.load()
                 assert(max_creature_mutation_count == 10, 'Assert 1 creature (ancestor) »»mutates»» into ten creatures including itself.')
         end
 
-        is_debug_hud_enabled = false --- Toggled by keys event.
+        is_debug_hud_enabled = not true --- Toggled by keys event.
 
         -- Create a small circle image to use in our sprite batch.
         local function create_circle_image(radius, r, g, b, a)
@@ -1670,7 +1661,7 @@ function love.load()
 
         local function make_creatures_sprite_batch()
                 local creature_circle_image = create_circle_image(creature_evolution_stages[#creature_evolution_stages].radius)
-                return love.graphics.newSpriteBatch(creature_circle_image, TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
+                return love.graphics.newSpriteBatch(creature_circle_image, config.TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
         end
 
         local function make_laser_sprite_batch()
@@ -1680,15 +1671,15 @@ function love.load()
 
         function reset_game()
                 -- MUTATE GLOBAL VARS0
-                INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
+                config.INITIAL_LARGE_CREATURES = config.CONSTANT_INITIAL_LARGE_CREATURES * game_level
                 do -- FIXME: ^^^ Avoiding exponential-like (not really) overpopulation
-                        INITIAL_LARGE_CREATURES = math.floor(CONSTANT_INITIAL_LARGE_CREATURES * (game_level ^ (1 / 4)))
+                        config.INITIAL_LARGE_CREATURES = math.floor(config.CONSTANT_INITIAL_LARGE_CREATURES * (game_level ^ (1 / 4)))
                 end
                 do -- AUTO-UPDATE
                         ---@type integer # This count excludes the initial ancestor count.
-                        EXPECTED_FINAL_HEALED_CREATURE_COUNT = (INITIAL_LARGE_CREATURES ^ 2) - INITIAL_LARGE_CREATURES
+                        config.EXPECTED_FINAL_HEALED_CREATURE_COUNT = (config.INITIAL_LARGE_CREATURES ^ 2) - config.INITIAL_LARGE_CREATURES
                         ---@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
-                        TOTAL_CREATURES_CAPACITY = 2 * (INITIAL_LARGE_CREATURES ^ 2)
+                        config.TOTAL_CREATURES_CAPACITY = 2 * (config.INITIAL_LARGE_CREATURES ^ 2)
                 end
 
                 game_timer_dt = 0.0
@@ -1750,7 +1741,7 @@ function love.load()
                 -- curr_state.creatures_y = { 100, 100, arena_h - 10 }
 
                 local largest_creature_stage = #creature_evolution_stages
-                for i = 1, TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
+                for i = 1, config.TOTAL_CREATURES_CAPACITY do -- Pre-allocate all creature's including stage combinations
                         curr_state.creatures_angle[i] = 0
                         curr_state.creatures_evolution_stage[i] = largest_creature_stage
                         curr_state.creatures_health[i] = 0 -- default 0 value
@@ -1761,7 +1752,7 @@ function love.load()
                         curr_state.creatures_vel_y[i] = 0
                 end
 
-                for i = 1, INITIAL_LARGE_CREATURES do -- Activate initial creatures.
+                for i = 1, config.INITIAL_LARGE_CREATURES do -- Activate initial creatures.
                         curr_state.creatures_angle[i] = love.math.random() * (2 * math.pi)
                         curr_state.creatures_evolution_stage[i] = largest_creature_stage -- Start at smallest stage
                         curr_state.creatures_health[i] = -1 -- -1 to 0 to 1.... like dash timer, or fade timer ( -1 to 0 to 1 )
@@ -1787,7 +1778,7 @@ function love.load()
         --     test_timer_basic_usage()
         -- end
 
-        LG.setBackgroundColor(common.Color.background)
+        -- LG.setBackgroundColor(common.Color.background)
 end
 
 function love.update(dt)
@@ -1823,35 +1814,31 @@ function love.update(dt)
 end
 
 function love.draw()
+        LG.clear(1, 1, 1, 1)                         -- this clears crt and background color each frame start
         if config.debug.is_assert then assert_consistent_state() end
-
         local alpha = dt_accum * config.FIXED_DT_INV --- @type number
-
         shaders.post_processing(function()
                 do
-                        draw_screenshake_fx(alpha)
-
                         LG.setShader(background_gradient_shader)
-                        LG.rectangle("fill",0,0,arena_w,arena_h)
+                        LG.rectangle("fill", 0, 0, arena_w, arena_h)                                 --- draw background fill, else background color shows up (maybe use LG.clearBackground())
                         background_gradient_shader:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
-
-                        draw_background_shader(alpha)
-                        LG.setShader() -- reset
-
-                        -- • Objects that are partially off the edge of the screen can be seen on the other side.
-                        -- • Coordinate system is translated to different positions and
-                        --   everything is drawn at each position around the screen and
-                        --   in the center.
-                        -- • Draw off-screen object partially wrap around without glitch
-                        for y = -1, 1 do
-                                for x = -1, 1 do
-                                        LG.origin()
-                                        LG.translate(x * arena_w, y * arena_h)
-                                        draw_game(alpha)
-                                end
+                        do
+                                draw_background_shader(alpha)
                         end
-                        LG.origin() -- Reverse any previous calls to love.graphics.
+                        LG.setShader() -- LG.setShader(background_gradient_shader)
                 end
+
+                -- • Objects that are partially off the edge of the screen can be seen on the other side.
+                -- • Coordinate system is translated to different positions and everything is drawn at each position around the screen and in the center.
+                -- • Draw off-screen object partially wrap around without glitch
+                for y = -1, 1 do
+                        for x = -1, 1 do
+                                LG.origin()
+                                LG.translate(x * arena_w, y * arena_h)
+                                draw_game(alpha)
+                        end
+                end
+                LG.origin() -- Reverse any previous calls to love.graphics.
         end)
         if is_debug_hud_enabled then draw_hud() end
         if is_debug_hud_enabled then draw_debug_hud() end

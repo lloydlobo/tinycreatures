@@ -46,7 +46,7 @@ M.Color = {
         -- GREENNNNN
         background = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
         -- creature_healed = { 0.45, 0.52, 0.45 }, -- before impl gradient bg shader
-        creature_healed = { 0.05, 0.02, 0.15, 0.4 },  -- after impl gradient bg shader
+        creature_healed = { 0.08, 0.08, 0.08, 0.2 },  -- after impl gradient bg shader
         creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
 
         -- BLUUEUUEUE
@@ -59,7 +59,8 @@ M.Color = {
 
         player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
         player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
-        player_dash_neonblue_modifier = { 0.8, 0.8, 1.0 }, --- bubbles (luminiscent blue)
+        -- player_dash_neonblue_modifier = { 0.8, 0.8, 1.0 }, --- bubbles (luminiscent blue)
+        player_dash_neonblue_modifier = { 0.85, 0.85, 0.95 }, --- bubbles (luminiscent blue)
         player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
         player_dash_yellow_modifier = { 0.9, 0.9, 0.4 }, --- You see, you're not dealing with the average player. (yellow)
         player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } }) [config.CURRENT_THEME],

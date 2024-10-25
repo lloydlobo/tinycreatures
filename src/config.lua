@@ -67,8 +67,8 @@ M = {
         -- DEBUGGING FLAGS
 
         debug = {
-                is_assert = not true,
-                is_development = not true,
+                is_assert = true,
+                is_development = true,
                 is_test = true,
                 is_trace_entities = not true,
                 is_trace_hud = not true,
@@ -76,6 +76,13 @@ M = {
 
         Theme = Theme, -- FIXME: Shouldn't this be in common.lua?
 }
+
+M.CONSTANT_INITIAL_LARGE_CREATURES = (2 ^ 2)                                                                   -- WARN: Any more than this, and levels above 50 lag
+do
+        M.INITIAL_LARGE_CREATURES = (2 ^ 0)                                                                    --- @type integer # This count excludes the initial ancestor count.
+        M.EXPECTED_FINAL_HEALED_CREATURE_COUNT = ((M.INITIAL_LARGE_CREATURES ^ 2) - M.INITIAL_LARGE_CREATURES) --- @type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`
+        M.TOTAL_CREATURES_CAPACITY = (2 * (M.INITIAL_LARGE_CREATURES ^ 2))
+end
 
 local is_skip_assert = true
 if not is_skip_assert then assert(M.PLAYER_ACCELERATION / M.PLAYER_DEFAULT_TURN_SPEED <= 60, 'Expected <= 60. Actual: ' .. M.PLAYER_ACCELERATION) end
