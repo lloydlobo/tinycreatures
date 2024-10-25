@@ -903,16 +903,20 @@ end
 
 --- @enum PLAYER_ACTION
 local PLAYER_ACTION = {
-        BESERKER = 'BESERKER',
+        BESERK_BOOST_COMBO = 'BESERK_BOOST_COMBO',
+        BESERK = 'BESERK',
         DASH = 'DASH',
         FIRE = 'FIRE',
+        IDLE = 'IDLE',
 }
 
 --- @type table<PLAYER_ACTION, [number, number, number]>
 local PROJECTILE_TO_PLAYER_ACTION_MAP = {
-        [PLAYER_ACTION.BESERKER] = common.Color.player_beserker_modifier,
+        [PLAYER_ACTION.BESERK_BOOST_COMBO] = common.Color.player_beserker_dash_modifier,
+        [PLAYER_ACTION.BESERK] = common.Color.player_beserker_modifier,
         [PLAYER_ACTION.DASH] = common.Color.player_dash_neonblue_modifier,
         [PLAYER_ACTION.FIRE] = common.Color.player_entity_firing_projectile,
+        [PLAYER_ACTION.IDLE] = common.Color.player_entity,
 }
 
 function _draw_active_projectile(i, alpha)
@@ -923,12 +927,19 @@ function _draw_active_projectile(i, alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
         end
 
-        -- maybne this should be in its update method?
-        local player_action = ( --[[@type PLAYER_ACTION]]
-                love.keyboard.isDown('lshift', 'rshift') and PLAYER_ACTION.BESERKER --[[ beserker has higher priority than dash ]]
-                or love.keyboard.isDown 'x' and PLAYER_ACTION.DASH --[[ dash has high priorityh than fire ]]
-                or PLAYER_ACTION.FIRE
+        local is_beserk = love.keyboard.isDown('lshift', 'rshift')
+        local is_boost = love.keyboard.isDown 'x'
+        local is_beserk_boost_combo = is_beserk and is_boost
+
+        -- maybe this should be in its update method?
+        --[[@type PLAYER_ACTION]]
+        local player_action = (
+                is_beserk_boost_combo and PLAYER_ACTION.BESERK_BOOST_COMBO
+                or (is_beserk and PLAYER_ACTION.BESERK
+                        or (is_boost and PLAYER_ACTION.DASH or PLAYER_ACTION.FIRE)
+                        or PLAYER_ACTION.IDLE)
         )
+
         -- Add sprite to batch with position, rotation, scale and color
         local scale = 1 --- Scale based on original `LASER_RADIUS`.
         local origin_x = config.LASER_RADIUS
