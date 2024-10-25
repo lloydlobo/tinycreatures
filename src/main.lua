@@ -21,9 +21,13 @@ local simulate = require 'simulate'
 local LG = love.graphics
 
 local PHI, PHI_INV = config.PHI, config.PHI_INV
-local lerp = common.lerp
-local smoothstep = common.lerper['smoothstep']
 
+-- local lerp = common.lerp
+-- local smoothstep = common.lerper['smoothstep']
+local lerp = lume.lerp
+local smoothstep = lume.smooth
+
+--- MOVE THIS TO CONFIG.LUA
 --- NOTE: This is used by `game_level` to mutate `initial_large_creatures` these are mutated after
 ---       each level::: i can't bother changing case as of now... will do when time permits??
 local CONSTANT_INITIAL_LARGE_CREATURES = (2 ^ 2) -- WARN: Any more than this, and levels above 50 lag
@@ -423,7 +427,7 @@ function update_player_trails_this_frame(dt)
         player_trails_index = (player_trails_index % config.MAX_PLAYER_TRAIL_COUNT) + 1
 end
 
-function update_player_entity_projectiles_this_frame(dt)
+function update_player_fired_projectiles_this_frame(dt)
         local cs = curr_state
 
         -- #region Update laser positions.
@@ -880,6 +884,20 @@ function draw_player_shield_collectible(alpha)
         LG.setColor(1, 1, 1) -- reset
 end
 
+--- @enum PLAYER_ACTION
+local PLAYER_ACTION = {
+        BESERKER = 'BESERKER',
+        DASH = 'DASH',
+        FIRE = 'FIRE',
+}
+
+--- @type table<PLAYER_ACTION, [number, number, number]>
+local PROJECTILE_TO_PLAYER_ACTION_MAP = {
+        [PLAYER_ACTION.BESERKER] = common.Color.player_beserker_modifier,
+        [PLAYER_ACTION.DASH] = common.Color.player_dash_neonblue_modifier,
+        [PLAYER_ACTION.FIRE] = common.Color.player_entity_firing_projectile,
+}
+
 function _draw_active_projectile(i, alpha)
         local pos_x = curr_state.lasers_x[i]
         local pos_y = curr_state.lasers_y[i]
@@ -887,59 +905,45 @@ function _draw_active_projectile(i, alpha)
                 pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
         end
-        LG.circle('fill', pos_x, pos_y, config.LASER_RADIUS)
+
+        -- maybne this should be in its update method?
+        local player_action = ( --[[@type PLAYER_ACTION]]
+                love.keyboard.isDown('lshift', 'rshift') and PLAYER_ACTION.BESERKER --[[ beserker has higher priority than dash ]]
+                or love.keyboard.isDown 'x' and PLAYER_ACTION.DASH --[[ dash has high priorityh than fire ]]
+                or PLAYER_ACTION.FIRE
+        )
+        -- Add sprite to batch with position, rotation, scale and color
+        local scale = 1 --- Scale based on original `LASER_RADIUS`.
+        local origin_x = config.LASER_RADIUS
+        local origin_y = config.LASER_RADIUS
+        laser_sprite_batch:setColor(PROJECTILE_TO_PLAYER_ACTION_MAP[player_action])
+        laser_sprite_batch:add(pos_x, pos_y, 0, scale, scale, origin_x, origin_y)
 end
 
-function draw_projectiles(alpha)
-        local is_beserker = love.keyboard.isDown('lshift', 'rshift')
-        local is_dash = love.keyboard.isDown 'x'
-        -- Draw player player fired projectiles
-        if is_beserker then
-                LG.setColor(common.Color.player_beserker_modifier)
-        elseif is_dash then
-                LG.setColor(common.Color.player_dash_neonblue_modifier)
-        else
-                LG.setColor(common.Color.player_entity_firing_projectile)
-        end
+function draw_player_fired_projectiles(alpha)
+        laser_sprite_batch:clear()
         for i = 1, #curr_state.lasers_x do
                 if curr_state.lasers_is_active[i] == common.Status.active then --
                         _draw_active_projectile(i, alpha)
                 end
         end
+        LG.setColor(1, 1, 1, 1) -- Reset color before drawing
+        LG.draw(laser_sprite_batch) -- Draw all sprites in one batch
 end
 
+local MAX_CREATURE_RADIUS_INV = 1 / config.MAX_CREATURE_RADIUS
 function _draw_active_creature(i, alpha)
-        local curr_x = curr_state.creatures_x[i]
-        local curr_y = curr_state.creatures_y[i]
-
-        local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
+        local cs = curr_state
+        local curr_x = cs.creatures_x[i]
+        local curr_y = cs.creatures_y[i]
+        local evolution_stage = creature_evolution_stages[cs.creatures_evolution_stage[i]] --- @type Stage
         local radius = evolution_stage.radius --- @type integer
-
-        -- Draw swarm behavior glitch circumference effect (blur-haze) on this creature.
-        if config.IS_CREATURE_SWARM_ENABLED then -- note: better to use a wave shader for ripples
-                local tolerance = evolution_stage.speed
-                if math.abs(curr_state.creatures_vel_x[i] - prev_state.creatures_vel_x[i]) >= tolerance then
-                        local segments = lerp(18, 6, alpha) -- for an eeerie hexagonal sharp edges effect
-                        local segment_distortion_amplitude = 2
-                        local segment_distortion = (segments * math.sin(segments) * 0.03) * segment_distortion_amplitude
-
-                        local is_draw_segment = false
-                        local distort_radius = lerp(radius - 1, radius + (is_draw_segment and 1 + segment_distortion or 2), alpha)
-                        -- FIXME: swarm range ─ should be evolution_stage.radius specific
-                        if is_draw_segment then
-                                LG.setColor(common.Color.creature_infected_rgba)
-                                LG.circle('line', curr_x, curr_y, distort_radius, segments)
-                        else
-                                LG.setColor(0.5, 0.6, 0.5, 0.05)
-                                LG.circle('line', curr_x, curr_y, distort_radius)
-                        end
-                        LG.setColor(common.Color.creature_infected) --- reset color
-                end
-        end
-
-        -- Draw this creature.
-        LG.setColor(common.Color.creature_infected)
-        LG.circle('fill', curr_x, curr_y, radius)
+        -- Add sprite to batch with position, rotation, scale and color
+        local scale = radius * MAX_CREATURE_RADIUS_INV
+        local origin_x = radius
+        local origin_y = radius
+        creatures_sprite_batch:setColor(common.Color.creature_infected) -- !!!! can this paint them individually with set color
+        creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 end
 
 function _draw_non_active_creature(i, alpha)
@@ -947,6 +951,8 @@ function _draw_non_active_creature(i, alpha)
         local curr_y = curr_state.creatures_y[i]
 
         local evolution_stage = creature_evolution_stages[curr_state.creatures_evolution_stage[i]] --- @type Stage
+        local radius = evolution_stage.radius
+        local scale = radius * MAX_CREATURE_RADIUS_INV --- since sprite batch item has radius of largest creature
 
         -- Automatically disappear when the `find_inactive_creature_index` looks them up and then
         -- `spawn_new_creature` mutates them.
@@ -962,31 +968,40 @@ function _draw_non_active_creature(i, alpha)
                 and health > common.HealthTransitions.healing
                 and health <= common.HealthTransitions.healthy
         if (is_away_from_corner or is_not_moving) and is_healing then
-                LG.setColor(common.Color.creature_healed)
-                LG.circle('fill', curr_x, curr_y, evolution_stage.radius)
+                -- Add sprite to batch with position, rotation, scale and color
+                local origin_x = radius
+                local origin_y = radius
+                creatures_sprite_batch:setColor(common.Color.creature_healed) -- !!!! can this paint them individually with set color
+                creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
-                -- Draw final creature evolution on successful healing.
-                local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV)
-                if smooth_alpha < config.PHI_INV then --- avoid janky alpha fluctuations per game basis
-                        local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
-                        local juice_frequency_damper = lerp(0.25, 0.125, alpha)
-                        local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
-                        local radius = evolution_stage.radius * radius_factor
-                        LG.setColor(common.Color.creature_healing)
-                        LG.circle('fill', curr_x, curr_y, radius)
-
-                        -- Draw `+` icon indicating score increment.
-                        LG.setColor(1, 1, 1)
-                        for dy = -1, 1 do
-                                for dx = -1, 1 do
-                                        draw_plus_icon(curr_x + dx, curr_y + dy, radius)
+                -- PERF: Use a different sprite batch for healed departing creature
+                -- THIS LEADS TO +1000 batch calls
+                -- Draw final creature evolution on successful healing with '+' symbol.
+                if config.IS_GAME_SLOW then
+                        local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV)
+                        if smooth_alpha < config.PHI_INV then --- avoid janky alpha fluctuations per game basis
+                                local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
+                                local juice_frequency_damper = lerp(0.25, 0.125, alpha)
+                                local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
+                                local radius = evolution_stage.radius * radius_factor
+                                LG.setColor(common.Color.creature_healing)
+                                LG.circle('fill', curr_x, curr_y, radius)
+                                -- Draw `+` icon indicating score increment.
+                                LG.setColor(1, 1, 1)
+                                for dy = -1, 1 do
+                                        for dx = -1, 1 do
+                                                draw_plus_icon(curr_x + dx, curr_y + dy, radius)
+                                        end
                                 end
                         end
                 end
         end
 end
 
+--- FIXME: Creature still on screen after laser collision, after introducing batch draw
+---             USE separate batches to draw active and non_active creatures
 function draw_creatures(alpha)
+        creatures_sprite_batch:clear() -- clear previous frame's creatures_sprite_batch from canvas
         for i = 1, #curr_state.creatures_x do
                 if curr_state.creatures_is_active[i] == common.Status.active then
                         _draw_active_creature(i, alpha)
@@ -994,6 +1009,8 @@ function draw_creatures(alpha)
                         _draw_non_active_creature(i, alpha)
                 end
         end
+        LG.setColor(1, 1, 1, 1) -- Reset color before drawing
+        LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
 end
 
 function draw_plus_icon(x_, y_, size_, linewidth)
@@ -1191,36 +1208,39 @@ function update_game(dt) ---@param dt number # Fixed delta time.
         update_player_vulnerability_timer_this_frame(dt)
         update_player_position_this_frame(dt)
         update_player_trails_this_frame(dt)
-        update_player_entity_projectiles_this_frame(dt)
+        update_player_fired_projectiles_this_frame(dt)
         update_player_shield_collectible_this_frame(dt)
         update_creatures_this_frame(dt)
 end
 
 -- bigger parallax entities go slow?
 -- or closer to the screen goes slow?
-local MAX_PARALLAX_ENTITIES = (2 ^ 6)
-local PARALLAX_ENTITY_MAX_DEPTH = 3 --- @type integer
+local MAX_PARALLAX_ENTITIES = (2 ^ 5)
+local PARALLAX_ENTITY_MAX_DEPTH = 4 --- @type integer
 local PARALLAX_ENTITY_MIN_DEPTH = 1 --- @type integer
 local PARALLAX_OFFSET_FACTOR_X = 0.075 * PHI_INV -- NOTE: Should be lower to avoid puking
 local PARALLAX_OFFSET_FACTOR_Y = 0.075 * PHI_INV
+local _PARALLAX_ENTITY_RADIUS_FACTOR = 2 * PHI * (config.IS_GAME_SLOW and 2 or 1) -- some constant
 
-local parallax_entity_depth = {}
-local parallax_entity_pos_x = {} -- without arena_w
-local parallax_entity_pos_y = {} -- without arena_h
-local parallax_entity_radius = {}
-for i = 1, MAX_PARALLAX_ENTITIES do
-        local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
-        parallax_entity_radius[i] = (config.IS_GAME_SLOW and 0.16 or 0.16) * math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
-        parallax_entity_depth[i] = depth
-        parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
-        parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
+local parallax_entity_depth = {} --- @type number[]
+local parallax_entity_pos_x = {} --- @type number[] without arena_w world coordinate scaling
+local parallax_entity_pos_y = {} --- @type number[] without arena_h world coordinate scaling
+local parallax_entity_radius = {} --- @type number[]
+-- Initialize parallax entities
+do
+        for i = 1, MAX_PARALLAX_ENTITIES do
+                parallax_entity_pos_x[i] = love.math.random() --- 0.0..1.0
+                parallax_entity_pos_y[i] = love.math.random() --- 0.0..1.0
+                local depth = love.math.random(PARALLAX_ENTITY_MIN_DEPTH, PARALLAX_ENTITY_MAX_DEPTH)
+                parallax_entity_depth[i] = depth
+                parallax_entity_radius[i] = _PARALLAX_ENTITY_RADIUS_FACTOR * math.ceil(math.sqrt(depth) * (PARALLAX_ENTITY_MAX_DEPTH / depth))
+        end
+        if not true then
+                local condition = #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x)
+                assert(condition, 'Assert count of parallax entity is a perfect square')
+        end
 end
-if not true then
-        assert(
-                #parallax_entity_pos_x == math.sqrt(#parallax_entity_pos_x) * math.sqrt(#parallax_entity_pos_x),
-                'Assert count of parallax entity is a perfect square'
-        )
-end
+
 local offset_x = 0
 local offset_y = 0
 local parallax_entity_alpha_color = ({ (PHI_INV ^ (config.IS_GAME_SLOW and -1 or 4)) * 0.56, 0.7, 1.0 })[config.CURRENT_THEME]
@@ -1229,11 +1249,11 @@ local sign2 = ({ -3, 3 })[love.math.random(1, 2)]
 
 function update_background_shader(dt)
         local alpha = dt_accum * config.FIXED_DT_INV
-        local a, b, t = sign1 * 0.003 * alpha, sign2 * 0.03 * alpha, math.sin(0.003 * alpha)
+        local a, b, t = (sign1 * 0.003 * alpha), (sign2 * 0.03 * alpha), math.sin(0.003 * alpha)
         local smoothValue = smoothstep(a, b, t)
         local freq = (smoothstep(common.sign(smoothValue) * (dt + 0.001), common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
         local vel_x = 0.001 * 5 * freq * dt
-        local vel_y = math.abs(0.4 * 8 * freq) * dt
+        local vel_y = 4 * math.abs(0.4 * 8 * freq) * dt
         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
                 if config.IS_GRUG_BRAIN and screenshake.duration > 0 then
                         vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
@@ -1254,34 +1274,14 @@ function update_background_shader(dt)
         end
 end
 
--- draw calls 2474 for (2^8 entities)
--- function _draw_background_shader(alpha)
---         local cs = curr_state
---         local dx = 0
---         local dy = 0
---         local is_follow_player_parallax = true
---         if is_follow_player_parallax then
---                 offset_x = cs.player_x / arena_w
---                 offset_y = cs.player_y / arena_h
---                 dx = offset_x * PARALLAX_OFFSET_FACTOR_X
---                 dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
---         end
---         for i = 1, MAX_PARALLAX_ENTITIES, 4 do
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i])
---                 LG.circle( 'fill', (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w, (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h, parallax_entity_radius[i])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 1]) LG.circle( 'fill', (parallax_entity_pos_x[i + 1] - (dx / parallax_entity_depth[i + 1])) * arena_w, (parallax_entity_pos_y[i + 1] - (dy / parallax_entity_depth[i + 1])) * arena_h, parallax_entity_radius[i + 1])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 2]) LG.circle( 'fill', (parallax_entity_pos_x[i + 2] - (dx / parallax_entity_depth[i + 2])) * arena_w, (parallax_entity_pos_y[i + 2] - (dy / parallax_entity_depth[i + 2])) * arena_h, parallax_entity_radius[i + 2])
---                 LG.setColor(0.8, 0.8, 0.8, parallax_entity_alpha_color / parallax_entity_depth[i + 3]) LG.circle( 'fill', (parallax_entity_pos_x[i + 3] - (dx / parallax_entity_depth[i + 3])) * arena_w, (parallax_entity_pos_y[i + 3] - (dy / parallax_entity_depth[i + 3])) * arena_h, parallax_entity_radius[i + 3])
---         end
--- end
-
--- draw calls 162 for (2^8 entities)
+--- without sprite batch:        draw calls 2474 for (2^8 entities)
+--- with sprite batch:           draw calls 162 for (2^8 entities)
+--- TODO: simulate fireworks like animation of entities
+local thirty_two_inv = 1 / 32
 function _draw_background_shader(alpha)
-        --- MAYBE: simulate fireworks like animation of entities
         local cs = curr_state
         local dx = 0
         local dy = 0
-
         local is_follow_player_parallax = true
         if is_follow_player_parallax then
                 offset_x = cs.player_x / arena_w -- FIXME: should lerp on wrap
@@ -1289,25 +1289,24 @@ function _draw_background_shader(alpha)
                 dx = offset_x * PARALLAX_OFFSET_FACTOR_X
                 dy = offset_y * PARALLAX_OFFSET_FACTOR_Y
         end
-
-        -- Clear and update sprite batch
-        sprite_batch:clear()
-
+        background_parallax_sprite_batch:clear() -- Clear and update sprite batch
         for i = 1, MAX_PARALLAX_ENTITIES do
-                local x = (parallax_entity_pos_x[i] - (dx / parallax_entity_depth[i])) * arena_w
-                local y = (parallax_entity_pos_y[i] - (dy / parallax_entity_depth[i])) * arena_h
-                local point_alpha = parallax_entity_alpha_color / parallax_entity_depth[i]
-                local scale = parallax_entity_radius[i] / 4 -- Scale based on original circle radius
+                local depth_inv = parallax_entity_depth[i]
+                local radius = parallax_entity_radius[i]
+                local x = (parallax_entity_pos_x[i] - (dx * depth_inv)) * arena_w
+                local y = (parallax_entity_pos_y[i] - (dy * depth_inv)) * arena_h
+                local point_alpha = parallax_entity_alpha_color * depth_inv
 
                 -- Add sprite to batch with position, rotation, scale and color
-                sprite_batch:setColor(0.8, 0.8, 0.8, point_alpha)
-                sprite_batch:add(x, y, 0, scale, scale, 4, 4) -- origin x, y (center of the circle)
+                local scale = radius * thirty_two_inv -- Scale based on original circle radius as 32 was parallax entity image size
+                local origin_x = radius
+                local origin_y = radius
+                -- background_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
+                background_parallax_sprite_batch:setColor(0.025, 0.015, 0.10, point_alpha)
+                background_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
         end
-
-        -- Reset color before drawing
-        love.graphics.setColor(1, 1, 1, 1)
-        -- Draw all sprites in one batch
-        love.graphics.draw(sprite_batch)
+        LG.setColor(1, 1, 1, 1) -- Reset color before drawing
+        LG.draw(background_parallax_sprite_batch) -- Draw all sprites in one batch
 end
 
 function draw_background_shader(alpha)
@@ -1337,7 +1336,7 @@ function draw_game(alpha)
         draw_screenshake_fx(alpha)
         draw_creatures(alpha)
         draw_player_health_bar(alpha)
-        draw_projectiles(alpha)
+        draw_player_fired_projectiles(alpha)
         draw_player_shield_collectible(alpha)
         draw_player_trail(alpha)
         draw_player_direction_ray(alpha)
@@ -1527,19 +1526,18 @@ function love.load()
                 -- shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
 
                 local is_default = false -- Choices: dark .125|light .325
-                shaders.post_processing.godsray.exposure = (is_default and 0.25 or ({ 0.40, 0.12, 0.25 })[config.CURRENT_THEME])
-                shaders.post_processing.godsray.decay = (is_default and 0.95 or ({ 0.550, 0.69, 0.70 })[config.CURRENT_THEME]) -- Choices: dark .60|light .75
-
+                shaders.post_processing.godsray.exposure = (is_default and 0.25 or ({ 0.20, 0.12, 0.25 })[config.CURRENT_THEME])
+                shaders.post_processing.godsray.decay = (is_default and 0.95 or ({ 0.75, 0.69, 0.70 })[config.CURRENT_THEME]) -- Choices: dark .60|light .75
                 shaders.post_processing.godsray.density = (is_default and 0.15 or 0.15)
                 shaders.post_processing.godsray.weight = (is_default and 0.50 or ({ 0.50, 0.45, 0.65 })[config.CURRENT_THEME])
                 shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-                shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 2)
+                shaders.post_processing.godsray.samples = (is_default and 70 or 8 * 3)
         end
         if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-                shaders.post_processing.vignette.radius = 0.8 + 0.15 -- avoid health bar at the top
-                -- shaders.post_processing.vignette.softness = (0.5 + 0.2)
+                shaders.post_processing.vignette.radius = 0.8 -- avoid health bar at the top
+                shaders.post_processing.vignette.softness = (0.5 + 0.2)
                 -- shaders.post_processing.vignette.opacity = 0.5 + 0.1 + 0.3
-                -- shaders.post_processing.vignette.color = common.Color.background
+                shaders.post_processing.vignette.color = common.Color.background
         end
 
         -- can put a fadeout timer for infected -> healed creatures as achievement with color change
@@ -1638,15 +1636,22 @@ function love.load()
                 return LG.newImage(canvas:newImageData())
         end
 
-        local function init_background_points()
-                -- Create circle image for our sprite batch
-                circle_image = create_circle_image(24) -- if 4 -> Base size of 8 pixels diameter
-                -- Initialize the sprite batch
-                sprite_batch = love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'dynamic')
+        local function make_background_parallax_entities_sprite_batch()
+                local circle_image = create_circle_image(32) -- if 4 -> Base size of 8 pixels diameter
+                return love.graphics.newSpriteBatch(circle_image, MAX_PARALLAX_ENTITIES, 'static')
+        end
+
+        local function make_creatures_sprite_batch()
+                local creature_circle_image = create_circle_image(creature_evolution_stages[#creature_evolution_stages].radius)
+                return love.graphics.newSpriteBatch(creature_circle_image, TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
+        end
+
+        local function make_laser_sprite_batch()
+                local laser_circle_image = create_circle_image(config.LASER_RADIUS) --- FIXME: how to make this dynamic sized? use differnet sprite images and batches?
+                return love.graphics.newSpriteBatch(laser_circle_image, config.MAX_LASER_CAPACITY, 'static')
         end
 
         function reset_game()
-                init_background_points()
                 -- MUTATE GLOBAL VARS0
                 INITIAL_LARGE_CREATURES = CONSTANT_INITIAL_LARGE_CREATURES * game_level
                 do -- FIXME: ^^^ Avoiding exponential-like (not really) overpopulation
@@ -1687,6 +1692,12 @@ function love.load()
                 prev_state.player_vel_y = 0
                 prev_state.player_x = arena_w * 0.5
                 prev_state.player_y = arena_h * 0.5
+
+                do
+                        background_parallax_sprite_batch = make_background_parallax_entities_sprite_batch() --- @type love.SpriteBatch
+                        creatures_sprite_batch = make_creatures_sprite_batch() --- @type love.SpriteBatch
+                        laser_sprite_batch = make_laser_sprite_batch() --- @type love.SpriteBatch
+                end
 
                 for i = 1, config.MAX_PLAYER_TRAIL_COUNT do
                         player_trails_x[i] = 0
