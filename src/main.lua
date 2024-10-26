@@ -65,6 +65,50 @@ vec4 effect(vec4 color, Image image, vec2 uvs, vec2 screen_coords) {
 }
 ]]
 
+--- @class Light
+--- @field position [number, number]
+--- @field diffuse [number, number, number]
+--- @field power number
+
+local glsl_phong_shader_code = [[
+#define NUM_LIGHTS 32
+
+struct Light{
+        vec2 position;
+        vec3 diffuse;
+        float power;
+};
+
+extern Light lights[NUM_LIGHTS];
+extern int num_lights;
+
+extern vec2 screen;
+
+const float constant=1.;
+const float linear=.09;
+const float quadratic=.032;
+
+vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
+        vec4 pixel=Texel(image,uvs);
+
+        vec2 norm_screen=screen_coords/screen;
+        vec3 diffuse=vec3(0);
+
+        for(int i=0;i<num_lights;i++){
+                Light light=lights[i];
+                vec2 norm_position=light.position/screen;
+
+                float distance=length(norm_position-norm_screen)*light.power;
+                float attenuation=1./(constant+linear*distance+quadratic*(distance*distance));
+                diffuse+=light.diffuse*attenuation;
+        }
+
+        diffuse=clamp(diffuse,0.,1.);
+
+        return pixel*vec4(diffuse,1.);
+}
+]]
+
 
 function test_timer_basic_usage()
         local isInvincible = true -- grant the player 5 seconds of invulnerability
@@ -128,6 +172,25 @@ end
 --- @field offset_y number # 0
 --- @field wait number # 0
 --- See also: https://sheepolution.com/learn/book/22
+
+
+--- @enum PLAYER_ACTION
+local PLAYER_ACTION = {
+        BESERK_BOOST_COMBO = 'BESERK_BOOST_COMBO',
+        BESERK = 'BESERK',
+        DASH = 'DASH',
+        FIRE = 'FIRE',
+        IDLE = 'IDLE',
+}
+
+--- @type table<PLAYER_ACTION, [number, number, number]>
+local PLAYER_ACTION_COLOR_MAP = {
+        [PLAYER_ACTION.BESERK_BOOST_COMBO] = common.Color.player_beserker_dash_modifier,
+        [PLAYER_ACTION.BESERK] = common.Color.player_beserker_modifier,
+        [PLAYER_ACTION.DASH] = common.Color.player_dash_neonblue_modifier,
+        [PLAYER_ACTION.FIRE] = common.Color.player_entity_firing_projectile,
+        [PLAYER_ACTION.IDLE] = common.Color.player_entity,
+}
 
 --
 --
@@ -698,7 +761,8 @@ function draw_player_trail(alpha)
 end
 
 local RAY_RADIUS = config.PLAYER_RADIUS * (1 - PHI_INV) * 0.5
-local RAY_COLOR = { 0.6, 0.6, 0.6, 0.15 }
+-- local RAY_COLOR = { 0.6, 0.6, 0.6, 0.15 }
+local RAY_COLOR = {1,1,1}
 
 --- Excellent for predicting visually where player might end up.. like a lookahead (great for dodge!)
 function draw_player_direction_ray(alpha)
@@ -726,9 +790,9 @@ function draw_player_direction_ray(alpha)
                 local ease = 1
                 ray_x = (ray_x + ray_vel_x * config.AIR_RESISTANCE) % arena_w
                 ray_y = (ray_y + ray_vel_y * config.AIR_RESISTANCE) % arena_h
-                LG.line(cs.player_x - 1, cs.player_y - 1, ray_x - 1, ray_y - 1)
+                -- LG.line(cs.player_x - 1, cs.player_y - 1, ray_x - 1, ray_y - 1)
                 LG.line(cs.player_x, cs.player_y, ray_x, ray_y)
-                LG.line(cs.player_x + 1, cs.player_y + 1, ray_x + 1, ray_y + 1)
+                -- LG.line(cs.player_x + 1, cs.player_y + 1, ray_x + 1, ray_y + 1)
         else -- jump to dot
                 local last_ray_radius_if_multiple_rays = 2
                 for i = -1, 1, 1 do
@@ -896,25 +960,10 @@ function draw_player_shield_collectible(alpha)
         LG.setColor(1, 1, 1) -- reset
 end
 
---- @enum PLAYER_ACTION
-local PLAYER_ACTION = {
-        BESERK_BOOST_COMBO = 'BESERK_BOOST_COMBO',
-        BESERK = 'BESERK',
-        DASH = 'DASH',
-        FIRE = 'FIRE',
-        IDLE = 'IDLE',
-}
-
---- @type table<PLAYER_ACTION, [number, number, number]>
-local PROJECTILE_TO_PLAYER_ACTION_MAP = {
-        [PLAYER_ACTION.BESERK_BOOST_COMBO] = common.Color.player_beserker_dash_modifier,
-        [PLAYER_ACTION.BESERK] = common.Color.player_beserker_modifier,
-        [PLAYER_ACTION.DASH] = common.Color.player_dash_neonblue_modifier,
-        [PLAYER_ACTION.FIRE] = common.Color.player_entity_firing_projectile,
-        [PLAYER_ACTION.IDLE] = common.Color.player_entity,
-}
 
 function _draw_active_projectile(i, alpha)
+        local prev_player_action = player_action --- @type PLAYER_ACTION
+
         local pos_x = curr_state.lasers_x[i]
         local pos_y = curr_state.lasers_y[i]
         if prev_state.lasers_is_active[i] == common.Status.active then
@@ -922,25 +971,17 @@ function _draw_active_projectile(i, alpha)
                 pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
         end
 
-        local is_beserk = love.keyboard.isDown('lshift', 'rshift')
-        local is_boost = love.keyboard.isDown 'x'
-        local is_beserk_boost_combo = is_beserk and is_boost
-
-        -- maybe this should be in its update method?
-        --[[@type PLAYER_ACTION]]
-        local player_action = (
-                is_beserk_boost_combo and PLAYER_ACTION.BESERK_BOOST_COMBO
-                or (is_beserk and PLAYER_ACTION.BESERK
-                        or (is_boost and PLAYER_ACTION.DASH or PLAYER_ACTION.FIRE)
-                        or PLAYER_ACTION.IDLE)
-        )
 
         -- Add sprite to batch with position, rotation, scale and color
         local scale = 1 --- Scale based on original `LASER_RADIUS`.
         local origin_x = config.LASER_RADIUS
         local origin_y = config.LASER_RADIUS
-        laser_sprite_batch:setColor(PROJECTILE_TO_PLAYER_ACTION_MAP[player_action])
+        laser_sprite_batch:setColor(PLAYER_ACTION_COLOR_MAP[player_action])
         laser_sprite_batch:add(pos_x, pos_y, 0, scale, scale, origin_x, origin_y)
+        do
+
+                player_action = prev_player_action -- since we are firing
+        end
 end
 
 function draw_player_fired_projectiles(alpha)
@@ -965,7 +1006,8 @@ function _draw_active_creature(i, alpha)
         local scale = radius * MAX_CREATURE_RADIUS_INV
         local origin_x = radius
         local origin_y = radius
-        creatures_sprite_batch:setColor(common.Color.creature_infected) -- !!!! can this paint them individually with set color
+        -- !!!! can this paint them individually with set color
+        creatures_sprite_batch:setColor(common.Color.creature_infected)
         creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 end
 
@@ -991,19 +1033,33 @@ function _draw_non_active_creature(i, alpha)
                 and health > common.HealthTransitions.healing
                 and health <= common.HealthTransitions.healthy
         if (is_away_from_corner or is_not_moving) and is_healing then
+                local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
+
                 -- Add sprite to batch with position, rotation, scale and color
                 local origin_x = radius
                 local origin_y = radius
                 creatures_sprite_batch:setColor(common.Color.creature_healed) -- !!!! can this paint them individually with set color
-                creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
+                local _sx = scale
+                local _sy = scale
+                local __is_overide = true
+                if __is_overide or config.IS_GRUG_BRAIN then
+                        local shrinkage = lume.clamp(curr_state.creatures_health[i], -radius, 0.200)
+                        -- local shrink_factor = (alpha * 0.1618 - game_timer_dt)
+                        -- local shrink_factor = (math.sin(game_timer_t % 2) * 0.1618 - game_timer_dt)
+                        shrink_factor = shrinkage
+                        local s_lo = scale - PHI_INV * shrink_factor
+                        local s_hi = scale - PHI * shrink_factor
+                        _sx = smoothstep(s_lo, s_hi, game_timer_dt)
+                        _sy = smoothstep(s_lo, s_hi, game_timer_dt)
+                end
+                creatures_sprite_batch:add(curr_x, curr_y, 0, _sx, _sy, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
                 -- PERF: Use a different sprite batch for healed departing creature
                 -- THIS LEADS TO +1000 batch calls
                 -- Draw final creature evolution on successful healing with '+' symbol.
-                if config.IS_GAME_SLOW then
+                if  config.IS_GAME_SLOW then
                         local smooth_alpha = lerp((1 - PHI_INV), alpha, PHI_INV)
                         if smooth_alpha < config.PHI_INV then --- avoid janky alpha fluctuations per game basis
-                                local juice_frequency = 1 + math.sin(config.FIXED_FPS * game_timer_dt)
                                 local juice_frequency_damper = lerp(0.25, 0.125, alpha)
                                 local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
                                 local radius = evolution_stage.radius * radius_factor
@@ -1217,6 +1273,21 @@ function handle_player_input_this_frame(dt)
         else
                 player_turn_speed = config.PLAYER_DEFAULT_TURN_SPEED
         end
+
+        do -- FIXME: Let it be or move each action to (if/elseif/else) checks above
+                local is_beserk = love.keyboard.isDown('lshift', 'rshift')
+                local is_boost = love.keyboard.isDown 'x'
+                local is_beserk_boost_combo = is_beserk and is_boost
+                if is_beserk_boost_combo then
+                        player_action = PLAYER_ACTION.BESERK_BOOST_COMBO
+                elseif is_beserk then
+                        player_action = PLAYER_ACTION.BESERK
+                elseif is_boost then
+                        player_action = PLAYER_ACTION.DASH
+                else
+                        player_action = PLAYER_ACTION.FIRE -- since we are firing
+                end
+        end
 end
 
 ---
@@ -1351,18 +1422,19 @@ function draw_screenshake_fx(alpha)
         LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
 end
 
+
+
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-        draw_screenshake_fx(alpha)
+        draw_phong_shader_active_creatures_callback(function() draw_creatures(alpha) end)
 
-        draw_creatures(alpha)
         draw_player_health_bar(alpha)
         draw_player_fired_projectiles(alpha)
-        draw_player_shield_collectible(alpha)
-        draw_player_trail(alpha)
+        draw_phong_shader_player_trail_callback(function() draw_player_trail(alpha) end)
         draw_player_direction_ray(alpha)
+        draw_player_shield_collectible(alpha)
         draw_player(alpha)
 end
 
@@ -1474,6 +1546,7 @@ function love.load()
                         .chain(fx.vignette),
         }
         glsl_gradient_shader = LG.newShader(glsl_gradient_shader_code)
+        glsl_phong_shader = LG.newShader(glsl_phong_shader_code)
 
         if true then
                 if not true then
@@ -1616,6 +1689,8 @@ function love.load()
         player_trails_time_left = {} --- @type number[]
         player_trails_index = 1 --- @type integer # 1..`MAX_PLAYER_TRAIL_COUNT`
 
+        player_action = PLAYER_ACTION.IDLE --- @type PLAYER_ACTION
+
         screenshake = { --- @type ScreenShake
                 amount = 5 * 0.5 * config.PHI_INV,
                 duration = 0.0,
@@ -1682,7 +1757,10 @@ function love.load()
         end
 
         local function make_creatures_sprite_batch()
-                local creature_circle_image = create_circle_image(creature_evolution_stages[#creature_evolution_stages].radius)
+                local color = common.Color.creature_infected
+                local radius=creature_evolution_stages[#creature_evolution_stages].radius
+                -- local creature_circle_image = create_circle_image(radius, color[1], color[2], color[3], 1.0)
+                local creature_circle_image = create_circle_image(radius, 1, 1, 1, 1)
                 return love.graphics.newSpriteBatch(creature_circle_image, config.TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
         end
 
@@ -1835,6 +1913,41 @@ function love.update(dt)
         update_screenshake(dt)
 end
 
+function draw_phong_shader_player_trail_callback(fun)
+        LG.setShader(glsl_phong_shader)
+        glsl_phong_shader:send('screen', { LG.getWidth(), LG.getHeight() })
+        glsl_phong_shader:send('num_lights', 1)
+        do
+                local name = "lights[" .. 0 .. "]"         -- first array offset is 0 in glsl. lua uses 1 as index
+                -- glsl_phong_shader:send(name .. '.position', { LG.getWidth() * .5, LG.getHeight() * .5 })
+                glsl_phong_shader:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
+                glsl_phong_shader:send(name .. '.diffuse', (PLAYER_ACTION_COLOR_MAP[player_action] or { 1, 1, 1 }))
+                -- glsl_phong_shader:send(name .. '.power', 64 - 64 * curr_state.player_invulnerability_timer)
+                glsl_phong_shader:send(name .. '.power', 48 )
+        end
+        do         -- draw here
+                fun()
+        end
+        LG.setShader()         -- glsl_phong_shader
+end
+function draw_phong_shader_active_creatures_callback(fun)
+        LG.setShader(glsl_phong_shader)
+        glsl_phong_shader:send('screen', { LG.getWidth(), LG.getHeight() })
+        glsl_phong_shader:send('num_lights', 1)
+        do
+                local name = "lights[" .. 0 .. "]"         -- first array offset is 0 in glsl. lua uses 1 as index
+                -- glsl_phong_shader:send(name .. '.position', { LG.getWidth() * .5, LG.getHeight() * .5 })
+                glsl_phong_shader:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
+                glsl_phong_shader:send(name .. '.diffuse', (PLAYER_ACTION_COLOR_MAP[player_action] or { 0.5, 0.5, 0.5 }))
+                -- glsl_phong_shader:send(name .. '.power', 64 - 64 * curr_state.player_invulnerability_timer)
+                glsl_phong_shader:send(name .. '.power', 256 )
+        end
+        do         -- draw here
+                fun()
+        end
+        LG.setShader()         -- glsl_phong_shader
+end
+
 function love.draw()
         LG.clear(1, 1, 1, 1)                         -- this clears crt and background color each frame start
         if config.debug.is_assert then assert_consistent_state() end
@@ -1842,14 +1955,13 @@ function love.draw()
         shaders.post_processing(function()
                 do
                         LG.setShader(glsl_gradient_shader)
-                        LG.rectangle("fill", 0, 0, arena_w, arena_h)                                 --- draw background fill, else background color shows up (maybe use LG.clearBackground())
+                        LG.rectangle("fill", 0, 0, arena_w, arena_h)                           --- draw background fill, else background color shows up (maybe use LG.clearBackground())
                         glsl_gradient_shader:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
-                        do
+                        do                                                                     -- draw here
                                 draw_background_shader(alpha)
                         end
-                        LG.setShader() -- LG.setShader(background_gradient_shader)
+                        LG.setShader() --> background_gradient_shader
                 end
-
                 -- • Objects that are partially off the edge of the screen can be seen on the other side.
                 -- • Coordinate system is translated to different positions and everything is drawn at each position around the screen and in the center.
                 -- • Draw off-screen object partially wrap around without glitch
@@ -1857,9 +1969,12 @@ function love.draw()
                         for x = -1, 1 do
                                 LG.origin()
                                 LG.translate(x * arena_w, y * arena_h)
+
+                                draw_screenshake_fx(alpha)
                                 draw_game(alpha)
                         end
                 end
+
                 LG.origin() -- Reverse any previous calls to love.graphics.
         end)
         if is_debug_hud_enabled then draw_hud() end
