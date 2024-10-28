@@ -1,7 +1,8 @@
 local M = {}
 
-local common = require 'tests.common'
+local common = require 'common'
 local config = require 'config'
+
 local lerp = common.lerp
 
 --- Calculate the vector from the creature to the player.
