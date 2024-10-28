@@ -1168,6 +1168,7 @@ function player_damage_status_actions(status)
         sound_player_took_damage:play()
     elseif status == common.PLAYER_DAMAGE_STATUS.INVULNERABLE then
         screenshake.duration = 0.45
+        --- just use a fade in Timer here
         sound_player_engine:play() -- indicate player to move while they still can ^_^
     end -- no-op
 end
@@ -1187,6 +1188,14 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     update_player_fired_projectiles_this_frame(dt)
     update_player_shield_collectible_this_frame(dt)
     update_creatures_this_frame(dt)
+
+    if curr_state.player_invulnerability_timer > 0 then
+        music_bgm:setEffect('on_damage_lowpass', true)
+        music_bgm:setEffect('on_damage_reverb', true)
+    else
+        music_bgm:setEffect('on_damage_lowpass', not true)
+        music_bgm:setEffect('on_damage_reverb', not true)
+    end
 end
 
 -- bigger parallax entities go slow?
@@ -1341,13 +1350,15 @@ function love.load()
             sound_fire_combo_hit:setVolume(PHI_INV ^ 4)
         else
             sound_creature_healed_1 = (love.audio.newSource('resources/audio/sfx/wip/laser_jsfxr.wav', 'static'))
-            sound_creature_healed_1:setVolume(1)
+            sound_creature_healed_1:setPitch(PHI_INV ^ 1)
+            sound_creature_healed_1:setVolume(PHI_INV)
             sound_creature_healed_2 = (love.audio.newSource('resources/audio/sfx/wip/laser_final_jsfxr.wav', 'static'))
-            sound_creature_healed_2:setVolume(1)
+            sound_creature_healed_2:setPitch(PHI_INV ^ 1)
+            sound_creature_healed_2:setVolume(PHI_INV)
             -- sound_fire_combo_hit = love.audio.newSource('resources/audio/sfx/animal_happy_bird.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
             sound_fire_combo_hit = (love.audio.newSource('resources/audio/sfx/wip/laser_explosion_jsfxr.wav', 'static'))
-            sound_fire_combo_hit:setPitch(PHI_INV ^ 2)
-            sound_fire_combo_hit:setVolume(PHI_INV ^ 2)
+            sound_fire_combo_hit:setPitch(PHI_INV ^ 0)
+            sound_fire_combo_hit:setVolume(PHI_INV ^ 5)
         end
 
         sound_pickup_shield = love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static') -- stream and loop background music
@@ -1395,10 +1406,7 @@ function love.load()
         sound_upgrade_level:setVolume(3)
         sound_upgrade_level:play()
 
-        -- sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/742717__artix0__dash-sound-effect.wav', 'static')) -- Dash Sound Effect by ArTiX.0 -- https://freesound.org/s/742717/ -- License: Creative Commons 0
-        -- sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static'))
-        -- thisw can be used for beserk mode
-        sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/585256__lesaucisson__swoosh-2.mp3', 'static')) -- Dash Sound Effect by ArTiX.1 -- https://freesound.org/s/742717/ -- License: Creative Commons 0
+        sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/585256__lesaucisson__swoosh-2.mp3', 'static')) -- swoosh-2.mp3 by lesaucisson -- https://freesound.org/s/585256/ -- License: Creative Commons 0
         sound_boost_impulse:setPitch(PHI_INV ^ 0)
         sound_boost_impulse:setVolume(PHI_INV ^ 1)
 
@@ -1411,20 +1419,72 @@ function love.load()
         ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
         ---     • [YouTube Link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC)
         --- Note: `stream` option ─ stream and loop background music
-        music_bgm = love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream')
-        music_bgm:setFilter {
-            type = 'lowpass',
-            volume = 1,
-            highgain = 1,
+        music_bgms = {
+            love.audio.newSource('resources/audio/music/ross_bugden_chime_chase.wav', 'stream'),
+            -- love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream'),
         }
-        if config.debug.is_development then music_bgm:setFilter {
-            type = 'bandpass',
-            lowgain = 1,
-        } end
-        music_bgm:setVolume(0.9)
-        music_bgm:setPitch(0.2 * PHI_INV) -- one octave lower
-        music_bgm:setVolume((config.debug.is_development and (music_bgm:getVolume()) * 0.025) or PHI_INV)
-        if true then music_bgm:setVolume(0) end
+        -- Create a low-pass filter effect
+        -- see https://love2d.org/wiki/EffectType
+        love.audio.setEffect('on_damage_lowpass', {
+            type = 'equalizer',
+            -- Adjust the frequency components of the sound using a 4-band (low-shelf, two band-pass
+            -- and a high-shelf) equalizer.
+            highcut = 4000,
+            highgain = 0.126,
+            highmidgain = 0.126,
+            lowgain = 2,
+            lowmidfrequency = 500,
+            lowmidgain = 0.126,
+            volume = 2.0, -- Reduces the overall volume during the effect
+            -- highgain = 0.1, -- Controls how much high frequencies are allowed through
+        })
+        love.audio.setEffect('on_damage_reverb', {
+            -- type = 'echo',
+            -- damping = 0.9,
+            -- feedback = 0.1,
+            -- tapdelay = 0.01,
+            -- spread = 1 / 30, -- 30% spread
+            -- delay = 0.01,
+
+            -- type = 'reverb',
+            -- decaytime = lume.clamp(1.49 * (PHI * 4), 0.1, 20), -- `(default: 1.49)`
+            -- roomrolloff = lume.clamp(2 * PHI, 0, 10),
+            -- gain = 0.32 * PHI_INV,
+
+            type = 'ringmodulator',
+            frequency = 100, -- `default: 800` ─ I want a hollow eerie effect
+            highcut = lume.clamp(450, 0, 24000), -- ... use a freq which is consistently playing (1000Hz)
+            waveform = 'square', --- @type 'sine' | 'square' | 'sawtooth'
+            volume = PHI_INV,
+        })
+        do
+            music_bgm = music_bgms[love.math.random(1, #music_bgms)]
+            love.audio.setEffect('master_reverb', {
+                type = 'reverb',
+                decaytime = lume.clamp(1.49 * (PHI * 1), 0.1, 20), -- `(default: 1.49)`
+                roomrolloff = lume.clamp(PHI, 0, 10),
+                gain = 0.32 * 1,
+            })
+
+            music_bgm:setEffect('master_reverb', true)
+            local is_beat_enable = not true
+            if is_beat_enable then
+                music_bgm_bass_always = love.audio.newSource('resources/audio/music/ross_bugden_chime_chase.wav', 'stream')
+                -- music_bgm_bass_always:setFilter { type = 'lowpass', volume = 3, highgain = -48 }
+                -- music_bgm_bass_always:setFilter { type = 'lowpass', volume = 1, highgain = -48 }
+                music_bgm_bass_always:setVolume(1.0)
+                music_bgm_bass_always:setLooping(true)
+                music_bgm_bass_always:play()
+            end
+
+            music_bgm:setFilter { type = 'highpass', volume = 6, lowgain = 6 }
+            -- if config.debug.is_development then music_bgm:setFilter { type = 'bandpass', lowgain = 0 } end
+            music_bgm:setPitch(1.0) -- one octave lower
+            music_bgm:setVolume(1.0)
+            music_bgm:setLooping(true)
+            -- music_bgm:setVolume((config.debug.is_development and (music_bgm:getVolume()) * 0.025) or PHI_INV)
+            -- if true then music_bgm:setVolume(0) end
+        end
 
         music_ambience_underwater = (love.audio.newSource('resources/audio/sfx/255597__akemov__underwater-ambience.wav', 'stream')) -- underwater ambience by akemov -- https://freesound.org/s/255597/ -- License: Attribution 4.0
         music_ambience_underwater:setVolume(1.0)
@@ -1446,7 +1506,9 @@ function love.load()
         -- Sci-Fi Engine - Light Cycle.wav by fedexico -- https://freesound.org/s/136672/ -- License: Attribution 3.0
 
         -- Master volume
-        love.audio.setVolume(not config.debug.is_development and 1.0 or 0.5) -- volume # number # 1.0 is max and 0.0 is off.
+        if not true then
+            love.audio.setVolume(not config.debug.is_development and 1.0 or 0.5) -- volume # number # 1.0 is max and 0.0 is off.
+        end
     end
 
     game_level = 1
@@ -1631,11 +1693,11 @@ function love.load()
                 radius = (math.max(config.MIN_CREATURE_RADIUS, math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 5) * _creature_scale))),
             },
             {
-                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 3) * _speed_multiplier),
+                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 2) * _speed_multiplier),
                 radius = math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 3) * _creature_scale),
             },
             {
-                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 2) * _speed_multiplier),
+                speed = math.floor(config.MIN_CREATURE_SPEED * (PHI ^ 1) * _speed_multiplier),
                 radius = math.ceil(config.MAX_CREATURE_RADIUS * (PHI_INV ^ 2) * _creature_scale),
             },
             {

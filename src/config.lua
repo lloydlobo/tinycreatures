@@ -42,7 +42,7 @@ M = {
     MAX_PLAYER_HEALTH = 3,
     MAX_PLAYER_TRAIL_COUNT = -4 + math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
     MIN_CREATURE_RADIUS = 8,
-    MIN_CREATURE_SPEED = 20,
+    MIN_CREATURE_SPEED = 32, -- 20|30
     PLAYER_ACCELERATION = 3 * ({ 150, 200, 300 })[speed_mode],
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _phi_inv,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _phi_inv), 10, -2 + (30 / 2) / 4 + (_player_acceleration / _fixed_fps) })[speed_mode],
