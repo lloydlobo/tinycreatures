@@ -1,17 +1,30 @@
-assert = require 'luassert'
 local common = require '../common'
+
+assert = require 'luassert'
 require 'busted'
 
 if arg[1] == '' then error 'Please run `busted tests/*.lua`.' end
 
+describe('common - datastructures', function()
+    describe('enumerations', function()
+        it('should have correct status values', function()
+            assert.are.equal(common.Status.active, 1)
+            assert.are.equal(common.Status.not_active, 0)
+            assert.are.equal(common.Status.active == 1, true)
+            assert.are.equal(common.Status.not_active == 0, true)
+        end)
+        it('should have correct health transition values', function()
+            assert.are.equal(common.HealthTransitions.none, -1)
+            assert.are.equal(common.HealthTransitions.healing, 0)
+            assert.are.equal(common.HealthTransitions.healthy, 1)
+        end)
+    end)
+end)
+
 describe('common - functions', function()
     describe('get sign', function()
-        it('should get positive sign for positive numbers', function()
-            assert.are.equal(1, common.sign(1))
-        end)
-        it('should get negative sign for negative numbers', function()
-            assert.are.equal(-1, common.sign(-1))
-        end)
+        it('should get positive sign for positive numbers', function() assert.are.equal(1, common.sign(1)) end)
+        it('should get negative sign for negative numbers', function() assert.are.equal(-1, common.sign(-1)) end)
         it('should not return zero for zero input', function() -- edge case
             assert.are.equal(1, common.sign(0))
         end)
@@ -65,22 +78,6 @@ describe('common - functions', function()
             assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = -1, y2 = -1 })
             assert.are.equal(2, common.manhattan_distance { x1 = 0, y1 = 0, x2 = 1, y2 = 1 })
             assert.are.equal(2, common.manhattan_distance { x1 = 1, y1 = 1, x2 = 0, y2 = 0 })
-        end)
-    end)
-end)
-
-describe('common - datastructures', function()
-    describe('enumerations', function()
-        it('should have correct status values', function()
-            assert.are.equal(common.Status.active, 1)
-            assert.are.equal(common.Status.not_active, 0)
-            assert.are.equal(common.Status.active == 1, true)
-            assert.are.equal(common.Status.not_active == 0, true)
-        end)
-        it('should have correct health transition values', function()
-            assert.are.equal(common.HealthTransitions.none, -1)
-            assert.are.equal(common.HealthTransitions.healing, 0)
-            assert.are.equal(common.HealthTransitions.healthy, 1)
         end)
     end)
 end)
