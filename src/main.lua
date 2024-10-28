@@ -1159,10 +1159,12 @@ end
 function player_damage_status_actions(status)
     if status == common.PLAYER_DAMAGE_STATUS.DEAD then
         screenshake.duration = 0.15 * PHI * PHI
+        sound_player_took_damage_interference:play()
         sound_player_took_damage:play()
         reset_game()
     elseif status == common.PLAYER_DAMAGE_STATUS.DAMAGED then
         screenshake.duration = 0.15 * PHI
+        sound_player_took_damage_interference:play()
         sound_player_took_damage:play()
     elseif status == common.PLAYER_DAMAGE_STATUS.INVULNERABLE then
         screenshake.duration = 0.45
@@ -1361,26 +1363,28 @@ function love.load()
         sound_guns_turn_off:setEffect 'bandpass'
         sound_guns_turn_off:setVolume(PHI_INV ^ 4)
 
-        -- sound_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_player_took_damage_interference = love.audio.newSource('resources/audio/sfx/machines_interference.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_player_took_damage_interference:setPitch(PHI_INV ^ -3)
+        sound_player_took_damage_interference:setVolume(0.5)
         sound_player_took_damage = love.audio.newSource('resources/audio/sfx/wip/laser_final_jsfxr.wav', 'static')
         sound_player_took_damage:setPitch(PHI_INV ^ 2.5)
         sound_player_took_damage:setVolume(1)
 
+        sound_player_beserk = (love.audio.newSource('resources/audio/sfx/statistics_upgrade.wav', 'static')) -- Dash Sound Effect by ArTiX.0 -- https://freesound.org/s/742717/ -- License: Creative Commons 0
+        sound_player_beserk:setPitch(PHI_INV ^ 1)
+        sound_player_beserk:setVolume(PHI_INV ^ 2)
+
         -- sound_fire_projectile = love.audio.newSource('resources/audio/sfx/select_sound.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
         -- sound_fire_projectile:setPitch(1.15)
         -- sound_fire_projectile:setVolume(PHI_INV)
-        sound_fire_projectile = love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
-        sound_fire_projectile:setPitch(5.0)
-        sound_fire_projectile:setVolume(PHI_INV ^ 7)
+        sound_fire_projectile = love.audio.newSource('resources/audio/sfx/wip/laser_jsfxr.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
+        sound_fire_projectile:setPitch(PHI_INV ^ 1)
+        sound_fire_projectile:setVolume(PHI_INV ^ 3)
 
         sound_player_engine = love.audio.newSource('resources/audio/sfx/atmosphere_dive.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io
         sound_player_engine:setPitch(0.6)
         sound_player_engine:setVolume(0.5)
-        sound_player_engine:setFilter {
-            type = 'lowpass',
-            volume = 1,
-            highgain = (3 * 0.5),
-        }
+        sound_player_engine:setFilter { type = 'lowpass', volume = 1, highgain = (3 * 0.5) }
         sound_player_engine:setVolume(PHI_INV ^ 8)
 
         sound_ui_menu_select = love.audio.newSource('resources/audio/sfx/menu_select.wav', 'static') -- Credit to DASK: Retro sounds https://dagurasusk.itch.io/retrosounds
@@ -1392,9 +1396,11 @@ function love.load()
         sound_upgrade_level:play()
 
         -- sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/742717__artix0__dash-sound-effect.wav', 'static')) -- Dash Sound Effect by ArTiX.0 -- https://freesound.org/s/742717/ -- License: Creative Commons 0
-        sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static'))
+        -- sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/wip/powerup_jsfxr.wav', 'static'))
+        -- thisw can be used for beserk mode
+        sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/585256__lesaucisson__swoosh-2.mp3', 'static')) -- Dash Sound Effect by ArTiX.1 -- https://freesound.org/s/742717/ -- License: Creative Commons 0
         sound_boost_impulse:setPitch(PHI_INV ^ 0)
-        sound_boost_impulse:setVolume(PHI_INV ^ 2)
+        sound_boost_impulse:setVolume(PHI_INV ^ 1)
 
         --- Audio Drone
 
