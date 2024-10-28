@@ -172,6 +172,7 @@ Grateful to the following creators for their amazing sound and music contributio
 #### Sound Effects
 
 - **DASK**: Retro sounds • [itch.io link](https://dagurasusk.itch.io/retrosounds)
+- underwater ambience by akemov -- https://freesound.org/s/255597/ -- License: Attribution 4.0
 
 #### Music
 
