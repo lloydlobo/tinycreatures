@@ -34,7 +34,7 @@ M = {
     FIXED_FPS = _fixed_fps,
     LASER_FIRE_TIMER_LIMIT = _phi_inv * ({ 0.21, 0.16, 0.14 })[speed_mode], --- Reduce this to increase fire rate.
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[speed_mode], --- 256|512|768
-    LASER_RADIUS = math.floor(_player_radius * _phi_inv ^ _phi),
+    LASER_RADIUS = math.floor(_player_radius * (_phi_inv ^ (1 * _phi))),
     MAX_CREATURE_RADIUS = 100,
     MAX_CREATURE_SPEED = 120,
     MAX_GAME_LEVELS = 2 ^ 6, -- > 64
@@ -43,7 +43,7 @@ M = {
     MAX_PLAYER_TRAIL_COUNT = -4 + math.floor(math.pi * math.sqrt(_player_radius * _phi_inv)), -- player_radius(32)*PHI==20(approx)
     MIN_CREATURE_RADIUS = 8,
     MIN_CREATURE_SPEED = 32, -- 20|30
-    PLAYER_ACCELERATION = 3 * ({ 150, 200, 300 })[speed_mode],
+    PLAYER_ACCELERATION = math.floor(3 * 1.25 * ({ 150, 200, 300 })[speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _phi_inv,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _phi_inv), 10, -2 + (30 / 2) / 4 + (_player_acceleration / _fixed_fps) })[speed_mode],
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()

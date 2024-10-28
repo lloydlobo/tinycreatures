@@ -1408,7 +1408,7 @@ function love.load()
 
         sound_boost_impulse = (love.audio.newSource('resources/audio/sfx/585256__lesaucisson__swoosh-2.mp3', 'static')) -- swoosh-2.mp3 by lesaucisson -- https://freesound.org/s/585256/ -- License: Creative Commons 0
         sound_boost_impulse:setPitch(PHI_INV ^ 0)
-        sound_boost_impulse:setVolume(PHI_INV ^ 1)
+        sound_boost_impulse:setVolume(PHI_INV ^ 0)
 
         --- Audio Drone
 
@@ -1480,7 +1480,7 @@ function love.load()
             music_bgm:setFilter { type = 'highpass', volume = 6, lowgain = 6 }
             -- if config.debug.is_development then music_bgm:setFilter { type = 'bandpass', lowgain = 0 } end
             music_bgm:setPitch(1.0) -- one octave lower
-            music_bgm:setVolume(1.0)
+            music_bgm:setVolume(config.debug.is_development and 0.4 or 1)
             music_bgm:setLooping(true)
             -- music_bgm:setVolume((config.debug.is_development and (music_bgm:getVolume()) * 0.025) or PHI_INV)
             -- if true then music_bgm:setVolume(0) end
