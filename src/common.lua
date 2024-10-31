@@ -1,6 +1,8 @@
 local M = {}
 
-local config = require 'config'
+local LG = love.graphics
+
+local Config = require 'config'
 
 --- @enum STATUS
 M.STATUS = {
@@ -72,11 +74,11 @@ M.COLOR = {
 
     --{
     -- GREENNNNN
-    BACKGROUND = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
+    BACKGROUND = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[Config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
     -- creature_healed = { 0.45, 0.52, 0.45 }, -- before impl gradient bg shader
     creature_healed = { 0.08, 0.08, 0.08, 0.2 }, -- after impl gradient bg shader
     -- creature_healed = { 0.8, 0.8, 0.8 },  -- after impl gradient bg shader
-    creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[config.CURRENT_THEME], -- green low_light
+    creature_infected = ({ { 0.05, 0.02, 0.15 }, { 0.25 + 0.1, 0.9 + 0.1, 0.6 + 0.2 }, { 0.05, 0.05, 0.05 } })[Config.CURRENT_THEME], -- green low_light
 
     -- BLUUEUUEUE
     -- background = ({ { 0.06, 0.36, 0.30 }, { 0.4, 0.4, 0.4 }, { 0.75, 0.75, 0.75 } })[config.CURRENT_THEME], -- exposure: 0.0625, decay: 0.60
@@ -92,7 +94,7 @@ M.COLOR = {
     player_dash_neonblue_modifier = { 0.85, 0.85, 0.95 }, --- bubbles (luminiscent blue)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
     player_dash_yellow_modifier = { 0.9, 0.9, 0.4 }, --- You see, you're not dealing with the average player. (yellow)
-    player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[config.CURRENT_THEME],
+    player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
     player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
     player_entity_firing_edge_darker = { 0.8, 0.8, 0.8 }, --- The lighter outer edge of the eye. (offwhite)
     player_entity_firing_projectile = { 125 / 255, 148 / 255, 290 / 255 }, --- The idle tail and projectile color. (purple)
@@ -173,7 +175,7 @@ end
 --- Linear interpolation between `a` and `b` using parameter `t`.
 --- @type LerpFn
 function M.lerp(a, b, t)
-    if config.debug.is_assert then
+    if Config.debug.is_assert then
         if not (a ~= nil and b ~= nil and t ~= nil) then error(string.format('Invalid lerp arguments { a = "%s", b = "%s", c = "%s" }.', a, b, t), 3) end
     end
 
@@ -247,5 +249,49 @@ do
     assert(M.lerper['smoothstep'](1, 10, 0.25) == 2.40625)
     assert(M.lerper['smoothstep'](1, 10, 0.75) == 8.59375)
 end
+
+--- Create a small circle image to use in our sprite batch.
+--- @param opts { radius: number, color: [number, number, number, number]|[number, number, number] } A table containing radius and color options.
+--- @return love.Image image A new Image object which can be drawn on screen.
+--- @nodiscard
+M.create_circle_image = function(opts)
+    local radius = opts.radius
+    local col = opts.color or { 1, 1, 1, 1 }
+
+    local diameter = radius * 2
+    local canvas = LG.newCanvas(diameter, diameter)
+
+    LG.setCanvas(canvas)
+    LG.clear()
+    LG.setColor(col[1] or 1, col[2] or 1, col[3] or 1, col[4] or 1)
+    LG.circle('fill', radius, radius, radius)
+    LG.setCanvas()
+
+    return LG.newImage(canvas:newImageData())
+end
+
+--- @class (exact) SpriteBatchFn
+--- @field make_bg_parallax_entities fun():love.SpriteBatch
+--- @field make_creatures fun():love.SpriteBatch
+--- @field make_lasers fun():love.SpriteBatch
+M.SpriteBatchFn = {
+    make_bg_parallax_entities = function()
+        local img = M.create_circle_image { radius = 32, color = { 0.025, 0.15, 0.10, 0.2 } } -- if 4 -> Base size of 8 pixels diameter
+        return love.graphics.newSpriteBatch(img, Config.MAX_PARALLAX_ENTITIES, 'static')
+    end,
+
+    make_creatures = function()
+        local color = M.COLOR.creature_infected
+        local radius = Config.CREATURE_STAGES[#Config.CREATURE_STAGES].radius --[[local creature_circle_image = create_circle_image(radius, color[1], color[2], color[3], 1.0)]]
+        local img = M.create_circle_image { radius = radius, color = { 1, 1, 1 } }
+        return love.graphics.newSpriteBatch(img, Config.TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
+    end,
+
+    make_lasers = function()
+        --- FIXME: how to make this dynamic sized? use differnet sprite images and batches?
+        local img = M.create_circle_image { radius = Config.LASER_RADIUS }
+        return love.graphics.newSpriteBatch(img, Config.MAX_LASER_CAPACITY, 'static')
+    end,
+}
 
 return M
