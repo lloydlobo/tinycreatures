@@ -21,7 +21,7 @@
 --- ```
 local M = {}
 
---- @class ScheduledTimer
+--- @class (exact) ScheduledTimer
 --- @field callback function # The function to execute when the timer ends.
 --- @field time_left number # Time remaining for the timer.
 
@@ -34,7 +34,10 @@ local timers = {}
 --- @param delay number # Time in seconds until the callback is executed.
 --- @param callback function # The function to call after the delay.
 function M.after(delay, callback)
-    timers[#timers + 1] = { time_left = delay, callback = callback }
+    timers[#timers + 1] = {
+        time_left = delay,
+        callback = callback,
+    }
 end
 
 --- Updates all timers. Call this in `love.update(dt)`.
