@@ -1,19 +1,20 @@
-local M = {}
+--- @class shaders_bg_gradient
+--- @field shader_code string
+local M = {
 
-local LG = love.graphics
+    -- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
 
-local common = require 'common'
+    shader_code = [[
 
--- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
-M.glsl_gradient_shader_code = [[
 extern vec2 screen;
 
 vec4 effect(vec4 color, Image image, vec2 uvs, vec2 screen_coords) {
-        vec4 pixel = Texel(image, uvs);
-        vec2 sc = vec2(screen_coords.x/screen.x,screen_coords.y/screen.y);
-        return pixel * vec4(1.,sc[0],sc[1],1.);// red-pink-yellow
+    vec4 pixel = Texel(image, uvs);
+    vec2 sc = vec2(screen_coords.x/screen.x,screen_coords.y/screen.y);
+    return pixel * vec4(1.,sc[0],sc[1],1.);// red-pink-yellow
 }
-]]
+   ]],
+}
 
 --[[
 

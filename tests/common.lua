@@ -2,7 +2,6 @@ local common = require '../common'
 
 assert = require 'luassert'
 require 'busted'
-
 if arg[1] == '' then error 'Please run `busted tests/*.lua`.' end
 
 describe('common - datastructures', function()

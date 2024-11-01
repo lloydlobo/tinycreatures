@@ -48,17 +48,17 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
 ]]
 
 function M.draw_phong_shader_player_trail_callback(fun)
-    LG.setShader(glsl_phong_shader)
-    glsl_phong_shader:send('screen', { LG.getWidth(), LG.getHeight() })
-    glsl_phong_shader:send('num_lights', 1)
+    LG.setShader(glsl_love_shaders.lighting_phong)
+    glsl_love_shaders.lighting_phong:send('screen', { LG.getWidth(), LG.getHeight() })
+    glsl_love_shaders.lighting_phong:send('num_lights', 1)
     do
         local name = 'lights[' .. 0 .. ']' -- first array offset is 0 in glsl. lua uses 1 as index
         -- glsl_phong_shader:send(name .. '.position', { LG.getWidth() * .5, LG.getHeight() * .5 })
-        glsl_phong_shader:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
-        glsl_phong_shader:send(name .. '.diffuse', (common.PLAYER_ACTION_COLOR_MAP[player_action] or { 1, 1, 1 }))
+        glsl_love_shaders.lighting_phong:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
+        glsl_love_shaders.lighting_phong:send(name .. '.diffuse', (common.PLAYER_ACTION_COLOR_MAP[player_action] or { 1, 1, 1 }))
         -- glsl_phong_shader:send(name .. '.power', 64 - 64 * curr_state.player_invulnerability_timer)
         -- glsl_phong_shader:send(name .. '.power', 48 )
-        glsl_phong_shader:send(name .. '.power', 8)
+        glsl_love_shaders.lighting_phong:send(name .. '.power', 8)
     end
     do -- draw here
         fun()
@@ -67,17 +67,14 @@ function M.draw_phong_shader_player_trail_callback(fun)
 end
 
 function M.draw_phong_shader_active_creatures_callback(fun)
-    LG.setShader(glsl_phong_shader)
-    glsl_phong_shader:send('screen', { LG.getWidth(), LG.getHeight() })
-    glsl_phong_shader:send('num_lights', 1)
-    do
-        local name = 'lights[' .. 0 .. ']' -- first array offset is 0 in glsl. lua uses 1 as index
-        -- glsl_phong_shader:send(name .. '.position', { LG.getWidth() * .5, LG.getHeight() * .5 })
-        glsl_phong_shader:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
-        glsl_phong_shader:send(name .. '.diffuse', (common.PLAYER_ACTION_COLOR_MAP[player_action] or { 0.5, 0.5, 0.5 }))
-        -- glsl_phong_shader:send(name .. '.power', 64 - 64 * curr_state.player_invulnerability_timer)
-        glsl_phong_shader:send(name .. '.power', 192)
-        -- local sdf = 128+32
+    LG.setShader(glsl_love_shaders.lighting_phong)
+    glsl_love_shaders.lighting_phong:send('screen', { LG.getWidth(), LG.getHeight() })
+    glsl_love_shaders.lighting_phong:send('num_lights', 1)
+    do -- NOTE: First array offset is 0 in glsl. lua uses 1 as index
+        local name = 'lights[' .. 0 .. ']'
+        glsl_love_shaders.lighting_phong:send(name .. '.position', { curr_state.player_x, curr_state.player_y })
+        glsl_love_shaders.lighting_phong:send(name .. '.diffuse', (common.PLAYER_ACTION_DESATURATED_COLOR_MAP[player_action] or { 0.5, 0.5, 0.5 }))
+        glsl_love_shaders.lighting_phong:send(name .. '.power', 192)
     end
     do -- draw here
         fun()

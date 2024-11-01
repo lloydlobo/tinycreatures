@@ -1,7 +1,5 @@
 local M = {}
 
-local LG = love.graphics
-
 local Config = require 'config'
 
 --- @enum STATUS
@@ -112,6 +110,36 @@ M.PLAYER_ACTION_COLOR_MAP = {
     [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity,
 }
+
+--- Desaturate an RGB color by averaging it with grayscale.
+--- @param color [number, number, number]  The original RGB color.
+--- @return [number, number, number] The desaturated RGB color.
+function M.desaturate(color)
+    local gray = (color[1] + color[2] + color[3]) / 3
+    return {
+        (color[1] + gray) / 2,
+        (color[2] + gray) / 2,
+        (color[3] + gray) / 2,
+    }
+end
+
+--- @type table<PLAYER_ACTION, [number, number, number]>
+M.PLAYER_ACTION_DESATURATED_COLOR_MAP = {
+    [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.desaturate(M.COLOR.player_beserker_dash_modifier),
+    [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
+    [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_dash_neonblue_modifier),
+    [M.PLAYER_ACTION.FIRE] = M.desaturate(M.COLOR.player_entity_firing_projectile),
+    [M.PLAYER_ACTION.IDLE] = M.desaturate(M.COLOR.player_entity),
+}
+
+-- --- @type table<PLAYER_ACTION, [number, number, number]>
+-- M.PLAYER_ACTION_COLOR_MAP_DESATURATED = {
+--     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
+--     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
+--     [M.PLAYER_ACTION.BOOST] = M.COLOR.player_dash_neonblue_modifier,
+--     [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
+--     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity,
+-- }
 
 -- --- @type fun(a: number, b: number, t: number): number
 -- function M.lerp(a, b, t)
@@ -249,49 +277,5 @@ do
     assert(M.lerper['smoothstep'](1, 10, 0.25) == 2.40625)
     assert(M.lerper['smoothstep'](1, 10, 0.75) == 8.59375)
 end
-
---- Create a small circle image to use in our sprite batch.
---- @param opts { radius: number, color: [number, number, number, number]|[number, number, number] } A table containing radius and color options.
---- @return love.Image image A new Image object which can be drawn on screen.
---- @nodiscard
-M.create_circle_image = function(opts)
-    local radius = opts.radius
-    local col = opts.color or { 1, 1, 1, 1 }
-
-    local diameter = radius * 2
-    local canvas = LG.newCanvas(diameter, diameter)
-
-    LG.setCanvas(canvas)
-    LG.clear()
-    LG.setColor(col[1] or 1, col[2] or 1, col[3] or 1, col[4] or 1)
-    LG.circle('fill', radius, radius, radius)
-    LG.setCanvas()
-
-    return LG.newImage(canvas:newImageData())
-end
-
---- @class (exact) SpriteBatchFn
---- @field make_bg_parallax_entities fun():love.SpriteBatch
---- @field make_creatures fun():love.SpriteBatch
---- @field make_lasers fun():love.SpriteBatch
-M.SpriteBatchFn = {
-    make_bg_parallax_entities = function()
-        local img = M.create_circle_image { radius = 32, color = { 0.025, 0.15, 0.10, 0.2 } } -- if 4 -> Base size of 8 pixels diameter
-        return love.graphics.newSpriteBatch(img, Config.MAX_PARALLAX_ENTITIES, 'static')
-    end,
-
-    make_creatures = function()
-        local color = M.COLOR.creature_infected
-        local radius = Config.CREATURE_STAGES[#Config.CREATURE_STAGES].radius --[[local creature_circle_image = create_circle_image(radius, color[1], color[2], color[3], 1.0)]]
-        local img = M.create_circle_image { radius = radius, color = { 1, 1, 1 } }
-        return love.graphics.newSpriteBatch(img, Config.TOTAL_CREATURES_CAPACITY, 'static') -- maybe static?
-    end,
-
-    make_lasers = function()
-        --- FIXME: how to make this dynamic sized? use differnet sprite images and batches?
-        local img = M.create_circle_image { radius = Config.LASER_RADIUS }
-        return love.graphics.newSpriteBatch(img, Config.MAX_LASER_CAPACITY, 'static')
-    end,
-}
 
 return M

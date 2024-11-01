@@ -49,7 +49,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
             local group_center_y = 0
             local count = 0
             local creature_stage_id = cs.creatures_evolution_stage[creature_index] --- @type integer
-            local creature_stage = config.CREATURE_STAGES[creature_stage_id] --- @type Stage
+            local creature_stage = config.CREATURE_STAGES[creature_stage_id] --- @type CreatureStage
             -- local creature_swarm_range = creature_stage.radius --- @type integer # TEMPORARY solution
             local creature_x = cs.creatures_x[creature_index]
             local creature_y = cs.creatures_y[creature_index]
@@ -62,7 +62,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
                     local other_creature_x = cs.creatures_x[other_creature_index]
                     local other_creature_y = cs.creatures_y[other_creature_index]
                     local other_creature_stage_id = cs.creatures_evolution_stage[other_creature_index] --- @type integer
-                    local other_creature_stage = config.CREATURE_STAGES[other_creature_stage_id] --- @type Stage
+                    local other_creature_stage = config.CREATURE_STAGES[other_creature_stage_id] --- @type CreatureStage
 
                     local dist = nil
                     if creature_x ~= nil and creature_y ~= nil and other_creature_x ~= nil and other_creature_y ~= nil then
