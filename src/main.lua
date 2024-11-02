@@ -1485,9 +1485,6 @@ function load_audio()
     sound_atmosphere_tense = (love.audio.newSource('resources/audio/sfx/atmosphere_tense_atmosphere_1.wav', 'static')) -- Credit to DASK: Retro
     sound_atmosphere_tense:setVolume(INV_PHI ^ 4)
 
-    --- Background Music Credit:
-    ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
-    ---     • [YouTube Link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC)
     --- Note: `stream` option ─ stream and loop background music
     music_bgms = {
         love.audio.newSource('resources/audio/music/ross_bugden_chime_chase.wav', 'stream'),
@@ -1495,6 +1492,9 @@ function load_audio()
     }
     local _is_skip_load_bgm = true
     if not _is_skip_load_bgm then --[[OLDER MUSIC]]
+        --- Background Music Credit:
+        ---     • [Lupus Nocte](http://link.epidemicsound.com/LUPUS)
+        ---     • [YouTube Link](https://youtu.be/NwyDMDlZrMg?si=oaFxm0LHqGCiUGEC)
         table.insert(music_bgms, love.audio.newSource('resources/audio/music/lupus_nocte_arcadewave.mp3', 'stream'))
     end
 
