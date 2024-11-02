@@ -175,7 +175,7 @@ return {
     LASER_MAX_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
     LASER_RADIUS = math.floor(_player_radius * (_inv_phi ^ (1 * _phi))),
-    PARALLAX_ENTITY_IMG_RADIUS = 16,
+    PARALLAX_ENTITY_IMG_RADIUS = 32,
     PARALLAX_ENTITY_MAX_COUNT = (2 ^ 4),
     PARALLAX_ENTITY_MAX_DEPTH = 4, --- @type integer
     PARALLAX_ENTITY_MIN_DEPTH = 1, --- @type integer
