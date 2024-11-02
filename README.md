@@ -4,7 +4,7 @@
 
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
-![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
+![tinycreatures_20241102145514](static/screencasts/tinycreatures_20241102145514.gif)
 
 > Initially built during a game jam for Ludum Dare 56's Tiny Creatures theme.
 
@@ -172,11 +172,16 @@ Grateful to the following creators for their amazing sound and music contributio
 #### Sound Effects
 
 - **DASK**: Retro sounds • [itch.io link](https://dagurasusk.itch.io/retrosounds)
-- underwater ambience by akemov -- https://freesound.org/s/255597/ -- License: Attribution 4.0
+- **akemov**: [underwater ambience](https://freesound.org/people/akemov/sounds/255597/) By [akemov](https://freesound.org/people/akemov/) | License: [Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 #### Music
 
-- **Lupus Nocte**: Arcadewave (background) • [Epidemic Sound link](http://link.epidemicsound.com/LUPUS) • [YouTube](https://youtu.be/NwyDMDlZrMg?si=oaFxm1LHqGCiUGEC)
+- **[Ross Bugden](https://soundcloud.com/rossbugden)**:
+  - [Chime Chase](https://soundcloud.com/rossbugden/chime-chase?utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing) By Ross Bugden is licensed under a Creative Commons License.
+  - [Silver Seven Step](https://soundcloud.com/rossbugden/silverfish?utm_source=clipboard&utm_medium=text&utm_campaign=social_sharing) By Ross Bugden is licensed under a Creative Commons Attribution 4.0 International License.
+
+- **Lupus Nocte**:
+  - Arcadewave (background) • [Epidemic Sound link](http://link.epidemicsound.com/LUPUS) • [YouTube](https://youtu.be/NwyDMDlZrMg?si=oaFxm1LHqGCiUGEC)
 
 ### Special thanks
 
@@ -203,6 +208,7 @@ This project is open source under the MIT License. See the LICENSE file for more
 ![tinycreatures_20241017121242](static/screencasts/tinycreatures_20241017121242.gif)
 ![tinycreatures_20241023184744](static/screencasts/tinycreatures_20241023184744.gif)
 ![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
+![tinycreatures_20241102145514](static/screencasts/tinycreatures_20241102145514.gif)
 
 </details>
 

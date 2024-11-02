@@ -1,4 +1,9 @@
---- @class (exact) shaders
+--- @class Light
+--- @field position [number, number]
+--- @field diffuse [number, number, number]
+--- @field power number
+
+--- @class (exact) Shaders
 return {
     bg_gradient = require 'shaders.bg_gradient',
     bg_gradient_time_modulate = require 'shaders.bg_gradient_time_modulate',

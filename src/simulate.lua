@@ -80,7 +80,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
                         count = count + 1
                         do
                             local __is_log_enabled = false
-                            if __is_log_enabled and config.debug.is_trace_entities and love.math.random() < 0.05 then
+                            if __is_log_enabled and config.Debug.IS_TRACE_ENTITIES and love.math.random() < 0.05 then
                                 print(dist, creature_swarm_range, creature_index, other_creature_index, count)
                             end
                         end
@@ -105,7 +105,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
                         local next_vel_y = curr_vel_y + (group_center_y - creature_y) * factor
                         do
                             local __is_log_enabled = false
-                            if __is_log_enabled and config.debug.is_trace_entities and love.math.random() < 0.05 then
+                            if __is_log_enabled and config.Debug.IS_TRACE_ENTITIES and love.math.random() < 0.05 then
                                 print('range', creature_swarm_range, 'dist', dist)
                                 print(curr_vel_x, ' -> ', next_vel_x, curr_vel_y, ' -> ', next_vel_y)
                             end
@@ -123,7 +123,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
                                 -- new_stage: any)
 
                                 local inactive_index = find_inactive_creature_index()
-                                if config.debug.is_trace_entities then
+                                if config.Debug.IS_TRACE_ENTITIES then
                                     -- print('inactive_index: ', inactive_index)
                                 end
                                 local is_able_to_fuse = inactive_index ~= nil
@@ -146,7 +146,7 @@ function M.simulate_creatures_swarm_behavior(dt, total)
 end
 
 function M.spawn_new_fused_creature_pair(new_index, parent_index1, parent_index2, new_stage)
-    if config.debug.is_assert then
+    if config.Debug.IS_ASSERT then
         assert(new_stage >= 1)
         assert(new_stage < #config.CREATURE_STAGES)
         assert(new_stage ~= curr_state.creatures_evolution_stage[parent_index1] and new_stage ~= curr_state.creatures_evolution_stage[parent_index2])

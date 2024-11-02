@@ -33,7 +33,7 @@ end
 ---
 --- @type fun(opts: { a: Circle, b: Circle, tolerance_factor: number|COLLISION_TOLERANCE } ): boolean
 function M.is_intersect_circles_tolerant(opts)
-    if config.debug.is_assert then
+    if config.Debug.IS_ASSERT then
         assert((opts.tolerance_factor >= 0.0) and (opts.tolerance_factor <= 2.0), string.format("Invalid tolerance value '%.2f'", opts.tolerance_factor))
     end
     local dx = (opts.a.x - opts.b.x)
