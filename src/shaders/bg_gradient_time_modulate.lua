@@ -11,33 +11,40 @@ extern float time;//> love.timer.getTime()
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      vec4 pixel=Texel(image,uvs);
 
+     float aspect_ratio=screen.x/screen.y;
+
      // Normalize screen coordinates
      vec2 sc=vec2(screen_coords.x/screen.x,screen_coords.y/screen.y);
 
-     float aspect_ratio=screen.x/screen.y;
-     vec2 uv=vec2(sc.x/aspect_ratio,sc.y);// glsl idiom for screen uv - not uvs
+     // glsl idiom for uv (screen)─not uvs (texture)
+     vec2 uv=vec2(sc.x/aspect_ratio,sc.y);
+
      vec2 uv0=uv;// original normalized screen
 
+     // Radial distance from canvas center
+     float d=-exp(length(uv));d=abs(d);
+
+     // Modulate color channels over time
+     float f=1.;
+
+     vec3 col=vec3(0.);
      vec3 final_col=vec3(0.);
 
      for(float i=1.;i<5.;++i){
-          // Radial distance from canvas center
-          float d=-exp(length(uv));d=abs(d);
+          f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i; /*f/=i;*/
 
-          // Modulate color channels over time
-          float f=.5-.5*sin((uv[0]*3.14159+time/5.));
+          // Color this iteration
+          col=vec3(d,uv[0]-f,uv[1]-f);col/=i;
 
-          vec3 col=vec3(1.)/i;
-          col[0]*=d;
-          col[1]=uv[0]-f;
-          col[2]=uv[1]-f;
-
-          col.gb/=1.+sin(uvs/d);
-
+          // Accentuate darker contrast
           d=pow(d,1.2);d=abs(d);
-          col.yz*=col.yz/d;
+
+          // Feather radient edges
+          col.gb*=clamp(1.-sin(uvs/d)/i,.1,.8);col.gb*=col.gb/d;
+
           final_col+=col;
      }
+
      return pixel*vec4(final_col,1.);// red-pink-yellow
 }
 ]]
