@@ -102,15 +102,6 @@ M.COLOR = {
     TEXT_DEBUG_HUD = { 0.8, 0.7, 0.0 },
 }
 
---- @type table<PLAYER_ACTION, [number, number, number]>
-M.PLAYER_ACTION_COLOR_MAP = {
-    [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
-    [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
-    [M.PLAYER_ACTION.BOOST] = M.COLOR.player_dash_neonblue_modifier,
-    [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
-    [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity,
-}
-
 --- Desaturate an RGB color by averaging it with grayscale.
 --- @param color [number, number, number]  The original RGB color.
 --- @return [number, number, number] The desaturated RGB color.
@@ -124,12 +115,21 @@ function M.desaturate(color)
 end
 
 --- @type table<PLAYER_ACTION, [number, number, number]>
-M.PLAYER_ACTION_DESATURATED_COLOR_MAP = {
+M.PLAYER_ACTION_TO_COLOR = {
+    [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
+    [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
+    [M.PLAYER_ACTION.BOOST] = M.COLOR.player_dash_neonblue_modifier,
+    [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
+    [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity_firing_edge_dark, -- for laser
+}
+
+--- @type table<PLAYER_ACTION, [number, number, number]>
+M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.desaturate(M.COLOR.player_beserker_dash_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
     [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_dash_neonblue_modifier),
     [M.PLAYER_ACTION.FIRE] = M.desaturate(M.COLOR.player_entity_firing_projectile),
-    [M.PLAYER_ACTION.IDLE] = M.desaturate(M.COLOR.player_entity),
+    [M.PLAYER_ACTION.IDLE] = M.desaturate(M.COLOR.player_entity_firing_edge_dark), -- for laser and creature light phong
 }
 
 -- --- @type table<PLAYER_ACTION, [number, number, number]>
@@ -203,7 +203,7 @@ end
 --- Linear interpolation between `a` and `b` using parameter `t`.
 --- @type LerpFn
 function M.lerp(a, b, t)
-    if Config.debug.is_assert then
+    if Config.Debug.IS_ASSERT then
         if not (a ~= nil and b ~= nil and t ~= nil) then error(string.format('Invalid lerp arguments { a = "%s", b = "%s", c = "%s" }.', a, b, t), 3) end
     end
 

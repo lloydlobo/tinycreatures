@@ -1,10 +1,10 @@
 --- @class shaders_bg_gradient
---- @field shader_code string
+--- @field glsl_frag string
 local M = {
 
     -- Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
 
-    shader_code = [[
+    glsl_frag = [[
 
 extern vec2 screen;
 
