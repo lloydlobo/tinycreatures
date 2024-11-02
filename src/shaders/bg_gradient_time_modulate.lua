@@ -31,7 +31,7 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      vec3 final_col=vec3(0.);
 
      for(float i=1.;i<5.;++i){
-          f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i; /*f/=i;*/
+          f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i;/*f/=i;*/
 
           // Color this iteration
           col=vec3(d,uv[0]-f,uv[1]-f);col/=i;
