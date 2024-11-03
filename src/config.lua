@@ -16,24 +16,22 @@ local Theme = {
 
 local _speed_mode = Mode.ADVANCED
 
-local _creature_initial_large_count = (2 ^ 1) --[[NOTE: Increase this for more challenging levels that are not trivial]]
-local _creatures_initial_constant_large_count = (2 ^ 3)
 local _fixed_fps = 60
 local _inv_phi = 0.618
 local _phi = 1.618
-local _player_accel = ({ 150, 200, 300 })[_speed_mode]
-local _player_radius = (32 * 0.61) - 4
 
 --- @class (exact) CreatureStage
 --- @field radius integer
 --- @field speed number
 
-local _cret_max_radius = 100
-local _cret_max_speed = 120
+local _creature_initial_large_count = (2 ^ 1) --[[NOTE: Increase this for more challenging levels that are not trivial]]
+local _creatures_initial_constant_large_count = (2 ^ 3)
+local _cret_max_radius = 92
+local _cret_max_speed = 100 -- 32..120
 local _cret_min_radius = 8
 local _cret_min_speed = 32
-local _f_cret_scale = 1 -- factor
-local _f_cret_speed = 1.35 -- factor
+local _f_cret_scale = 1. -- factor
+local _f_cret_speed = 1. -- factor
 
 --- @type CreatureStage[] Size decreases as stage progresses.
 local _CREATURE_STAGES = {
@@ -54,6 +52,9 @@ local _CREATURE_STAGES = {
         speed = math.floor(_cret_min_speed * (_phi ^ 0) * _f_cret_speed),
     },
 }
+
+local _player_accel = ({ 150, 200, 300 })[_speed_mode]
+local _player_radius = math.min(_CREATURE_STAGES[1].radius * _phi, (32 * 0.61) - 4)
 
 --- @class (exact) MoonshineShaderSettings
 --- @field bloom_intensity { enable: boolean, amount: number }
@@ -174,7 +175,7 @@ return {
     LASER_FIRE_TIMER_LIMIT = _inv_phi * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = math.floor(_player_radius * (_inv_phi ^ (1 * _phi))),
+    LASER_RADIUS = math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
     PARALLAX_ENTITY_MAX_COUNT = (2 ^ 4),
     PARALLAX_ENTITY_MAX_DEPTH = 2, --- @type integer

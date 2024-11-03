@@ -748,9 +748,11 @@ function handle_player_input_this_frame(dt)
     end
 
     do -- FIXME: Let it be or move each action to (if/elseif/else) checks above
-        local is_beserk = love.keyboard.isDown('lshift', 'rshift')
-        local is_boost = love.keyboard.isDown 'x'
-        local is_firing = love.keyboard.isDown 'space'
+        local KEY = Common.CONTROL_KEY
+        local is_beserk = love.keyboard.isDown(KEY.BESERK_LSHIFT, KEY.BESERK_RSHIFT)
+        local is_boost = love.keyboard.isDown(KEY.BOOST)
+        local is_firing = love.keyboard.isDown(KEY.FIRE)
+
         if love.keyboard.isDown 'x' then
             local should_play_once = not music_sci_fi_engine:isPlaying() or music_sci_fi_engine_is_fading_out
             if should_play_once then sound_boost_impulse:play() end
@@ -786,18 +788,15 @@ local dest_trail_color = { 0, 0, 0 } --- WARN: Initialize zero value (this is th
 function draw_player_trail(alpha)
     local IS_ENLARGE_PLAYER_TRAIL_ON_DAMAGE = true
 
-    local clr_green = Common.COLOR.player_beserker_modifier
-    local clr_yellow = Common.COLOR.player_dash_yellow_modifier
     local invulnerability_timer = curr_state.player_invulnerability_timer
     local is_beserker = love.keyboard.isDown('lshift', 'rshift')
     local is_boost = love.keyboard.isDown 'x'
     if is_beserker and is_boost then
-        Common.lerp_rbg(dest_trail_color, clr_green, clr_yellow, alpha)
-        LG.setColor(dest_trail_color)
+        LG.setColor(Common.COLOR.player_beserker_dash_modifier)
     elseif is_beserker then
-        LG.setColor(clr_green)
+        LG.setColor(Common.COLOR.player_beserker_modifier)
     elseif is_boost then
-        LG.setColor(Common.COLOR.player_dash_neonblue_modifier)
+        LG.setColor(Common.COLOR.player_boost_dash_modifier)
     else
         LG.setColor(Common.COLOR.player_entity_firing_projectile)
     end
@@ -873,6 +872,7 @@ function draw_player(alpha)
     local player_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
     local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
     local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
+    local player_radius = Config.PLAYER_RADIUS
 
     local is_interpolate_player = true
     if is_interpolate_player then
@@ -886,7 +886,7 @@ function draw_player(alpha)
         if (cs.player_health == 1) and (love.math.random() < 0.1 * alpha) then
             local clr = Common.COLOR.creature_healing
             LG.setColor(clr[1], clr[2], clr[3], lerp(0.2, 0.4, alpha))
-            LG.circle('fill', player_x, player_y, Config.PLAYER_RADIUS)
+            LG.circle('fill', player_x, player_y, player_radius)
         end
     end
 
@@ -906,14 +906,14 @@ function draw_player(alpha)
     LG.circle('fill', player_x, player_y, player_iris_radius)
 
     -- Draw player player firing trigger • (circle)
-    local dest_trigger_x = player_x + math.cos(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
-    local dest_trigger_y = player_y + math.sin(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+    local fire_pos_x = player_x + math.cos(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+    local fire_pos_y = player_y + math.sin(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
     local firing_trigger_radius = Config.PLAYER_FIRING_EDGE_RADIUS
     local invulnerability_timer = cs.player_invulnerability_timer
 
     local trigger_radius = lerp( --
-        firing_trigger_radius - 3,
         firing_trigger_radius - 1,
+        firing_trigger_radius - 0,
         lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.)
         -- alpha + (invulnerability_timer * 0.5)
     )
@@ -949,13 +949,37 @@ function draw_player(alpha)
             do -- Apply inertia to dest position.
                 local dfactor = true and 0.328 or (INV_PHI * 0.8) -- ideal: .328 (distance factor)
                 local amplitude_factor = is_player_going_backwards and 0.125 or 0.35
-                dest_trigger_x = dest_trigger_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
-                dest_trigger_y = dest_trigger_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
+                fire_pos_x = fire_pos_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
+                fire_pos_y = fire_pos_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
             end
         end
     end
-    LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
-    LG.circle('fill', dest_trigger_x, dest_trigger_y, trigger_radius)
+    if player_action ~= Common.PLAYER_ACTION.IDLE then
+        local prev_line_width = LG.getLineWidth()
+        LG.setLineWidth(3)
+        do
+            local triangle_size = 0.88 * player_radius
+            local angle = cs.player_rot_angle
+            local pos_x_
+            local pos_y_
+            pos_x_ = player_x
+            pos_y_ = player_y
+            pos_x_ = fire_pos_x
+            pos_y_ = fire_pos_y
+            local x1 = pos_x_ + math.cos(angle) * triangle_size -- ze pointy end
+            local y1 = pos_y_ + math.sin(angle) * triangle_size
+            local x2 = pos_x_ + math.cos(angle + PI * 0.75) * triangle_size
+            local y2 = pos_y_ + math.sin(angle + PI * 0.75) * triangle_size
+            local x3 = pos_x_ + math.cos(angle - PI * 0.75) * triangle_size
+            local y3 = pos_y_ + math.sin(angle - PI * 0.75) * triangle_size
+            LG.setColor(Common.PLAYER_ACTION_TO_COLOR[player_action])
+            LG.polygon('line', x1, y1, x2, y2, x3, y3)
+        end
+        LG.setLineWidth(prev_line_width)
+    else
+        LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
+        LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
+    end
 end
 
 local temp_last_ouch_x = nil
@@ -1392,7 +1416,7 @@ function draw_game(alpha)
     draw_player_fired_projectiles(alpha)
     -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
     draw_player_trail(alpha)
-    draw_player_direction_ray(alpha)
+    -- draw_player_direction_ray(alpha)
     draw_player_shield_collectible(alpha)
     draw_player(alpha)
 end
