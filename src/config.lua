@@ -150,6 +150,7 @@ return {
     INV_PHI_SQ = 1 / (_phi ^ 2),
     INV_PI = 1 / math.pi,
     PHI = _phi,
+    PHI_SQ = (_phi ^ 2),
     PI = math.pi,
     TWO_PI = 2 * math.pi,
 
@@ -188,10 +189,10 @@ return {
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[_speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
-    PLAYER_FIRING_EDGE_MAX_RADIUS = (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
-    PLAYER_FIRING_EDGE_RADIUS = (1.0 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
-    PLAYER_MAX_HEALTH = 3,
-    PLAYER_MAX_TRAIL_COUNT = (-2 + math.floor(math.pi * math.sqrt(_player_radius * _inv_phi))), -- player_radius(32)*PHI==20(approx)
+    PLAYER_FIRING_EDGE_MAX_RADIUS = (0.6 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
+    PLAYER_FIRING_EDGE_RADIUS = (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
+    PLAYER_MAX_HEALTH = 4,
+    PLAYER_MAX_TRAIL_COUNT = 8, -- (-2 + math.floor(math.pi * math.sqrt(_player_radius * _inv_phi))), -- player_radius(32)*PHI==20(approx)
     PLAYER_RADIUS = _player_radius,
-    PLAYER_TRAIL_THICKNESS = (1.2 * math.ceil(_player_radius * _inv_phi)), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
+    PLAYER_TRAIL_THICKNESS = (1.0 * math.ceil(_player_radius * _inv_phi)), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
 }

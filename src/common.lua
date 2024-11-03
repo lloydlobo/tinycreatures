@@ -36,7 +36,7 @@ M.PLAYER_ACTION = {
     BESERK = 'BESERK',
     BOOST = 'BOOST',
     COMBO_BESERK_BOOST = 'COMBO_BESERK_BOOST',
-    FIRE = 'FIRE',
+    FIRING = 'FIRING',
     IDLE = 'IDLE',
 }
 
@@ -120,7 +120,7 @@ M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
     [M.PLAYER_ACTION.BOOST] = M.COLOR.player_boost_dash_modifier,
-    [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
+    [M.PLAYER_ACTION.FIRING] = M.COLOR.player_entity_firing_projectile,
     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity_firing_edge_dark, -- for laser
 }
 
@@ -129,8 +129,30 @@ M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.desaturate(M.COLOR.player_beserker_dash_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
     [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_boost_dash_modifier),
-    [M.PLAYER_ACTION.FIRE] = M.desaturate(M.COLOR.player_entity_firing_projectile),
+    [M.PLAYER_ACTION.FIRING] = M.desaturate(M.COLOR.player_entity_firing_projectile),
     [M.PLAYER_ACTION.IDLE] = M.desaturate(M.COLOR.player_entity_firing_edge_dark), -- for laser and creature light phong
+}
+
+-- @STUB
+-- Auto-generated for companion entity polygon attributes
+M.PLAYER_ACTION_TO_DATA = {
+    [M.PLAYER_ACTION.IDLE] = {
+        sides = 3,
+        size_factor = 1,
+        color = M.COLOR.IDLE,
+        line_width = 2.5,
+    },
+    [M.PLAYER_ACTION.FIRING] = {
+        sides = 4,
+        size_factor = 1.25,
+        color = M.COLOR.FIRING,
+        line_width = 3,
+        pulse_effect = {
+            size_factor = 1.1,
+            offset = 2,
+        },
+    },
+    -- Additional actions and shapes
 }
 
 -- --- @type table<PLAYER_ACTION, [number, number, number]>
