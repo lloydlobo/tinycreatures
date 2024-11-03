@@ -89,16 +89,14 @@ M.COLOR = {
     creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
     creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
-    player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
+    player_beserker_dash_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
     player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
-    -- player_dash_neonblue_modifier = { 0.8, 0.8, 1.0 }, --- bubbles (luminiscent blue)
-    player_dash_neonblue_modifier = { 0.85, 0.85, 0.95 }, --- bubbles (luminiscent blue)
+    player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
-    player_dash_yellow_modifier = { 0.9, 0.9, 0.4 }, --- You see, you're not dealing with the average player. (yellow)
     player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
     player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
     player_entity_firing_edge_darker = { 0.8, 0.8, 0.8 }, --- The lighter outer edge of the eye. (offwhite)
-    player_entity_firing_projectile = { 125 / 255, 148 / 255, 290 / 255 }, --- The idle tail and projectile color. (purple)
+    player_entity_firing_projectile = { 1., 1., 1. }, --- The idle tail and projectile color. (white)
 
     TEXT_DARKER = { 0.4, 0.4, 0.4 },
     TEXT_DARKEST = { 0.3, 0.3, 0.3 },
@@ -121,7 +119,7 @@ end
 M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
-    [M.PLAYER_ACTION.BOOST] = M.COLOR.player_dash_neonblue_modifier,
+    [M.PLAYER_ACTION.BOOST] = M.COLOR.player_boost_dash_modifier,
     [M.PLAYER_ACTION.FIRE] = M.COLOR.player_entity_firing_projectile,
     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity_firing_edge_dark, -- for laser
 }
@@ -130,7 +128,7 @@ M.PLAYER_ACTION_TO_COLOR = {
 M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
     [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.desaturate(M.COLOR.player_beserker_dash_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
-    [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_dash_neonblue_modifier),
+    [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_boost_dash_modifier),
     [M.PLAYER_ACTION.FIRE] = M.desaturate(M.COLOR.player_entity_firing_projectile),
     [M.PLAYER_ACTION.IDLE] = M.desaturate(M.COLOR.player_entity_firing_edge_dark), -- for laser and creature light phong
 }
