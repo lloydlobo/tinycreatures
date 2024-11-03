@@ -1,5 +1,10 @@
 -- file: config.lua
 
+local _fixed_fps = 60
+local _inv_phi = 0.618
+local _phi = 1.618
+local _inv_phi_sq = 1 / (_phi ^ 2)
+
 --- @enum Mode
 local Mode = { -- table indexes starts from 1
     MINIMAL = 1,
@@ -15,14 +20,6 @@ local Theme = {
 }
 
 local _speed_mode = Mode.ADVANCED
-
-local _creature_initial_large_count = (2 ^ 1) --[[NOTE: Increase this for more challenging levels that are not trivial]]
-local _creatures_initial_constant_large_count = (2 ^ 3)
-local _fixed_fps = 60
-local _inv_phi = 0.618
-local _phi = 1.618
-local _player_accel = ({ 150, 200, 300 })[_speed_mode]
-local _player_radius = (32 * 0.61) - 4
 
 --- @class (exact) CreatureStage
 --- @field radius integer
@@ -55,6 +52,11 @@ local _CREATURE_STAGES = {
     },
 }
 
+local _creature_initial_large_count = (2 ^ 1) --[[NOTE: Increase this for more challenging levels that are not trivial]]
+local _creatures_initial_constant_large_count = (2 ^ 3)
+local _player_accel = ({ 150, 200, 300 })[_speed_mode]
+local _player_radius = _CREATURE_STAGES[1].radius - 0
+
 --- @class (exact) MoonshineShaderSettings
 --- @field bloom_intensity { enable: boolean, amount: number }
 --- @field chromatic_abberation {enable:boolean, mode: 'minimal'|'default'|'advanced'}
@@ -63,29 +65,12 @@ local _CREATURE_STAGES = {
 --- @field lens_dirt {enable:boolean}
 --- @field scanlines {enable:boolean, mode:'grid'|'horizontal'}
 local _MoonshineShaderSettings = {
-    bloom_intensity = {
-        enable = true,
-        amount = 0.05,
-    }, --- For `fx.glow`.
-    chromatic_abberation = {
-        enable = true,
-        mode = 'minimal',
-    },
-    curved_monitor = {
-        enable = not true,
-        amount = _phi,
-    },
-    filmgrain = {
-        enable = not true,
-        amount = _inv_phi,
-    },
-    lens_dirt = {
-        enable = not true,
-    }, --- unimplemented
-    scanlines = {
-        enable = not true,
-        mode = 'horizontal',
-    }, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
+    bloom_intensity = { enable = true, amount = 0.05 }, --- For `fx.glow`.
+    chromatic_abberation = { enable = true, mode = 'minimal' },
+    curved_monitor = { enable = not true, amount = _phi },
+    filmgrain = { enable = not true, amount = _inv_phi },
+    lens_dirt = { enable = not true }, --- unimplemented
+    scanlines = { enable = not true, mode = 'horizontal' }, -- NOTE: ENABLED FOR BG SHADER---PERHAPS HAVE MORE OPTIONS TO PICK FOR post_processing and background_shader????
 }
 
 -- do --TESTING
@@ -146,6 +131,7 @@ return {
     --
 
     INV_PHI = _inv_phi,
+    INV_PHI_SQ = _inv_phi_sq,
     INV_PI = 1 / math.pi,
     PHI = _phi,
     PI = math.pi,
@@ -170,11 +156,11 @@ return {
     FIXED_DT = 1 / _fixed_fps, --- Consistent update frame rate fluctuations.
     FIXED_DT_INV = 1 / (1 / _fixed_fps), --- Helper constant to avoid dividing on each frame. (same as FIXED_FPS)
     FIXED_FPS = _fixed_fps,
-    GAME_MAX_LEVEL = 2 ^ 6, -- > 64
-    LASER_FIRE_TIMER_LIMIT = _inv_phi * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
+    GAME_MAX_LEVEL = 2 ^ 4, -- > 16
+    LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 1) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = math.floor(_player_radius * (_inv_phi ^ (1 * _phi))),
+    LASER_RADIUS = 2 + math.floor(_player_radius * (_inv_phi ^ (1 * _phi))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
     PARALLAX_ENTITY_MAX_COUNT = (2 ^ 4),
     PARALLAX_ENTITY_MAX_DEPTH = 2, --- @type integer
@@ -182,14 +168,14 @@ return {
     PARALLAX_ENTITY_RADIUS_FACTOR = 20, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
     PARALLAX_OFFSET_FACTOR_X = 0.01, -- NOTE: Should be lower to avoid puking
     PARALLAX_OFFSET_FACTOR_Y = 0.01,
-    PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
+    PLAYER_ACCELERATION = -0 + math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[_speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
-    PLAYER_FIRING_EDGE_MAX_RADIUS = (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
+    PLAYER_FIRING_EDGE_MAX_RADIUS = _inv_phi * (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
     PLAYER_FIRING_EDGE_RADIUS = (1.0 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
     PLAYER_MAX_HEALTH = 3,
-    PLAYER_MAX_TRAIL_COUNT = (-2 + math.floor(math.pi * math.sqrt(_player_radius * _inv_phi))), -- player_radius(32)*PHI==20(approx)
+    PLAYER_MAX_TRAIL_COUNT = 2 ^ 5, -- 8 + (7 + (math.floor(math.pi * math.sqrt(_player_radius * _inv_phi)))), -- player_radius(32)*PHI==20(approx)
     PLAYER_RADIUS = _player_radius,
-    PLAYER_TRAIL_THICKNESS = (1.2 * math.ceil(_player_radius * _inv_phi)), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
+    PLAYER_TRAIL_THICKNESS = _player_radius * _inv_phi, --(1 + _inv_sq_phi) * (0.618 * _player_radius), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
 }

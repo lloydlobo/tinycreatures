@@ -331,6 +331,13 @@ end
 
 --- @param duration number (in seconds)
 function start_fadeout_music_sci_fi_engine(duration)
+    -- FIXME: On exiting the game with`Esc` abruptly
+    -- Error: main.lua:335: assertion failed!
+    -- stack traceback:
+    --         [love "boot.lua"]:352: in function <[love "boot.lua"]:348>
+    --         [C]: in function 'assert'
+    --         main.lua:335: in function 'start_fadeout_music_sci_fi_engine'
+    --         main.lua:714: in function 'update_on_love_keyrelease
     if Config.Debug.IS_ASSERT and music_sci_fi_engine:isPlaying() and (MUSIC_SCI_FI_ENGINE_VOLUME == music_sci_fi_engine:getVolume()) then
         assert(not music_sci_fi_engine_is_fading_out) -- HACK: Avoid assertion failure if key that triggers the music is not debounced.
     end
@@ -748,9 +755,10 @@ function handle_player_input_this_frame(dt)
     end
 
     do -- FIXME: Let it be or move each action to (if/elseif/else) checks above
-        local is_beserk = love.keyboard.isDown('lshift', 'rshift')
-        local is_boost = love.keyboard.isDown 'x'
-        local is_firing = love.keyboard.isDown 'space'
+        local KEY = Common.CONTROL_KEY
+        local is_beserk = love.keyboard.isDown(KEY.BESERK_LSHIFT, KEY.BESERK_RSHIFT)
+        local is_boost = love.keyboard.isDown(KEY.BOOST)
+        local is_firing = love.keyboard.isDown(KEY.FIRE)
         if love.keyboard.isDown 'x' then
             local should_play_once = not music_sci_fi_engine:isPlaying() or music_sci_fi_engine_is_fading_out
             if should_play_once then sound_boost_impulse:play() end
@@ -792,8 +800,7 @@ function draw_player_trail(alpha)
     local is_beserker = love.keyboard.isDown('lshift', 'rshift')
     local is_boost = love.keyboard.isDown 'x'
     if is_beserker and is_boost then
-        Common.lerp_rbg(dest_trail_color, clr_green, clr_yellow, alpha)
-        LG.setColor(dest_trail_color)
+        LG.setColor(Common.COLOR.player_beserker_dash_modifier)
     elseif is_beserker then
         LG.setColor(clr_green)
     elseif is_boost then
@@ -912,8 +919,8 @@ function draw_player(alpha)
     local invulnerability_timer = cs.player_invulnerability_timer
 
     local trigger_radius = lerp( --
-        firing_trigger_radius - 3,
-        firing_trigger_radius - 1,
+        firing_trigger_radius * 0.9,
+        firing_trigger_radius * 1.0625,
         lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.)
         -- alpha + (invulnerability_timer * 0.5)
     )
@@ -1392,7 +1399,7 @@ function draw_game(alpha)
     draw_player_fired_projectiles(alpha)
     -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
     draw_player_trail(alpha)
-    draw_player_direction_ray(alpha)
+    -- draw_player_direction_ray(alpha)
     draw_player_shield_collectible(alpha)
     draw_player(alpha)
 end

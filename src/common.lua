@@ -19,6 +19,9 @@ M.HEALTH_TRANSITIONS = {
 
 --- @enum CONTROL_KEY
 M.CONTROL_KEY = {
+    BESERK_LSHIFT = 'lshift',
+    BESERK_RSHIFT = 'lshift',
+    BOOST = 'x', --- `x`─Boost player
     ESCAPE_KEY = 'escape',
     FIRE = 'space',
     FORCE_QUIT_GAME = 'q',
@@ -51,14 +54,15 @@ M.SCREEN_FLASH_ALPHA_LEVEL = {
     LOW = 0.045,
 }
 
---- @enum CREATURE_STAGE_COLORS
---- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
-M.CREATURE_STAGE_COLORS = {
-    { 0.75, 0.1, 0.3 },
-    { 0.70, 0.2, 0.3 },
-    { 0.70, 0.3, 0.4 },
-    { 0.52, 0.45, 0.45 },
-}
+-- @stub
+-- --- @enum CREATURE_STAGE_COLORS
+-- --- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
+-- M.CREATURE_STAGE_COLORS = {
+--     { 0.75, 0.1, 0.3 },
+--     { 0.70, 0.2, 0.3 },
+--     { 0.70, 0.3, 0.4 },
+--     { 0.52, 0.45, 0.45 },
+-- }
 
 -- local ordia_blue = { 0.06, 0.16, 0.38 }
 
@@ -86,16 +90,17 @@ M.COLOR = {
     creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
     creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
-    player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
-    player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
     -- player_dash_neonblue_modifier = { 0.8, 0.8, 1.0 }, --- bubbles (luminiscent blue)
-    player_dash_neonblue_modifier = { 0.85, 0.85, 0.95 }, --- bubbles (luminiscent blue)
+    -- player_beserker_dash_modifier = { 0.9, 0.9, 0.4 }, --- ??? Chaos when shift + x are down. (yellow)
+    player_beserker_dash_modifier = { 135 / 255, 280 / 255, 238 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
+    player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
+    player_dash_neonblue_modifier = { 1.0, 1.0, 0.3 }, --- bubbles (luminiscent blue)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
     player_dash_yellow_modifier = { 0.9, 0.9, 0.4 }, --- You see, you're not dealing with the average player. (yellow)
     player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
     player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
     player_entity_firing_edge_darker = { 0.8, 0.8, 0.8 }, --- The lighter outer edge of the eye. (offwhite)
-    player_entity_firing_projectile = { 125 / 255, 148 / 255, 290 / 255 }, --- The idle tail and projectile color. (purple)
+    player_entity_firing_projectile = { 250 / 255, 228 / 255, 225 / 255 }, --- The idle tail and projectile color. (purple)
 
     TEXT_DARKER = { 0.4, 0.4, 0.4 },
     TEXT_DARKEST = { 0.3, 0.3, 0.3 },
