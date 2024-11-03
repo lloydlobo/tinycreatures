@@ -19,6 +19,9 @@ M.HEALTH_TRANSITIONS = {
 
 --- @enum CONTROL_KEY
 M.CONTROL_KEY = {
+    BESERK_LSHIFT = 'lshift',
+    BESERK_RSHIFT = 'lshift',
+    BOOST = 'x', --- `x`─Boost player
     ESCAPE_KEY = 'escape',
     FIRE = 'space',
     FORCE_QUIT_GAME = 'q',

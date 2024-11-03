@@ -748,9 +748,11 @@ function handle_player_input_this_frame(dt)
     end
 
     do -- FIXME: Let it be or move each action to (if/elseif/else) checks above
-        local is_beserk = love.keyboard.isDown('lshift', 'rshift')
-        local is_boost = love.keyboard.isDown 'x'
-        local is_firing = love.keyboard.isDown 'space'
+        local KEY = Common.CONTROL_KEY
+        local is_beserk = love.keyboard.isDown(KEY.BESERK_LSHIFT, KEY.BESERK_RSHIFT)
+        local is_boost = love.keyboard.isDown(KEY.BOOST)
+        local is_firing = love.keyboard.isDown(KEY.FIRE)
+
         if love.keyboard.isDown 'x' then
             local should_play_once = not music_sci_fi_engine:isPlaying() or music_sci_fi_engine_is_fading_out
             if should_play_once then sound_boost_impulse:play() end
