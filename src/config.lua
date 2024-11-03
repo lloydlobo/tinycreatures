@@ -69,7 +69,7 @@ local _MoonshineShaderSettings = {
         amount = 0.05,
     }, --- For `fx.glow`.
     chromatic_abberation = {
-        enable = true,
+        enable = not true,
         mode = 'minimal',
     },
     curved_monitor = {
@@ -147,6 +147,7 @@ return {
     --
 
     INV_PHI = _inv_phi,
+    INV_PHI_SQ = 1 / (_phi ^ 2),
     INV_PI = 1 / math.pi,
     PHI = _phi,
     PI = math.pi,
@@ -177,10 +178,10 @@ return {
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
     LASER_RADIUS = math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
-    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 4),
-    PARALLAX_ENTITY_MAX_DEPTH = 2, --- @type integer
+    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 2),
+    PARALLAX_ENTITY_MAX_DEPTH = 4, --- @type integer
     PARALLAX_ENTITY_MIN_DEPTH = 1, --- @type integer
-    PARALLAX_ENTITY_RADIUS_FACTOR = 20, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
+    PARALLAX_ENTITY_RADIUS_FACTOR = 16, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
     PARALLAX_OFFSET_FACTOR_X = 0.01, -- NOTE: Should be lower to avoid puking
     PARALLAX_OFFSET_FACTOR_Y = 0.01,
     PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),

@@ -17,7 +17,7 @@ extern vec2 screen;
 const float constant=1.;
 const float linear=.09;// Increase this to reduce light spread (e.g., try 0.2 or 0.3)
 const float quadratic=.032;// Increase this for a sharper falloff (e.g., 0.05 or 0.1)
-const float f_diffuse=.328;// Scale factor down final diffuse effect (orginally 1.)
+const float f_diffuse=1.;// Scale factor down final diffuse effect (orginally 1.)
 
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      vec4 pixel=Texel(image,uvs);
@@ -57,7 +57,7 @@ local light_player_trail_screen_coords = { gw, gh }
 local light_active_creatures = {
     position = { 0, 0 },
     diffuse = LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR,
-    power = 128,
+    power = 64,
 }
 
 --- @class (exact) Light
@@ -93,7 +93,8 @@ end
 --- @type Light[]
 local multiple_lights = {
     { position = { 100, 200 }, diffuse = { 0.2, 0.5, 0.3 }, power = 64 },
-    { position = { 300, 400 }, diffuse = { 0.3, 0.5, 1 }, power = 200 },
+    { position = { 300, 400 }, diffuse = { 0.3, 0.5, 1 }, power = 64 },
+    { position = { 600, 600 }, diffuse = { 0.5, 0.3, 1 }, power = 64 },
 }
 local function shade_active_creatures_multiple_lights(fun, lights)
     local shader = glsl_love_shaders.lighting_phong

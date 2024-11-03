@@ -33,14 +33,14 @@ end
 local SpriteBatchFn = {
     make_bg_parallax_entities = function()
         -- local img = M.create_circle_image { radius = 32, color = { 0.025, 0.15, 0.10, 0.2 } } -- if 4 -> Base size of 8 pixels diameter
-        local img = create_circle_image { radius = Config.PARALLAX_ENTITY_IMG_RADIUS, color = { 1., 1., 1., 1. } } -- if 4 -> Base size of 8 pixels diameter
+        local img = create_circle_image { radius = Config.PARALLAX_ENTITY_IMG_RADIUS, color = { 0.5, 1., 1., 1. } } -- if 4 -> Base size of 8 pixels diameter
         return LG.newSpriteBatch(img, Config.PARALLAX_ENTITY_MAX_COUNT, 'static')
     end,
 
     make_creatures = function()
         local color = Common.COLOR.creature_infected
         local radius = Config.CREATURE_STAGES[#Config.CREATURE_STAGES].radius --[[local creature_circle_image = create_circle_image(radius, color[1], color[2], color[3], 1.0)]]
-        local img = create_circle_image { radius = radius, color = { 1, 1, 1 } }
+        local img = create_circle_image { radius = radius, color = { 0.3, 0.3, 0.3 } }
         return LG.newSpriteBatch(img, Config.CREATURE_TOTAL_CAPACITY, 'static') -- maybe static?
     end,
 
