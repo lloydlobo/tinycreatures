@@ -4,7 +4,7 @@
 
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
-![tinycreatures_20241102145514](static/screencasts/tinycreatures_20241102145514.gif)
+![tinycreatures_20241104125912](static/screencasts/tinycreatures_20241104125912.gif)
 
 > Initially built during a game jam for Ludum Dare 56's Tiny Creatures theme.
 
@@ -102,8 +102,9 @@ You have two options to run the game:
 
 - **Arrow Keys/WASD**: Move the player entity.
 - **Spacebar**: Fire projectiles.
-- **X**: Dash forward.
-- **Shift (Left/Right)**: Enhance attributes and increase turning speed.
+- **Z**: Beserk─Enhance attributes and increase turning speed.
+- **X**: Boost.
+- **C**: Spawn companions.
 - **Escape**: ~~Pause~~ or ~~exit~~ force quit.
 - **H**: Toggle debug HUD.
 - **N**: Next level.
@@ -209,6 +210,7 @@ This project is open source under the MIT License. See the LICENSE file for more
 ![tinycreatures_20241023184744](static/screencasts/tinycreatures_20241023184744.gif)
 ![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
 ![tinycreatures_20241102145514](static/screencasts/tinycreatures_20241102145514.gif)
+![tinycreatures_20241104125912](static/screencasts/tinycreatures_20241104125912.gif)
 
 </details>
 
