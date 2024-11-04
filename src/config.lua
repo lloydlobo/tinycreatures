@@ -141,7 +141,7 @@ return {
     IS_CREATURE_SWARM_ENABLED = not true,
     IS_GAME_SLOW = not true,
     IS_GRUG_BRAIN = not true, --- Whether to complicate life and the codebase.
-    IS_PLAYER_INVULNERABLE = true,
+    IS_PLAYER_INVULNERABLE = not true,
     IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = not true, --- Flags if fired projectile should wrap around arena.
 
     --
