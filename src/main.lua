@@ -1519,6 +1519,27 @@ function draw_screenshake_fx(alpha)
     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
 end
 
+function draw_keybindings(alpha)
+    local cs = curr_state
+    local player_x = cs.player_x
+    local player_y = cs.player_y
+    local x = 16
+    local y = arena_h - 32
+    local target_distance = 320
+
+    -- Calculate wrapped distance along the x and y axis.
+    local dx = math.min(math.abs(player_x - x), arena_w - math.abs(player_x - x))
+    local dy = math.min(math.abs(player_y - y), arena_h - math.abs(player_y - y))
+
+    -- Calculate the Manhattan distance using wrapped coordinates
+    local distance = dx + dy
+    if distance <= target_distance then
+        local f = math.min(1.0, (target_distance - distance) / target_distance)
+        LG.setColor(1., 1., 1., 1. * f)
+        LG.print([[Z-beserk  X-boost  C-companions SPC-fire]], x, y, 0., 0.9, 0.9)
+    end
+end
+
 function draw_hud()
     local cs = curr_state
 
