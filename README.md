@@ -102,8 +102,9 @@ You have two options to run the game:
 
 - **Arrow Keys/WASD**: Move the player entity.
 - **Spacebar**: Fire projectiles.
-- **X**: Dash forward.
-- **Shift (Left/Right)**: Enhance attributes and increase turning speed.
+- **Z**: Beserk─Enhance attributes and increase turning speed.
+- **X**: Boost.
+- **C**: Spawn companions.
 - **Escape**: ~~Pause~~ or ~~exit~~ force quit.
 - **H**: Toggle debug HUD.
 - **N**: Next level.
