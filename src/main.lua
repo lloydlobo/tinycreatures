@@ -1211,72 +1211,6 @@ end
 --     LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
 -- end
 
-local temp_last_ouch_x = nil
-local temp_last_ouch_y = nil
-local temp_ouch_messages = { 'OUCH!', 'OWW!', 'HEYY!' }
-local temp_last_ouch_message_index = love.math.random(1, MAX_TEMP_OUCH_MESSAGES)
-local MAX_TEMP_OUCH_MESSAGES = #temp_ouch_messages
-
---- Draws horizontal status bar for player statistics that includes health, invulnerability timer.
---- @param alpha number
-function draw_player_status_bar(alpha)
-    local cs = curr_state
-
-    local bar_width = 2 ^ 8 -- Example width
-    local bar_height = 2 ^ 3 -- Example height
-    local bar_x = (arena_w * 0.5) - (bar_width * 0.5) -- X position on screen
-    local bar_y = bar_height * 2 * PHI -- Y position on screen
-
-    local sw = 1 -- scale width
-    local sh = 1 -- scale height
-
-    local invulnerability_timer = cs.player_invulnerability_timer
-    local curr_health_percentage = (cs.player_health / Config.PLAYER_MAX_HEALTH)
-    if Config.Debug.IS_ASSERT then assert(curr_health_percentage >= 0.0 and curr_health_percentage <= 1.0) end
-
-    -- Draw health bar.
-    do
-        local prev_health_percentage = (prev_state.player_health / Config.PLAYER_MAX_HEALTH)
-        local interpolated_health = lerp(prev_health_percentage, curr_health_percentage, alpha)
-        if Config.IS_GRUG_BRAIN and invulnerability_timer > 0 then -- @juice: inflate/deflate health bar
-            sh = lerp(sh * 0.95, sh * 1.25, invulnerability_timer * alpha)
-        end
-        -- Draw missing health part.
-        LG.setColor(Common.COLOR.creature_healing) -- red
-        LG.rectangle('fill', bar_x, bar_y, bar_width * sw, bar_height * sh)
-        -- Draw current health part.
-        LG.setColor(0.95, 0.95, 0.95) -- white
-        LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health) * sw, bar_height * sh)
-    end
-
-    -- Draw invulnerability timer.
-    do
-        if invulnerability_timer > 0 then
-            if temp_last_ouch_x == nil and temp_last_ouch_y == nil then
-                temp_last_ouch_x = cs.player_x + Config.PLAYER_RADIUS - 4
-                temp_last_ouch_y = cs.player_y - Config.PLAYER_RADIUS - 4
-                temp_last_ouch_message_index = math.floor(love.math.random(1, MAX_TEMP_OUCH_MESSAGES)) --- WARN: Is the random output inclusive?
-                assert(temp_last_ouch_message_index >= 1 and temp_last_ouch_message_index <= MAX_TEMP_OUCH_MESSAGES)
-            else
-                LG.setColor(Common.COLOR.player_dash_pink_modifier) -- white
-                LG.print(temp_ouch_messages[temp_last_ouch_message_index], temp_last_ouch_x, temp_last_ouch_y)
-            end
-            local invulnerability_bar_height = bar_height * INV_PHI * 0.5
-            LG.setColor(0.95, 0.95, 0.95, 0.1) -- white
-            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
-            local invulnerable_tween = invulnerability_timer
-            if Config.IS_GRUG_BRAIN then invulnerable_tween = lerp(invulnerability_timer - game_timer_dt, invulnerability_timer, alpha) end
-            LG.setColor(0, 1, 1) -- cyan?????
-            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, invulnerability_bar_height * sh) -- current invulnerability
-        else
-            temp_last_ouch_x = nil
-            temp_last_ouch_y = nil
-        end
-    end
-
-    LG.setColor(1, 1, 1) -- reset color to default
-end
-
 function draw_player_shield_collectible(alpha)
     local COLLECTIBLE_SHIELD_RADIUS = Config.PLAYER_RADIUS * (1 - INV_PHI) * 3
     local is_spawned_shield = (player_shield_collectible_pos_x ~= nil and player_shield_collectible_pos_y ~= nil)
@@ -1521,12 +1455,115 @@ function draw_screenshake_fx(alpha)
     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
 end
 
-function draw_keybindings(alpha)
+local temp_last_ouch_x = nil
+local temp_last_ouch_y = nil
+local temp_ouch_messages = { 'OUCH!', 'OWW!', 'HEYY!' }
+local temp_last_ouch_message_index = love.math.random(1, MAX_TEMP_OUCH_MESSAGES)
+local MAX_TEMP_OUCH_MESSAGES = #temp_ouch_messages
+
+--- Draws horizontal status bar for player statistics that includes health, invulnerability timer.
+--- @param alpha number
+function draw_player_status_bar(alpha)
+    local cs = curr_state
+
+    local bar_width = 2 ^ 8 -- Example width
+    local bar_height = 2 ^ 3 -- Example height
+    local bar_x = (arena_w * 0.5) - (bar_width * 0.5) -- X position on screen
+    local bar_y = bar_height * 2 * PHI -- Y position on screen
+
+    local sw = 1 -- scale width
+    local sh = 1 -- scale height
+
+    local invulnerability_timer = cs.player_invulnerability_timer
+    local curr_health_percentage = (cs.player_health / Config.PLAYER_MAX_HEALTH)
+    if Config.Debug.IS_ASSERT then assert(curr_health_percentage >= 0.0 and curr_health_percentage <= 1.0) end
+
+    -- Draw health bar.
+    do
+        local prev_health_percentage = (prev_state.player_health / Config.PLAYER_MAX_HEALTH)
+        local interpolated_health = lerp(prev_health_percentage, curr_health_percentage, alpha)
+        if Config.IS_GRUG_BRAIN and invulnerability_timer > 0 then -- @juice: inflate/deflate health bar
+            sh = lerp(sh * 0.95, sh * 1.25, invulnerability_timer * alpha)
+        end
+        -- Draw missing health part.
+        LG.setColor(Common.COLOR.creature_healing) -- red
+        LG.rectangle('fill', bar_x, bar_y, bar_width * sw, bar_height * sh)
+        -- Draw current health part.
+        LG.setColor(0.95, 0.95, 0.95) -- white
+        LG.rectangle('fill', bar_x, bar_y, (bar_width * interpolated_health) * sw, bar_height * sh)
+    end
+
+    -- Draw invulnerability timer.
+    do
+        if invulnerability_timer > 0 then
+            if temp_last_ouch_x == nil and temp_last_ouch_y == nil then
+                temp_last_ouch_x = cs.player_x + Config.PLAYER_RADIUS - 4
+                temp_last_ouch_y = cs.player_y - Config.PLAYER_RADIUS - 4
+                temp_last_ouch_message_index = math.floor(love.math.random(1, MAX_TEMP_OUCH_MESSAGES)) --- WARN: Is the random output inclusive?
+                assert(temp_last_ouch_message_index >= 1 and temp_last_ouch_message_index <= MAX_TEMP_OUCH_MESSAGES)
+            else
+                LG.setColor(Common.COLOR.player_dash_pink_modifier) -- white
+                LG.print(temp_ouch_messages[temp_last_ouch_message_index], temp_last_ouch_x, temp_last_ouch_y)
+            end
+            local invulnerability_bar_height = bar_height * INV_PHI * 0.5
+            LG.setColor(0.95, 0.95, 0.95, 0.1) -- white
+            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
+            local invulnerable_tween = invulnerability_timer
+            if Config.IS_GRUG_BRAIN then invulnerable_tween = lerp(invulnerability_timer - game_timer_dt, invulnerability_timer, alpha) end
+            LG.setColor(0, 1, 1) -- cyan?????
+            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, invulnerability_bar_height * sh) -- current invulnerability
+        else
+            temp_last_ouch_x = nil
+            temp_last_ouch_y = nil
+        end
+    end
+
+    LG.setColor(1, 1, 1) -- reset color to default
+end
+
+function draw_timer_text()
+    local x = (arena_w * 0.5)
+    local y = 14
+
+    local text = string.format('%.2f', game_timer_t)
+    local tw, th = font:getWidth(text), font:getHeight()
+
+    -- Draw rounded rectangle button like backdrop.
+    if true then
+        if true then
+            local game_freq = math.sin(game_timer_t * 4) / 4
+            -- local f = lume.clamp((1 - game_freq), INV_PHI, PHI)
+            local f = lume.clamp((1 + game_freq), INV_PHI, PHI)
+            f = smoothstep(f, 1 + f * INV_PHI_SQ, f ^ 1.2)
+
+            local rect_w = tw * (INV_PHI + 0.15)
+            -- Save state.
+            local blend_mode = LG.getBlendMode()
+            LG.setBlendMode('lighten', 'premultiplied')
+            LG.setColor(0.2, 0.2, 0.2, 0.5)
+            LG.rectangle('fill', x - rect_w * 0.5, y - th * f, rect_w, th * f * 2)
+            LG.circle('fill', x - rect_w * 0.5, y, th * f)
+            LG.circle('fill', x + rect_w * 0.5, y, th * f)
+            -- Restore state.
+            LG.setBlendMode(blend_mode)
+        else
+            LG.setColor(1.0, 1.0, 1.0, 1.0)
+            LG.ellipse('fill', x, y, tw * 0.7, tw * 0.7)
+        end
+    end
+
+    -- Draw timer text.
+    LG.setColor(1, 1, 1)
+    LG.print(text, x, y, 0., 1., 1., tw * 0.5, th * 0.5)
+end
+
+function draw_keybindings_text()
+    local x = 16
+    local y = arena_h - 32
+
     local cs = curr_state
     local player_x = cs.player_x
     local player_y = cs.player_y
-    local x = 16
-    local y = arena_h - 32
     local target_distance = 320
 
     -- Calculate wrapped distance along the x and y axis.
@@ -1666,7 +1703,12 @@ function draw_game(alpha)
     Shaders.phong_lighting.shade_active_creatures_to_player_pov(function() draw_creatures(alpha) end)
     -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function() draw_creatures(alpha) end)
     -- draw_creatures(alpha)--[[]]
-    draw_player_status_bar(alpha)
+    do
+        draw_keybindings_text()
+        draw_timer_text()
+        draw_player_status_bar(alpha)
+    end
+
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
     -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
@@ -1956,6 +1998,7 @@ function love.load()
         arena_h = gh
         arena_w = gw
     end
+    font = LG.getFont()
 
     -- Smoother edges
     LG.setDefaultFilter('linear', 'linear')
@@ -2242,13 +2285,11 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
 
                 draw_screenshake_fx(alpha)
-                draw_keybindings(alpha)
                 draw_game(alpha)
+                LG.origin() -- Reverse any previous calls to love.graphics.
             end
         end
         -- moonshine_love_shaders.fog(function() draw_player(alpha) end)
-
-        LG.origin() -- Reverse any previous calls to love.graphics.
     end)
 
     if is_debug_hud_enable then draw_hud() end
