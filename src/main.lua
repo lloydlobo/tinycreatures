@@ -227,16 +227,53 @@ function spawn_new_creature(new_index, parent_index, new_stage, offset)
     cs.creatures_y[new_index] = cs.creatures_y[new_index] + love.math.random(-offset, offset)
 end
 
+function emit_projectile(x, y)
+    local cs = curr_state
+    cs.lasers_angle[laser_index] = cs.player_rot_angle
+    cs.lasers_is_active[laser_index] = Common.STATUS.ACTIVE
+    cs.lasers_time_left[laser_index] = 4
+
+    cs.lasers_x[laser_index] = x
+    cs.lasers_y[laser_index] = y
+
+    laser_index = (laser_index % Config.LASER_MAX_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
+
+    laser_fire_timer = Config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
+end
+
 function fire_player_projectile() --- Fire projectile from players's position.
     if laser_fire_timer <= 0 then
         local cs = curr_state
-        cs.lasers_angle[laser_index] = cs.player_rot_angle
-        cs.lasers_is_active[laser_index] = Common.STATUS.ACTIVE
-        cs.lasers_time_left[laser_index] = 4
-        cs.lasers_x[laser_index] = cs.player_x + math.cos(cs.player_rot_angle) * Config.PLAYER_RADIUS
-        cs.lasers_y[laser_index] = cs.player_y + math.sin(cs.player_rot_angle) * Config.PLAYER_RADIUS
-        laser_index = (laser_index % Config.LASER_MAX_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
-        laser_fire_timer = Config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
+
+        local player_x = cs.player_x
+        local player_y = cs.player_y
+        local player_rot_angle = cs.player_rot_angle
+        local player_radius = Config.PLAYER_RADIUS
+
+        local poly_size = Config.COMPANION_SIZE
+        local dist_from_player = Config.COMPANION_DIST_FROM_PLAYER
+
+        local x_origin = player_x + math.cos(cs.player_rot_angle) * Config.PLAYER_RADIUS
+        local y_origin = player_y + math.sin(cs.player_rot_angle) * Config.PLAYER_RADIUS
+
+        local x1 = player_x + math.cos(player_rot_angle) * poly_size
+        local y1 = player_y + math.sin(player_rot_angle) * poly_size
+
+        local x2 = player_x + math.cos(player_rot_angle + math.pi * 0.75) * poly_size
+        local y2 = player_y + math.sin(player_rot_angle + math.pi * 0.75) * poly_size
+
+        local x3 = player_x + math.cos(player_rot_angle - math.pi * 0.75) * poly_size
+        local y3 = player_y + math.sin(player_rot_angle - math.pi * 0.75) * poly_size
+
+        emit_projectile(x_origin, y_origin)
+        -- emit_projectile(x1, y1)
+        -- emit_projectile(x2, y2)
+        -- emit_projectile(x3, y3)
+        emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * -1)
+        emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * 1)
+        emit_projectile(x2 + dist_from_player * -1, y2 + dist_from_player * 0)
+        emit_projectile(x3 + dist_from_player * 1, y3 + dist_from_player * 0)
+
         sound_fire_projectile:play() -- Unconventional but works without distraction.
     end
 end
@@ -907,6 +944,7 @@ function draw_player_direction_ray(alpha)
         end
     end
 end
+
 function draw_player(alpha)
     local cs = curr_state
     local IS_EYE_TWINKLE_ENABLE = true
@@ -965,8 +1003,8 @@ function draw_player(alpha)
         local prev_line_width = LG.getLineWidth()
         LG.setLineWidth(2.5 * (1 + math.abs(invulnerability_timer)))
 
-        local poly_size = player_radius * INV_PHI_SQ
         local pos_x_, pos_y_ = player_x, player_y
+        local poly_size = Config.COMPANION_SIZE -- dest size
 
         -- Draw player triangle
         local x1 = pos_x_ + math.cos(player_rot_angle) * poly_size
@@ -983,11 +1021,22 @@ function draw_player(alpha)
         if has_companion then
             local game_pulse_freq = lume.clamp(lume.pingpong(math.abs(invulnerability_timer)) + game_freq, 0, 1)
             local f_size = 2 * smoothstep(PHI, PHI_SQ, game_pulse_freq)
-            local size = f_size * poly_size
+
+            if not Config.IS_GRUG_BRAIN then
+                f_size = 1. -- f_size = player_radius / 4
+            end
+            local offset = Config.COMPANION_DIST_FROM_PLAYER
 
             for y = -1, 1 do
                 for x = -1, 1 do
-                    if x == 0 or y == 0 then LG.polygon('line', x1 + size * x, y1 + size * y, x2 + size * x, y2 + size * y, x3 + size * x, y3 + size * y) end
+                    if x == 0 and y == 0 then goto continue_skip_origin end
+                    if x == 0 or y == 0 then --[[]]
+                        -- x = x * player_radius / 4
+                        -- y = y * player_radius / 4
+                        LG.print('' .. x .. ' ' .. y, 100 + x * 32, 100 + y * 32)
+                        LG.polygon('line', x1 + offset * x, y1 + offset * y, x2 + offset * x, y2 + offset * y, x3 + offset * x, y3 + offset * y)
+                    end
+                    ::continue_skip_origin::
                 end
             end
         else
