@@ -256,7 +256,7 @@ function fire_player_projectile() --- Fire projectile from players's position.
         local y_origin = player_y + math.sin(cs.player_rot_angle) * Config.PLAYER_RADIUS
         emit_projectile(x_origin, y_origin)
 
-        if player_action == Common.PLAYER_ACTION.COMBO_BESERK_BOOST then
+        if player_action == Common.PLAYER_ACTION.COMPANION then
             local poly_size = Config.COMPANION_SIZE
             local dist_from_player = Config.COMPANION_DIST_FROM_PLAYER
             local x1 = player_x + math.cos(player_rot_angle) * poly_size
@@ -758,8 +758,17 @@ function update_on_love_keyreleased(key)
     if key == 'x' then start_fadeout_music_sci_fi_engine(MUSIC_SCI_FI_ENGINE_FADEOUT_MAX_DURATION) end
 end
 
+local _F_REVERSE_ACCELERATION = 0.9
+local _CONTROL_KEY = Common.CONTROL_KEY
+local love_keyboard_isDown = love.keyboard.isDown
 function handle_player_input_this_frame(dt)
     local cs = curr_state
+
+    local is_stop_and_beserk_in_place = love_keyboard_isDown(_CONTROL_KEY.BESERK_LSHIFT, _CONTROL_KEY.BESERK_RSHIFT)
+    local is_boosting = love_keyboard_isDown(_CONTROL_KEY.BOOST)
+    local has_companions = love_keyboard_isDown(_CONTROL_KEY.COMPANIONS)
+    local is_firing = love_keyboard_isDown(_CONTROL_KEY.FIRING)
+
     if love.keyboard.isDown('right', 'd') then --
         cs.player_rot_angle = cs.player_rot_angle + player_turn_speed * dt
     end
@@ -767,49 +776,52 @@ function handle_player_input_this_frame(dt)
         cs.player_rot_angle = cs.player_rot_angle - player_turn_speed * dt
     end
     cs.player_rot_angle = cs.player_rot_angle % (2 * PI) -- wrap player angle each 360°
-    if love.keyboard.isDown('up', 'w') then
-        cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
-        cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
-        play_player_engine_sound(dt, EngineMoveKind.forward)
-    end
-    local is_reverse_enabled = true
-    if is_reverse_enabled then
-        local reverse_acceleration_factor = 0.9
-        local reverese_acceleration = Config.PLAYER_ACCELERATION * reverse_acceleration_factor
+
+    -- Move player entity.
+    local is_movement_enable = not is_stop_and_beserk_in_place -- or not is_boosting
+    if is_movement_enable then
+        if love.keyboard.isDown('up', 'w') then
+            cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
+            cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
+            play_player_engine_sound(dt, EngineMoveKind.forward)
+        end
+
+        local reverese_acceleration = Config.PLAYER_ACCELERATION * _F_REVERSE_ACCELERATION
         if love.keyboard.isDown('down', 's') then
             cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * reverese_acceleration * dt
             cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * reverese_acceleration * dt
         end
         play_player_engine_sound(dt, EngineMoveKind.backward)
     end
-    if love.keyboard.isDown 'space' then fire_player_projectile() end
-    if love.keyboard.isDown 'x' then boost_player_entity_speed(dt) end
-    if love.keyboard.isDown('lshift', 'rshift') then --- enhance attributes while spinning like a top
+
+    if is_firing and not is_boosting then fire_player_projectile() end
+
+    -- Can't shoot while boosting.
+    if is_boosting then
+        --[[TODO: Make player invulnerable while boost timer─which is unimplemented, does not runs out]]
+        boost_player_entity_speed(dt)
+        do
+            local should_play_once = (not music_sci_fi_engine:isPlaying()) or music_sci_fi_engine_is_fading_out
+            if should_play_once then sound_boost_impulse:play() end
+            music_sci_fi_engine:play()
+        end
+    elseif is_stop_and_beserk_in_place and not has_companions then
+        -- Enhance attributes while spinning like a top.
+        --[[TODO: On init, emit a burst of lasers automatically. Give player some respite]]
         player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED * PHI
         laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
     else
         player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
     end
 
-    do -- FIXME: Let it be or move each action to (if/elseif/else) checks above
-        local KEY = Common.CONTROL_KEY
-        local is_beserk = love.keyboard.isDown(KEY.BESERK_LSHIFT, KEY.BESERK_RSHIFT)
-        local is_boost = love.keyboard.isDown(KEY.BOOST)
-        local is_firing = love.keyboard.isDown(KEY.FIRE)
-
-        if love.keyboard.isDown 'x' then
-            local should_play_once = not music_sci_fi_engine:isPlaying() or music_sci_fi_engine_is_fading_out
-            if should_play_once then sound_boost_impulse:play() end
-            music_sci_fi_engine:play()
-        end
-
-        local is_beserk_boost_combo = is_beserk and is_boost
-        if is_beserk_boost_combo then
-            player_action = Common.PLAYER_ACTION.COMBO_BESERK_BOOST
-        elseif is_beserk then
-            player_action = Common.PLAYER_ACTION.BESERK
-        elseif is_boost then
+    -- Update and assign new player action
+    do
+        if is_boosting then
             player_action = Common.PLAYER_ACTION.BOOST
+        elseif has_companions then
+            player_action = Common.PLAYER_ACTION.COMPANION
+        elseif is_stop_and_beserk_in_place then
+            player_action = Common.PLAYER_ACTION.BESERK
         elseif is_firing then
             player_action = Common.PLAYER_ACTION.FIRING -- since we are firing
         else
@@ -835,14 +847,11 @@ function draw_player_trail(alpha)
     local f = 0. --- @type number Any factor
     local invulnerability_timer = curr_state.player_invulnerability_timer
 
-    local is_beserker = love.keyboard.isDown(Common.CONTROL_KEY.BESERK_LSHIFT, Common.CONTROL_KEY.BESERK_RSHIFT)
-    local is_boost = love.keyboard.isDown(Common.CONTROL_KEY.BOOST)
-
-    if is_beserker and is_boost then
-        LG.setColor(Common.COLOR.player_beserker_dash_modifier)
-    elseif is_beserker then
+    if player_action == Common.PLAYER_ACTION.COMPANION then
+        LG.setColor(Common.COLOR.player_companion_modifier)
+    elseif player_action == Common.PLAYER_ACTION.BESERK then
         LG.setColor(Common.COLOR.player_beserker_modifier)
-    elseif is_boost then
+    elseif player_action == Common.PLAYER_ACTION.BOOST then
         LG.setColor(Common.COLOR.player_boost_dash_modifier)
     else
         LG.setColor(Common.COLOR.player_entity_firing_projectile)
@@ -870,20 +879,18 @@ function draw_player_trail(alpha)
             radius = lerp(radius + radius_tween, radius, game_freq)
         end
 
-        if is_beserker and is_boost then
+        if player_action == Common.PLAYER_ACTION.COMPANION then
             f = i ^ 1.2
             f = smoothstep(i, PHI * i, game_freq)
             f = -f ^ 0.1
             last_f = f
             LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
-        elseif is_beserker then
-            -- f = i ^ 1.2
-            -- f = smoothstep(2*i, PHI * i, game_freq)
+        elseif player_action == Common.PLAYER_ACTION.BESERK then
             f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
             f = 1.5 * smoothstep(-f ^ 0.8, -f ^ 0.3, game_freq)
             last_f = f
             LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
-        elseif is_boost then
+        elseif player_action == Common.PLAYER_ACTION.BOOST then
             f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
             f = lume.clamp((f / (i ^ 1.2)), 0, 1)
             last_f = f
@@ -996,7 +1003,7 @@ function draw_player(alpha)
     end
 
     -- #4: Draw Player Shape and Companion Effects
-    if player_action == Common.PLAYER_ACTION.COMBO_BESERK_BOOST then
+    if player_action == Common.PLAYER_ACTION.COMPANION then
         local prev_line_width = LG.getLineWidth()
         LG.setLineWidth(2.5 * (1 + math.abs(invulnerability_timer)))
 

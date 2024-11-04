@@ -22,8 +22,9 @@ M.CONTROL_KEY = {
     BESERK_LSHIFT = 'lshift',
     BESERK_RSHIFT = 'lshift',
     BOOST = 'x', --- `x`─Boost player
+    COMPANIONS = 'c', --- `c`─Spawns companions
     ESCAPE_KEY = 'escape',
-    FIRE = 'space',
+    FIRING = 'space',
     FORCE_QUIT_GAME = 'q',
     NEXT_LEVEL = 'n',
     PREV_LEVEL = 'p',
@@ -35,7 +36,7 @@ M.CONTROL_KEY = {
 M.PLAYER_ACTION = {
     BESERK = 'BESERK',
     BOOST = 'BOOST',
-    COMBO_BESERK_BOOST = 'COMBO_BESERK_BOOST',
+    COMPANION = 'COMPANION',
     FIRING = 'FIRING',
     IDLE = 'IDLE',
 }
@@ -89,7 +90,7 @@ M.COLOR = {
     creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
     creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
-    player_beserker_dash_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
+    player_companion_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
     player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
     player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
@@ -117,7 +118,7 @@ end
 
 --- @type table<PLAYER_ACTION, [number, number, number]>
 M.PLAYER_ACTION_TO_COLOR = {
-    [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.COLOR.player_beserker_dash_modifier,
+    [M.PLAYER_ACTION.COMPANION] = M.COLOR.player_companion_modifier,
     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
     [M.PLAYER_ACTION.BOOST] = M.COLOR.player_boost_dash_modifier,
     [M.PLAYER_ACTION.FIRING] = M.COLOR.player_entity_firing_projectile,
@@ -126,7 +127,7 @@ M.PLAYER_ACTION_TO_COLOR = {
 
 --- @type table<PLAYER_ACTION, [number, number, number]>
 M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
-    [M.PLAYER_ACTION.COMBO_BESERK_BOOST] = M.desaturate(M.COLOR.player_beserker_dash_modifier),
+    [M.PLAYER_ACTION.COMPANION] = M.desaturate(M.COLOR.player_companion_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
     [M.PLAYER_ACTION.BOOST] = M.desaturate(M.COLOR.player_boost_dash_modifier),
     [M.PLAYER_ACTION.FIRING] = M.desaturate(M.COLOR.player_entity_firing_projectile),
