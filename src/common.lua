@@ -19,8 +19,7 @@ M.HEALTH_TRANSITIONS = {
 
 --- @enum CONTROL_KEY
 M.CONTROL_KEY = {
-    BESERK_LSHIFT = 'lshift',
-    BESERK_RSHIFT = 'lshift',
+    BESERK = 'z',
     BOOST = 'x', --- `x`─Boost player
     COMPANIONS = 'c', --- `c`─Spawns companions
     ESCAPE_KEY = 'escape',
@@ -136,25 +135,25 @@ M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
 
 -- @STUB
 -- Auto-generated for companion entity polygon attributes
-M.PLAYER_ACTION_TO_DATA = {
-    [M.PLAYER_ACTION.IDLE] = {
-        sides = 3,
-        size_factor = 1,
-        color = M.COLOR.IDLE,
-        line_width = 2.5,
-    },
-    [M.PLAYER_ACTION.FIRING] = {
-        sides = 4,
-        size_factor = 1.25,
-        color = M.COLOR.FIRING,
-        line_width = 3,
-        pulse_effect = {
-            size_factor = 1.1,
-            offset = 2,
-        },
-    },
-    -- Additional actions and shapes
-}
+-- M.PLAYER_ACTION_TO_DATA = {
+--     [M.PLAYER_ACTION.IDLE] = {
+--         sides = 3,
+--         size_factor = 1,
+--         color = M.COLOR.IDLE,
+--         line_width = 2.5,
+--     },
+--     [M.PLAYER_ACTION.FIRING] = {
+--         sides = 4,
+--         size_factor = 1.25,
+--         color = M.COLOR.FIRING,
+--         line_width = 3,
+--         pulse_effect = {
+--             size_factor = 1.1,
+--             offset = 2,
+--         },
+--     },
+--     -- Additional actions and shapes
+-- }
 
 -- --- @type table<PLAYER_ACTION, [number, number, number]>
 -- M.PLAYER_ACTION_COLOR_MAP_DESATURATED = {

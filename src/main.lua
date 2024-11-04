@@ -764,7 +764,7 @@ local love_keyboard_isDown = love.keyboard.isDown
 function handle_player_input_this_frame(dt)
     local cs = curr_state
 
-    local is_stop_and_beserk_in_place = love_keyboard_isDown(_CONTROL_KEY.BESERK_LSHIFT, _CONTROL_KEY.BESERK_RSHIFT)
+    local is_stop_and_beserk_in_place = love_keyboard_isDown(_CONTROL_KEY.BESERK, _CONTROL_KEY.BESERK)
     local is_boosting = love_keyboard_isDown(_CONTROL_KEY.BOOST)
     local has_companions = love_keyboard_isDown(_CONTROL_KEY.COMPANIONS)
     local is_firing = love_keyboard_isDown(_CONTROL_KEY.FIRING)
@@ -796,8 +796,8 @@ function handle_player_input_this_frame(dt)
 
     if is_firing and not is_boosting then fire_player_projectile() end
 
-    -- Can't shoot while boosting.
-    if is_boosting then
+    --[[Tradeoffs to aid microdecisions]]
+    if is_boosting then -- Can't shoot while boosting.
         --[[TODO: Make player invulnerable while boost timer─which is unimplemented, does not runs out]]
         boost_player_entity_speed(dt)
         do
@@ -810,6 +810,8 @@ function handle_player_input_this_frame(dt)
         --[[TODO: On init, emit a burst of lasers automatically. Give player some respite]]
         player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED * PHI
         laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
+    elseif has_companions then
+        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED * INV_PHI_SQ
     else
         player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
     end
@@ -2240,6 +2242,7 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
 
                 draw_screenshake_fx(alpha)
+                draw_keybindings(alpha)
                 draw_game(alpha)
             end
         end
