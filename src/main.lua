@@ -229,6 +229,7 @@ end
 
 function emit_projectile(x, y)
     local cs = curr_state
+
     cs.lasers_angle[laser_index] = cs.player_rot_angle
     cs.lasers_is_active[laser_index] = Common.STATUS.ACTIVE
     cs.lasers_time_left[laser_index] = 4
@@ -236,9 +237,11 @@ function emit_projectile(x, y)
     cs.lasers_x[laser_index] = x
     cs.lasers_y[laser_index] = y
 
-    laser_index = (laser_index % Config.LASER_MAX_CAPACITY) + 1 -- Laser_index tracks circular reusable buffer.
+    -- Laser_index tracks circular reusable buffer.
+    laser_index = 1 + (laser_index % Config.LASER_MAX_CAPACITY)
 
-    laser_fire_timer = Config.LASER_FIRE_TIMER_LIMIT -- Reset timer to default.
+    -- Reset timer to default.
+    laser_fire_timer = Config.LASER_FIRE_TIMER_LIMIT
 end
 
 function fire_player_projectile() --- Fire projectile from players's position.
@@ -248,31 +251,25 @@ function fire_player_projectile() --- Fire projectile from players's position.
         local player_x = cs.player_x
         local player_y = cs.player_y
         local player_rot_angle = cs.player_rot_angle
-        local player_radius = Config.PLAYER_RADIUS
-
-        local poly_size = Config.COMPANION_SIZE
-        local dist_from_player = Config.COMPANION_DIST_FROM_PLAYER
 
         local x_origin = player_x + math.cos(cs.player_rot_angle) * Config.PLAYER_RADIUS
         local y_origin = player_y + math.sin(cs.player_rot_angle) * Config.PLAYER_RADIUS
-
-        local x1 = player_x + math.cos(player_rot_angle) * poly_size
-        local y1 = player_y + math.sin(player_rot_angle) * poly_size
-
-        local x2 = player_x + math.cos(player_rot_angle + math.pi * 0.75) * poly_size
-        local y2 = player_y + math.sin(player_rot_angle + math.pi * 0.75) * poly_size
-
-        local x3 = player_x + math.cos(player_rot_angle - math.pi * 0.75) * poly_size
-        local y3 = player_y + math.sin(player_rot_angle - math.pi * 0.75) * poly_size
-
         emit_projectile(x_origin, y_origin)
-        -- emit_projectile(x1, y1)
-        -- emit_projectile(x2, y2)
-        -- emit_projectile(x3, y3)
-        emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * -1)
-        emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * 1)
-        emit_projectile(x2 + dist_from_player * -1, y2 + dist_from_player * 0)
-        emit_projectile(x3 + dist_from_player * 1, y3 + dist_from_player * 0)
+
+        if player_action == Common.PLAYER_ACTION.COMBO_BESERK_BOOST then
+            local poly_size = Config.COMPANION_SIZE
+            local dist_from_player = Config.COMPANION_DIST_FROM_PLAYER
+            local x1 = player_x + math.cos(player_rot_angle) * poly_size
+            local y1 = player_y + math.sin(player_rot_angle) * poly_size
+            local x2 = player_x + math.cos(player_rot_angle + math.pi * 0.75) * poly_size
+            local y2 = player_y + math.sin(player_rot_angle + math.pi * 0.75) * poly_size
+            local x3 = player_x + math.cos(player_rot_angle - math.pi * 0.75) * poly_size
+            local y3 = player_y + math.sin(player_rot_angle - math.pi * 0.75) * poly_size
+            emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * -1)
+            emit_projectile(x1 + dist_from_player * 0, y1 + dist_from_player * 1)
+            emit_projectile(x2 + dist_from_player * -1, y2 + dist_from_player * 0)
+            emit_projectile(x3 + dist_from_player * 1, y3 + dist_from_player * 0)
+        end
 
         sound_fire_projectile:play() -- Unconventional but works without distraction.
     end
@@ -999,12 +996,13 @@ function draw_player(alpha)
     end
 
     -- #4: Draw Player Shape and Companion Effects
-    if player_action ~= Common.PLAYER_ACTION.IDLE then
+    if player_action == Common.PLAYER_ACTION.COMBO_BESERK_BOOST then
         local prev_line_width = LG.getLineWidth()
         LG.setLineWidth(2.5 * (1 + math.abs(invulnerability_timer)))
 
         local pos_x_, pos_y_ = player_x, player_y
         local poly_size = Config.COMPANION_SIZE -- dest size
+        local dist_from_player = Config.COMPANION_DIST_FROM_PLAYER
 
         -- Draw player triangle
         local x1 = pos_x_ + math.cos(player_rot_angle) * poly_size
@@ -1020,21 +1018,20 @@ function draw_player(alpha)
         local has_companion = true
         if has_companion then
             local game_pulse_freq = lume.clamp(lume.pingpong(math.abs(invulnerability_timer)) + game_freq, 0, 1)
-            local f_size = 2 * smoothstep(PHI, PHI_SQ, game_pulse_freq)
-
+            local f_size = 1 * smoothstep(PHI, PHI_SQ, game_pulse_freq)
             if not Config.IS_GRUG_BRAIN then
                 f_size = 1. -- f_size = player_radius / 4
             end
-            local offset = Config.COMPANION_DIST_FROM_PLAYER
 
+            --[[PERF: Use lookup table of hard-coded coordinates. See `fire_player_projectile`]]
             for y = -1, 1 do
                 for x = -1, 1 do
                     if x == 0 and y == 0 then goto continue_skip_origin end
                     if x == 0 or y == 0 then --[[]]
-                        -- x = x * player_radius / 4
-                        -- y = y * player_radius / 4
-                        LG.print('' .. x .. ' ' .. y, 100 + x * 32, 100 + y * 32)
-                        LG.polygon('line', x1 + offset * x, y1 + offset * y, x2 + offset * x, y2 + offset * y, x3 + offset * x, y3 + offset * y)
+                        local nx = f_size * dist_from_player * x
+                        local ny = f_size * dist_from_player * y
+                        LG.polygon('line', x1 + nx, y1 + ny, x2 + nx, y2 + ny, x3 + nx, y3 + ny)
+                        if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then LG.print('' .. x .. ' ' .. y, arena_w - 100 + x * 32, 100 + y * 32) end
                     end
                     ::continue_skip_origin::
                 end
@@ -1636,18 +1633,14 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-    Shaders.phong_lighting.shade_active_creatures_to_player_pov(function()
-        draw_creatures(alpha) --[[]]
-    end)
-    -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function()
-    --     draw_creatures(alpha)--[[]]
-    -- end)
+    Shaders.phong_lighting.shade_active_creatures_to_player_pov(function() draw_creatures(alpha) end)
+    -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function() draw_creatures(alpha) end)
     -- draw_creatures(alpha)--[[]]
     draw_player_status_bar(alpha)
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
     -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
-    -- draw_player_direction_ray(alpha)
+    if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then draw_player_direction_ray(alpha) end
     draw_player_shield_collectible(alpha)
     draw_player(alpha)
 end

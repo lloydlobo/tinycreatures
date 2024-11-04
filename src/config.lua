@@ -163,7 +163,7 @@ return {
     AIR_RESISTANCE = 0.95, --- Resistance factor between 0 and 1.
     --[[ KEEP IN SYNC ]]
     COMPANION_SIZE = (_player_radius * 1 / (_phi ^ 2)),
-    COMPANION_DIST_FROM_PLAYER = 8 * (_player_radius * 1 / (_phi ^ 2)), -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
+    COMPANION_DIST_FROM_PLAYER = (_phi ^ 3) * (_player_radius * 1 / (_phi ^ 2)), -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
     --[[ KEEP IN SYNC ]]
     CREATURE_EXPECTED_FINAL_HEALED_COUNT = ((_creature_initial_large_count ^ 2) - _creature_initial_large_count), --- @type integer # Double buffer size possible creatures count `initial count ^ 2`
     CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT = _creatures_initial_constant_large_count, -- WARN: Any more than this, and levels above 50 lag
