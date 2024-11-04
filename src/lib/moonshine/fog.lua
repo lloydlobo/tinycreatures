@@ -44,47 +44,62 @@ return function(moonshine)
 	local time
 
 	local shader = love.graphics.newShader([[
-		extern vec3 fog_color = vec3(0.35, 0.48, 0.95);
-		extern int octaves = 4;
-		extern vec2 speed = vec2(0.0, 1.0);
+		extern vec3 fog_color=vec3(.35,.48,.95);
+		extern int octaves=4;
+		extern vec2 speed=vec2(0.,1.);
 		extern float time;
 
 		float rand(vec2 coord)
 		{
-			return fract(sin(dot(coord, vec2(56, 78)) * 1000.0) * 1000.0);
+			return fract(sin(dot(coord,vec2(56,78))*1000.)*1000.);
 		}
 
 		float noise(vec2 coord)
 		{
-			vec2 i = floor(coord); //get the whole number
-			vec2 f = fract(coord); //get the fraction number
-			float a = rand(i); //top-left
-			float b = rand(i + vec2(1.0, 0.0)); //top-right
-			float c = rand(i + vec2(0.0, 1.0)); //bottom-left
-			float d = rand(i + vec2(1.0, 1.0)); //bottom-right
-			vec2 cubic = f * f * (3.0 - 2.0 * f);
-			return mix(a, b, cubic.x) + (c - a) * cubic.y * (1.0 - cubic.x) + (d - b) * cubic.x * cubic.y; //interpolate
+			vec2 i=floor(coord);//get the whole number
+			vec2 f=fract(coord);//get the fraction number
+			float a=rand(i);//top-left
+			float b=rand(i+vec2(1.,0.));//top-right
+			float c=rand(i+vec2(0.,1.));//bottom-left
+			float d=rand(i+vec2(1.,1.));//bottom-right
+			vec2 cubic=f*f*(3.-2.*f);
+			return mix(a,b,cubic.x)+(c-a)*cubic.y*(1.-cubic.x)+(d-b)*cubic.x*cubic.y;//interpolate
 		}
 
-		float fbm(vec2 coord) //fractal brownian motion
+		float fbm(vec2 coord)//fractal brownian motion
 		{
-			float value = 0.0;
-			float scale = 0.5;
-			for (int i = 0; i < octaves; i++)
+			float value=0.;
+			float scale=.5;
+			for(int i=0;i<octaves;i++)
 			{
-				value += noise(coord) * scale;
-				coord *= 2.0;
-				scale *= 0.5;
+				value+=noise(coord)*scale;
+				coord*=2.;
+				scale*=.5;
 			}
 			return value;
 		}
 
-		vec4 effect(vec4 color, Image texture, vec2 tc, vec2 sc)
+		vec4 effect(vec4 color,Image texture,vec2 tc,vec2 sc)
 		{
-			vec2 coord = tc * 20.0;
-			vec2 motion = vec2(fbm(coord + vec2(time * speed.x, time * speed.y)));
-			float final = fbm(coord + motion);
-			return vec4(fog_color, final * 0.5);
+			float f=20.;
+			vec2 coord=tc*f;
+			vec2 motion=vec2(0.);
+			float final=0.;
+
+			// Normalize screen coordinates
+			//vec2 sc=vec2(screen_coords.x/screen.x,screen_coords.y/screen.y);
+	  		float aspect_ratio = 800/450;
+
+     		// glsl idiom for uv (screen)─not uvs (texture)
+			vec2 uv = vec2(sc.x/aspect_ratio,sc.y);
+
+     		// Radial distance from canvas center
+			float d = -exp(length(uv));d=abs(d);
+
+			vec2 disp=vec2(speed.x*time,speed.y*time);
+			motion+=vec2(fbm(coord+disp));
+			final+=fbm(coord+motion);
+			return vec4(fog_color,final*.5);
 		}
 	]])
 

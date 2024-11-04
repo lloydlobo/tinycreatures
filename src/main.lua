@@ -21,7 +21,8 @@ local Timer = require 'timer'
 
 local LG = love.graphics
 local lerp, smoothstep = lume.lerp, lume.smooth
-local PHI, INV_PHI, PI, INV_PI = Config.PHI, Config.INV_PHI, Config.PI, Config.INV_PI
+local PHI, PHI_SQ, INV_PHI, INV_PHI_SQ = Config.PHI, Config.PHI_SQ, Config.INV_PHI, Config.INV_PHI_SQ
+local PI, INV_PI = Config.PI, Config.INV_PI
 
 --
 --
@@ -457,11 +458,20 @@ end
 
 function update_player_trails_this_frame(dt)
     local cs = curr_state
-    player_trails_x[player_trails_index] = cs.player_x
-    player_trails_y[player_trails_index] = cs.player_y
-    player_trails_vel_x[player_trails_index] = cs.player_vel_x
-    player_trails_vel_y[player_trails_index] = cs.player_vel_y
-    player_trails_rot_angle[player_trails_index] = cs.player_rot_angle
+    local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
+
+    -- Interpolate Player Position and Rotation (COPIED FROM `draw_player()`)
+    local player_rot_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
+    local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
+    local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
+    local player_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x, alpha)
+    local player_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y, alpha)
+
+    player_trails_x[player_trails_index] = player_x
+    player_trails_y[player_trails_index] = player_y
+    player_trails_vel_x[player_trails_index] = player_vel_x
+    player_trails_vel_y[player_trails_index] = player_vel_y
+    player_trails_rot_angle[player_trails_index] = player_rot_angle
     player_trails_index = (player_trails_index % Config.PLAYER_MAX_TRAIL_COUNT) + 1
 end
 
@@ -767,7 +777,7 @@ function handle_player_input_this_frame(dt)
         elseif is_boost then
             player_action = Common.PLAYER_ACTION.BOOST
         elseif is_firing then
-            player_action = Common.PLAYER_ACTION.FIRE -- since we are firing
+            player_action = Common.PLAYER_ACTION.FIRING -- since we are firing
         else
             player_action = Common.PLAYER_ACTION.IDLE
         end
@@ -788,9 +798,12 @@ local dest_trail_color = { 0, 0, 0 } --- WARN: Initialize zero value (this is th
 function draw_player_trail(alpha)
     local IS_ENLARGE_PLAYER_TRAIL_ON_DAMAGE = true
 
+    local f = 0. --- @type number Any factor
     local invulnerability_timer = curr_state.player_invulnerability_timer
-    local is_beserker = love.keyboard.isDown('lshift', 'rshift')
-    local is_boost = love.keyboard.isDown 'x'
+
+    local is_beserker = love.keyboard.isDown(Common.CONTROL_KEY.BESERK_LSHIFT, Common.CONTROL_KEY.BESERK_RSHIFT)
+    local is_boost = love.keyboard.isDown(Common.CONTROL_KEY.BOOST)
+
     if is_beserker and is_boost then
         LG.setColor(Common.COLOR.player_beserker_dash_modifier)
     elseif is_beserker then
@@ -800,17 +813,52 @@ function draw_player_trail(alpha)
     else
         LG.setColor(Common.COLOR.player_entity_firing_projectile)
     end
+
     local thickness = Config.PLAYER_TRAIL_THICKNESS
     local frequency = 440 -- Hz
     local amplitude = 1
-    for i = Config.PLAYER_MAX_TRAIL_COUNT, 1, -1 do -- iter in reverse
-        local radius = lerp(thickness, thickness + (amplitude * math.sin(frequency * i)), alpha)
+    local wiggle_rate = 1.0
+    local wiggle_freq = alpha
+    local game_freq = math.sin(game_timer_t * 8) / 8
+    wiggle_freq = smoothstep(wiggle_freq, game_freq, game_freq)
+
+    local last_f = 0.
+    local NI = Config.PLAYER_MAX_TRAIL_COUNT
+    for i = NI, 1, -1 do -- iter in reverse
+        -- local radius = lerp(thickness, thickness + (amplitude * math.sin(frequency * i)), alpha) -- original
+        local radius = lerp(thickness, thickness + (amplitude * math.sin(wiggle_rate * frequency * i)), wiggle_freq)
+
         if Config.Debug.IS_ASSERT then assert(invulnerability_timer <= 1) end
+
         if invulnerability_timer > 0 then -- tween -> swell or shrink up
             local radius_tween = ((radius + (IS_ENLARGE_PLAYER_TRAIL_ON_DAMAGE and 8 or -8)) - radius) * invulnerability_timer
-            radius = lerp(radius + radius_tween, radius, alpha)
+            -- radius = lerp(radius + radius_tween, radius, alpha)
+            radius = lerp(radius + radius_tween, radius, game_freq)
         end
-        LG.circle('fill', player_trails_x[i], player_trails_y[i], radius)
+
+        if is_beserker and is_boost then
+            f = i ^ 1.2
+            f = smoothstep(i, PHI * i, game_freq)
+            f = -f ^ 0.1
+            last_f = f
+            LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
+        elseif is_beserker then
+            -- f = i ^ 1.2
+            -- f = smoothstep(2*i, PHI * i, game_freq)
+            f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
+            f = 1.5 * smoothstep(-f ^ 0.8, -f ^ 0.3, game_freq)
+            last_f = f
+            LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
+        elseif is_boost then
+            f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
+            f = lume.clamp((f / (i ^ 1.2)), 0, 1)
+            last_f = f
+            LG.circle('line', player_trails_x[NI + 1 - i], player_trails_y[NI + 1 - i], radius * f ^ 1.2)
+            LG.circle('line', player_trails_x[NI + 1 - i], player_trails_y[NI + 1 - i], radius * f ^ 1.2)
+        else
+            f, last_f = 1, 1
+            LG.circle('fill', player_trails_x[i], player_trails_y[i], radius)
+        end
     end
 end
 
@@ -859,128 +907,254 @@ function draw_player_direction_ray(alpha)
         end
     end
 end
-
 function draw_player(alpha)
     local cs = curr_state
-
     local IS_EYE_TWINKLE_ENABLE = true
 
-    local juice_frequency = 1 + math.sin(Config.FIXED_FPS * game_timer_dt)
+    -- Frequency-based visual effect
+    -- local juice_frequency = 1 + math.sin(Config.FIXED_FPS * game_timer_dt)
+    local game_freq = lume.clamp(math.sin(4 * game_timer_t) / 4, 0., 1.)
+    local juice_frequency = 1 + game_freq
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
 
-    -- Draw player entity.
-    local player_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
+    -- #1: Interpolate Player Position and Rotation
+    local player_rot_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
     local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
     local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
+    local player_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x, alpha)
+    local player_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y, alpha)
     local player_radius = Config.PLAYER_RADIUS
 
-    local is_interpolate_player = true
-    if is_interpolate_player then
-        local player_speed_x = lerp(prev_state.player_vel_x, cs.player_vel_x * Config.AIR_RESISTANCE, alpha)
-        local player_speed_y = lerp(prev_state.player_vel_y, cs.player_vel_y * Config.AIR_RESISTANCE, alpha)
-        player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
-        player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
-        LG.setColor(Common.COLOR.player_entity_firing_edge_darker)
-        LG.circle('fill', player_x, player_y, Config.PLAYER_RADIUS)
-        -- Draw if Last shield
-        if (cs.player_health == 1) and (love.math.random() < 0.1 * alpha) then
-            local clr = Common.COLOR.creature_healing
-            LG.setColor(clr[1], clr[2], clr[3], lerp(0.2, 0.4, alpha))
-            LG.circle('fill', player_x, player_y, player_radius)
-        end
+    -- #2: Firing Position and Trigger Radius
+    local fire_pos_x = player_x + math.cos(player_rot_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+    local fire_pos_y = player_y + math.sin(player_rot_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+    local firing_trigger_radius = Config.PLAYER_FIRING_EDGE_RADIUS
+    local invulnerability_timer = cs.player_invulnerability_timer
+    local trigger_radius = smoothstep(firing_trigger_radius - 1, firing_trigger_radius, game_freq)
+
+    if invulnerability_timer > 0 then
+        trigger_radius = smoothstep(trigger_radius + (2 * invulnerability_timer), trigger_radius + invulnerability_timer, game_freq * invulnerability_timer)
     end
 
-    -- Draw player inner cornea (black).
-    local player_iris_radius = (
-        (Config.PLAYER_RADIUS * Config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO) --[[]]
-        * (1 + juice_frequency * juice_frequency_damper)
-    )
-    if cs.player_invulnerability_timer > 0 then -- eye winces and widens
-        player_iris_radius = lerp( --
-            player_iris_radius,
-            (player_iris_radius * 1.328),
-            cs.player_invulnerability_timer * alpha
-        )
+    -- #3: Eye Twinkle Effect
+    if IS_EYE_TWINKLE_ENABLE then
+        local inertia_x, inertia_y = 0, 0
+        if love.keyboard.isDown('up', 'w') then
+            inertia_x = player_vel_x + math.cos(player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+            inertia_y = player_vel_y + math.sin(player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+        end
+
+        local is_player_going_backwards = love.keyboard.isDown('down', 's')
+        if is_player_going_backwards then
+            inertia_x = player_vel_x - math.cos(player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+            inertia_y = player_vel_y - math.sin(player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+        end
+
+        inertia_x = player_vel_x * Config.AIR_RESISTANCE
+        inertia_y = player_vel_y * Config.AIR_RESISTANCE
+
+        -- Apply inertia adjustments to firing position
+        local dfactor = (is_player_going_backwards and 0.125 or 0.35)
+        local amplitude_factor = 0.328
+        fire_pos_x = fire_pos_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
+        fire_pos_y = fire_pos_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
     end
+
+    -- #4: Draw Player Shape and Companion Effects
+    if player_action ~= Common.PLAYER_ACTION.IDLE then
+        local prev_line_width = LG.getLineWidth()
+        LG.setLineWidth(2.5 * (1 + math.abs(invulnerability_timer)))
+
+        local poly_size = player_radius * INV_PHI_SQ
+        local pos_x_, pos_y_ = player_x, player_y
+
+        -- Draw player triangle
+        local x1 = pos_x_ + math.cos(player_rot_angle) * poly_size
+        local y1 = pos_y_ + math.sin(player_rot_angle) * poly_size
+        local x2 = pos_x_ + math.cos(player_rot_angle + math.pi * 0.75) * poly_size
+        local y2 = pos_y_ + math.sin(player_rot_angle + math.pi * 0.75) * poly_size
+        local x3 = pos_x_ + math.cos(player_rot_angle - math.pi * 0.75) * poly_size
+        local y3 = pos_y_ + math.sin(player_rot_angle - math.pi * 0.75) * poly_size
+
+        LG.setColor(Common.PLAYER_ACTION_TO_DESATURATED_COLOR[player_action])
+
+        -- Draw companion pulse effect
+        local has_companion = true
+        if has_companion then
+            local game_pulse_freq = lume.clamp(lume.pingpong(math.abs(invulnerability_timer)) + game_freq, 0, 1)
+            local f_size = 2 * smoothstep(PHI, PHI_SQ, game_pulse_freq)
+            local size = f_size * poly_size
+
+            for y = -1, 1 do
+                for x = -1, 1 do
+                    if x == 0 or y == 0 then LG.polygon('line', x1 + size * x, y1 + size * y, x2 + size * x, y2 + size * y, x3 + size * x, y3 + size * y) end
+                end
+            end
+        else
+            LG.polygon('line', x1, y1, x2, y2, x3, y3)
+        end
+
+        LG.setLineWidth(prev_line_width)
+    end
+
+    -- #5: Interpolation and Shield Effects
+    if cs.player_health == 1 and love.math.random() < 0.1 * alpha then
+        LG.setColor(Common.COLOR.creature_healing)
+        LG.circle('fill', player_x, player_y, player_radius)
+    end
+
+    -- #6: Draw Inner Eye (Iris) and Firing Edge
+    local player_iris_radius = Config.PLAYER_RADIUS * Config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO * (1 + juice_frequency * juice_frequency_damper)
+    if cs.player_invulnerability_timer > 0 then
+        player_iris_radius = lerp(player_iris_radius, player_iris_radius * 1.382, cs.player_invulnerability_timer * alpha)
+    end
+
     LG.setColor(Common.COLOR.player_entity)
     LG.circle('fill', player_x, player_y, player_iris_radius)
 
-    -- Draw player player firing trigger • (circle)
-    local fire_pos_x = player_x + math.cos(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
-    local fire_pos_y = player_y + math.sin(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
-    local firing_trigger_radius = Config.PLAYER_FIRING_EDGE_RADIUS
-    local invulnerability_timer = cs.player_invulnerability_timer
-
-    local trigger_radius = lerp( --
-        firing_trigger_radius - 1,
-        firing_trigger_radius - 0,
-        lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.)
-        -- alpha + (invulnerability_timer * 0.5)
-    )
-
-    if invulnerability_timer > 0 then
-        trigger_radius = lerp( --
-            trigger_radius + (3 * invulnerability_timer),
-            trigger_radius + (2 * invulnerability_timer),
-            lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.) * invulnerability_timer
-        )
-    end
-    do -- Simulate the twinkle in eye to go opposite to player's direction
-        if IS_EYE_TWINKLE_ENABLE then
-            local inertia_x = 0
-            local inertia_y = 0
-            do -- Simulate inertia on movement.
-                if love.keyboard.isDown('up', 'w') then
-                    inertia_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
-                    inertia_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
-                end
-                local is_player_going_backwards = not true
-                if love.keyboard.isDown('down', 's') then
-                    is_player_going_backwards = true
-                    reverse_damp_dist = 0.5
-                    inertia_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
-                    inertia_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
-                else
-                    is_player_going_backwards = not true
-                end
-                inertia_x = cs.player_vel_x * Config.AIR_RESISTANCE
-                inertia_y = cs.player_vel_y * Config.AIR_RESISTANCE
-            end
-            do -- Apply inertia to dest position.
-                local dfactor = true and 0.328 or (INV_PHI * 0.8) -- ideal: .328 (distance factor)
-                local amplitude_factor = is_player_going_backwards and 0.125 or 0.35
-                fire_pos_x = fire_pos_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
-                fire_pos_y = fire_pos_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
-            end
-        end
-    end
-    if player_action ~= Common.PLAYER_ACTION.IDLE then
-        local prev_line_width = LG.getLineWidth()
-        LG.setLineWidth(3)
-        do
-            local triangle_size = 0.88 * player_radius
-            local angle = cs.player_rot_angle
-            local pos_x_
-            local pos_y_
-            pos_x_ = player_x
-            pos_y_ = player_y
-            pos_x_ = fire_pos_x
-            pos_y_ = fire_pos_y
-            local x1 = pos_x_ + math.cos(angle) * triangle_size -- ze pointy end
-            local y1 = pos_y_ + math.sin(angle) * triangle_size
-            local x2 = pos_x_ + math.cos(angle + PI * 0.75) * triangle_size
-            local y2 = pos_y_ + math.sin(angle + PI * 0.75) * triangle_size
-            local x3 = pos_x_ + math.cos(angle - PI * 0.75) * triangle_size
-            local y3 = pos_y_ + math.sin(angle - PI * 0.75) * triangle_size
-            LG.setColor(Common.PLAYER_ACTION_TO_COLOR[player_action])
-            LG.polygon('line', x1, y1, x2, y2, x3, y3)
-        end
-        LG.setLineWidth(prev_line_width)
-    else
-        LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
-        LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
-    end
+    LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
+    LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
 end
+
+-- function draw_player(alpha)
+--     local cs = curr_state
+
+--     local IS_EYE_TWINKLE_ENABLE = true
+
+--     local juice_frequency = 1 + math.sin(Config.FIXED_FPS * game_timer_dt)
+--     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
+
+--     -- Draw player entity.
+--     local player_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
+--     local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
+--     local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
+--     local player_radius = Config.PLAYER_RADIUS
+
+--     -- #region fire_pos_x
+--     -- Draw player player firing trigger • (circle)
+--     local fire_pos_x = player_x + math.cos(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+--     local fire_pos_y = player_y + math.sin(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
+--     local firing_trigger_radius = Config.PLAYER_FIRING_EDGE_RADIUS
+--     local invulnerability_timer = cs.player_invulnerability_timer
+--     local t_ = lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.)
+--     local trigger_radius = lerp(firing_trigger_radius - 1, firing_trigger_radius - 0, t_)
+--     if invulnerability_timer > 0 then
+--         t_ = lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.) * invulnerability_timer
+--         trigger_radius = lerp(trigger_radius + (3 * invulnerability_timer), trigger_radius + (2 * invulnerability_timer), t_)
+--     end
+--     do -- Simulate the twinkle in eye to go opposite to player's direction
+--         if IS_EYE_TWINKLE_ENABLE then
+--             local inertia_x = 0
+--             local inertia_y = 0
+--             do -- Simulate inertia on movement.
+--                 if love.keyboard.isDown('up', 'w') then
+--                     inertia_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+--                     inertia_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+--                 end
+--                 local is_player_going_backwards = not true
+--                 if love.keyboard.isDown('down', 's') then
+--                     is_player_going_backwards = true
+--                     reverse_damp_dist = 0.5
+--                     inertia_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+--                     inertia_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
+--                 else
+--                     is_player_going_backwards = not true
+--                 end
+--                 inertia_x = cs.player_vel_x * Config.AIR_RESISTANCE
+--                 inertia_y = cs.player_vel_y * Config.AIR_RESISTANCE
+--             end
+--             do -- Apply inertia to dest position.
+--                 local dfactor = true and 0.328 or (INV_PHI * 0.8) -- ideal: .328 (distance factor)
+--                 local amplitude_factor = is_player_going_backwards and 0.125 or 0.35
+--                 fire_pos_x = fire_pos_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
+--                 fire_pos_y = fire_pos_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
+--             end
+--         end
+--     end
+--     -- TODO: THIS CAN ALSO BE USED FOR SIGNALING WHERE POWER-UPS OR COLLECTIBLES ARE
+--     if player_action ~= Common.PLAYER_ACTION.IDLE then
+--         local prev_line_width = LG.getLineWidth()
+--         LG.setLineWidth(2.5 * (1. + math.abs(invulnerability_timer)))
+--         do
+--             local triangle_size = player_radius * INV_PHI_SQ
+--             local angle = cs.player_rot_angle
+--             local pos_x_
+--             local pos_y_
+--             pos_x_ = player_x
+--             pos_y_ = player_y
+--             -- pos_x_ = fire_pos_x
+--             -- pos_y_ = fire_pos_y
+--             local x1 = pos_x_ + math.cos(angle) * triangle_size -- ze pointy end
+--             local y1 = pos_y_ + math.sin(angle) * triangle_size
+--             local x2 = pos_x_ + math.cos(angle + PI * 0.75) * triangle_size
+--             local y2 = pos_y_ + math.sin(angle + PI * 0.75) * triangle_size
+--             local x3 = pos_x_ + math.cos(angle - PI * 0.75) * triangle_size
+--             local y3 = pos_y_ + math.sin(angle - PI * 0.75) * triangle_size
+--             LG.setColor(Common.PLAYER_ACTION_TO_DESATURATED_COLOR[player_action])
+
+--             local has_companion = true -- NOTE: Unimplemented
+--             if has_companion then
+--                 local pulse_freq = lume.clamp(lume.pingpong(math.abs(invulnerability_timer)) + math.sin(game_timer_t * 2) / 2, 0.0, 1.)
+--                 pulse_freq = pulse_freq ^ 1.2 -- more tighter curves
+
+--                 local f_companion = 2 * smoothstep(PHI, INV_PHI, pulse_freq)
+--                 for y = -1, 1 do
+--                     for x = -1, 1 do
+--                         local nx, ny = f_companion * triangle_size * x, f_companion * triangle_size * y
+--                         local is_any_corner = x ~= 0 and y ~= 0
+--                         if is_any_corner then goto continue end
+--                         LG.polygon('line', x1 + nx, y1 + ny, x2 + nx, y2 + ny, x3 + nx, y3 + ny)
+--                         ::continue::
+--                     end
+--                 end
+--             else
+--                 LG.polygon('line', x1, y1, x2, y2, x3, y3)
+--             end
+
+--             local has_outer_ring = not true
+--             if has_outer_ring then --
+--                 LG.circle('line', player_x, player_y, lerp(player_radius + 4, player_radius - 4, math.abs(invulnerability_timer)))
+--             end
+--         end
+--         LG.setLineWidth(prev_line_width)
+--     else
+--     end
+--     -- #endregion fire_pos_x
+
+--     local is_interpolate_player = true
+--     if is_interpolate_player then
+--         local player_speed_x = lerp(prev_state.player_vel_x, cs.player_vel_x * Config.AIR_RESISTANCE, alpha)
+--         local player_speed_y = lerp(prev_state.player_vel_y, cs.player_vel_y * Config.AIR_RESISTANCE, alpha)
+--         player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
+--         player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
+--         LG.setColor(Common.COLOR.player_entity_firing_edge_darker)
+--         LG.circle('fill', player_x, player_y, Config.PLAYER_RADIUS)
+--         -- Draw if Last shield
+--         if (cs.player_health == 1) and (love.math.random() < 0.1 * alpha) then
+--             local clr = Common.COLOR.creature_healing
+--             LG.setColor(clr[1], clr[2], clr[3], lerp(0.2, 0.4, alpha))
+--             LG.circle('fill', player_x, player_y, player_radius)
+--         end
+--     end
+
+--     -- Draw player inner cornea (black).
+--     local player_iris_radius = (
+--         (Config.PLAYER_RADIUS * Config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO) --[[]]
+--         * (1 + juice_frequency * juice_frequency_damper)
+--     )
+--     if cs.player_invulnerability_timer > 0 then -- eye winces and widens
+--         player_iris_radius = lerp( --
+--             player_iris_radius,
+--             (player_iris_radius * 1.328),
+--             cs.player_invulnerability_timer * alpha
+--         )
+--     end
+--     LG.setColor(Common.COLOR.player_entity)
+--     LG.circle('fill', player_x, player_y, player_iris_radius)
+
+--     LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
+--     LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
+-- end
 
 local temp_last_ouch_x = nil
 local temp_last_ouch_y = nil
@@ -1127,7 +1301,7 @@ function _draw_active_creature(i, alpha)
     local origin_y = radius
     local rgb = Common.COLOR.creature_infected -- !!!! can this paint them individually with set color
 
-    creatures_sprite_batch:setColor(rgb) ---@diagnostic disable-line: param-type-mismatch
+    creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3], 1.) ---@diagnostic disable-line: param-type-mismatch
     creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 end
 
@@ -1261,9 +1435,12 @@ function _draw_background_shader(alpha)
         local scale = radius * 0.03125 -- Scale based on original circle radius as 32 was parallax entity image size
         local origin_x = radius
         local origin_y = radius
+
         -- bg_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
         -- bg_parallax_sprite_batch:setColor(0.025, 0.015, 0.10, point_alpha)
-        bg_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, 1.) -- PERF: prevent drawing transluscent or textures with alpha?
+
+        bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, 1.) -- PERF: prevent drawing transluscent or textures with alpha?
+        -- bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, point_alpha)
         bg_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
     end
     LG.setColor(1, 1, 1, 1) -- Reset color before drawing
@@ -1410,12 +1587,17 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-    Shaders.phong_lighting.shade_active_creatures_to_player_pov(function() draw_creatures(alpha) end)
-    -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function() draw_creatures(alpha) end)
+    Shaders.phong_lighting.shade_active_creatures_to_player_pov(function()
+        draw_creatures(alpha) --[[]]
+    end)
+    -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function()
+    --     draw_creatures(alpha)--[[]]
+    -- end)
+    -- draw_creatures(alpha)--[[]]
     draw_player_status_bar(alpha)
     draw_player_fired_projectiles(alpha)
-    -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
     draw_player_trail(alpha)
+    -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
     -- draw_player_direction_ray(alpha)
     draw_player_shield_collectible(alpha)
     draw_player(alpha)
@@ -1590,11 +1772,31 @@ function load_shaders()
     --- @field background table
     --- @field post_processing table
     moonshine_love_shaders = {
-        background = moonshine(arena_w, arena_h, fx.chromasep).chain(fx.fastgaussianblur).chain(fx.colorgradesimple).chain(fx.vignette),
-        post_processing = moonshine(arena_w, arena_h, fx.godsray).chain(fx.chromasep).chain(fx.colorgradesimple).chain(fx.vignette),
+        background = moonshine(
+                arena_w,
+                arena_h, --
+                fx.desaturate --
+            )--[[]]
+            .chain(
+                fx.glow --
+            ) --[[]]
+            .chain(
+                fx.fastgaussianblur --
+            ) --[[]],
+        post_processing = moonshine(arena_w, arena_h, fx.godsray) --[[]]
+            -- .chain(fx.chromasep)
+            -- .chain(fx.colorgradesimple)
+            .chain(fx.vignette),
+        fog = moonshine(arena_w, arena_h, fx.fog),
     }
 
     -- Setup moonshine shaders
+    if true then
+        -- moonshine_love_shaders.fog.fog.fog_color = { 0.1, 0.0, 0.0 }
+        moonshine_love_shaders.fog.fog.fog_color = { 0.0, 0.0, 0.0 }
+        moonshine_love_shaders.fog.fog.speed = { 0.2, 0.9 }
+        moonshine_love_shaders.fog.fog.octaves = 1
+    end
     if true then
         if not true then
             moonshine_love_shaders.background.pixelate.size = { 4, 4 } -- Default: {5, 5}
@@ -1608,8 +1810,10 @@ function load_shaders()
             moonshine_love_shaders.background.godsray.samples = 48 -- lower sample helps to spread out rays
             moonshine_love_shaders.background.godsray.weight = ({ 0.65, 0.45, 0.65 })[Config.CURRENT_THEME]
         end
-        moonshine_love_shaders.background.chromasep.angle = 180 -- 180 light from above reflects rays downwards
-        moonshine_love_shaders.background.chromasep.radius = 3
+        if not true then
+            moonshine_love_shaders.background.chromasep.angle = 180 -- 180 light from above reflects rays downwards
+            moonshine_love_shaders.background.chromasep.radius = 3
+        end
         if Config.MoonshineShaderSettings.scanlines.enable then
             moonshine_love_shaders.background.scanlines.opacity = 1 * (1 - INV_PHI)
             moonshine_love_shaders.background.scanlines.thickness = 2 * INV_PHI
@@ -1658,9 +1862,9 @@ function load_shaders()
         moonshine_love_shaders.post_processing.godsray.weight = ({ 0.50, 0.45, 0.65 })[Config.CURRENT_THEME]
     end
     if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-        moonshine_love_shaders.post_processing.vignette.radius = 0.8 + 0.1 -- avoid health bar at the top
-        moonshine_love_shaders.post_processing.vignette.softness = (0.5 + 0.2)
-        moonshine_love_shaders.post_processing.vignette.opacity = 0.5 + 0.1 -- + 0.3
+        moonshine_love_shaders.post_processing.vignette.radius = 0.8 * PHI -- avoid health bar at the top
+        -- moonshine_love_shaders.post_processing.vignette.softness = (1.5 - 0.5)
+        -- moonshine_love_shaders.post_processing.vignette.opacity = 0.5 + 0.1 -- + 0.3
         -- shaders.post_processing.vignette.color = common.Color.background
     end
 end
@@ -1888,7 +2092,8 @@ function love.load()
     reset_game()
 
     -- NOTE: Background shaders over-write this... but this may be useful for menus...
-    LG.setBackgroundColor(Common.COLOR.BACKGROUND)
+    -- LG.setBackgroundColor(Common.COLOR.BACKGROUND)
+    LG.setBackgroundColor(0.1, 0.1, 0.1)
 
     -- Master volume
     love.audio.setVolume(not Config.Debug.IS_DEVELOPMENT and 1.0 or 0.5) -- volume # number # 1.0 is max and 0.0 is off.
@@ -1916,8 +2121,11 @@ function love.update(dt)
 
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
-    glsl_love_shaders.gradient_timemod:send('time', love.timer.getTime())
-    glsl_love_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() })
+    do
+        glsl_love_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() })
+        glsl_love_shaders.gradient_timemod:send('time', love.timer.getTime())
+        moonshine_love_shaders.fog.fog.time = game_timer_t
+    end
 
     -- #4 Frame Rate Independence: Fixed timestep loop.
     local fixed_dt = Config.FIXED_DT
@@ -1932,19 +2140,26 @@ function love.update(dt)
     update_screenshake(dt)
 end
 
+local has_background = true
 function love.draw()
     LG.clear(1, 1, 1, 1) -- this clears crt and background color each frame start
+
     if Config.Debug.IS_ASSERT then assert_consistent_state() end
+
     local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
+
     moonshine_love_shaders.post_processing(function()
         do
             LG.setShader(glsl_love_shaders.gradient_timemod)
-            LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
-            glsl_love_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() }) -- or use getDimension()???  -- shouldn't this be in update???
-            do -- draw here
-                draw_background_shader(alpha)
+            if has_background then
+                LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
             end
+            draw_background_shader(alpha)
             LG.setShader() -- > background_gradient_shader
+        end
+        do
+            moonshine_love_shaders.fog(function() draw_background_shader(alpha) end)
+            -- moonshine_love_shaders.fog(function() end)
         end
         -- • Objects that are partially off the edge of the screen can be seen on the other side.
         -- • Coordinate system is translated to different positions and everything is drawn at each position around the screen and in the center.
@@ -1958,9 +2173,11 @@ function love.draw()
                 draw_game(alpha)
             end
         end
+        -- moonshine_love_shaders.fog(function() draw_player(alpha) end)
 
         LG.origin() -- Reverse any previous calls to love.graphics.
     end)
+
     if is_debug_hud_enable then draw_hud() end
     if is_debug_hud_enable then draw_debug_hud() end
 end
