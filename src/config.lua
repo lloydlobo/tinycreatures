@@ -57,6 +57,7 @@ local _CREATURE_STAGES = {
 
 local _player_accel = ({ 150, 200, 300 })[_speed_mode]
 local _player_radius = math.min(_CREATURE_STAGES[1].radius * _phi, (32 * 0.61) - 4)
+local _companion_size = (_player_radius / (_phi ^ 4))
 
 --- @class (exact) MoonshineShaderSettings
 --- @field bloom_intensity { enable: boolean, amount: number }
@@ -161,13 +162,15 @@ return {
     --
 
     AIR_RESISTANCE = 0.95, --- Resistance factor between 0 and 1.
+
     --[[ KEEP IN SYNC ]]
-    COMPANION_SIZE = (_player_radius * 1 / (_phi ^ 2)),
-    COMPANION_DIST_FROM_PLAYER = (_phi ^ 3) * (_player_radius * 1 / (_phi ^ 2)), -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
+    COMPANION_SIZE = _companion_size,
+    COMPANION_DIST_FROM_PLAYER = (_phi ^ 5) * _companion_size, -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
     --[[ KEEP IN SYNC ]]
+
     CREATURE_EXPECTED_FINAL_HEALED_COUNT = ((_creature_initial_large_count ^ 2) - _creature_initial_large_count), --- @type integer # Double buffer size possible creatures count `initial count ^ 2`
     CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT = _creatures_initial_constant_large_count, -- WARN: Any more than this, and levels above 50 lag
-    CREATURE_INTIAL_LARGE_STAGE_COUNT = _creature_initial_large_count, --- @type integer # This count excludes the initial ancestor count.
+    CREATURE_INTIAL_LARGE_STAGE_COUNT = _creature_initial_large_count, --- @type integer # This count excludes the initial ancestor count.k
     CREATURE_MAX_RADIUS = _CREATURE_STAGES[#_CREATURE_STAGES].radius,
     CREATURE_MAX_SPEED = _CREATURE_STAGES[1].speed,
     CREATURE_MIN_RADIUS = _CREATURE_STAGES[1].radius,
@@ -183,7 +186,7 @@ return {
     LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 8, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = _inv_phi * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
+    LASER_RADIUS = (_inv_phi ^ 1.5) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
     PARALLAX_ENTITY_MAX_COUNT = (2 ^ 3),
     PARALLAX_ENTITY_MAX_DEPTH = 4, --- @type integer

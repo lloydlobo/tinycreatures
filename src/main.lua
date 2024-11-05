@@ -1130,7 +1130,12 @@ function draw_player(alpha)
         local x3 = pos_x_ + math.cos(player_rot_angle - math.pi * 0.75) * poly_size
         local y3 = pos_y_ + math.sin(player_rot_angle - math.pi * 0.75) * poly_size
 
-        LG.setColor(Common.PLAYER_ACTION_TO_DESATURATED_COLOR[player_action])
+        -- Triangle color same as companion mode??
+        -- PERF: Batch draw companions.
+        do
+            -- LG.setColor(Common.PLAYER_ACTION_TO_DESATURATED_COLOR[player_action])
+            LG.setColor(0.8, 0.9, 1.0)
+        end
 
         -- Draw companion pulse effect
         local has_companion = true
@@ -1681,60 +1686,68 @@ function draw_game(alpha)
         draw_player_direction_ray(alpha)
     end
     draw_player_shield_collectible(alpha)
-    curr_state:draw_player_collectible_indicators(alpha)
     draw_player(alpha)
+    curr_state:draw_player_collectible_indicators(alpha)
 end
 
+local COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR = 1.75
+local COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER = 16
+
 local _t_points_player_and_collectible = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+local __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ = not true
 function curr_state:draw_player_collectible_indicators(alpha)
-    --[[]]
+    --[[  UPDATE  ]]
 
     local src_x = self.player_x
     local src_y = self.player_y
     local dest_x = player_shield_collectible_pos_x
     local dest_y = player_shield_collectible_pos_y
+
     local is_spawn = dest_x ~= nil and dest_y ~= nil
-    local __TEMP_OVERRIDE__ = not true
     if is_spawn then
         --- @cast dest_x number
         --- @cast dest_y number
 
+        -- Get distance, angle between player and collectible.
         local _t = _t_points_player_and_collectible
-        _t.x1 = src_x
-        _t.y1 = src_y
-        _t.x2 = dest_x
-        _t.y2 = dest_y
+        do
+            -- Does this help with caching?
+            _t.x1 = src_x
+            _t.y1 = src_y
+            _t.x2 = dest_x
+            _t.y2 = dest_y
+        end
+
         local dist = Common.manhattan_distance(_t_points_player_and_collectible)
         local dx = _t.x2 - _t.x1
         local dy = _t.y2 - _t.y1
-        ---@diagnostic disable-next-line: deprecated # WARN: math.atan leads to weird behavior
-        local angle_radians = math.atan2(dy, dx)
+        --[[@diagnostic disable-next-line: deprecated # WARN: math.atan leads to weird behavior]]
+        local angle = math.atan2(dy, dx)
+
+        --[[  DRAW  ]]
 
         -- Draw indicator.
-        do
-            local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
-            local scale0 = smoothstep(2.20 - game_freq, 2.20 + game_freq, game_freq)
-            LG.setColor(1, 1, 1, 1.0)
-            LG.print('»', src_x, src_y, angle_radians, scale0, scale0, -10, 10)
-            local scale1 = smoothstep(1.5 - game_freq, 1.5 + game_freq, game_freq)
-            LG.setColor(0.5, 0.8, 0.8, 1.0)
-            LG.print('»', src_x, src_y, angle_radians, scale1, scale1, -10, 10)
-            local scale2 = smoothstep(2.0 - game_freq, 2.0 + game_freq, game_freq)
-            LG.setColor(1.0, 0.5, 0.7, 1.0)
-            LG.print('»', src_x, src_y, angle_radians, scale2, scale2, -10, 10)
-            LG.setColor(1, 1, 1) -- reset
-        end
+        local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
+        local f_scale = COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR
+        local scale0 = smoothstep(f_scale - game_freq, f_scale + game_freq, game_freq)
+
+        -- Just enough to avoid overlapping with player trail
+        local ox = -COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
+        local oy = COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
+
+        LG.setColor(0.1, 1., 0.4, 1)
+        LG.print('»', src_x, src_y, angle, scale0, scale0, ox, oy)
 
         -- Debug coordinates.
-        if __TEMP_OVERRIDE__ or (Config.Debug.IS_TRACE_ENTITIES and Config.Debug.IS_DEVELOPMENT) then
+        if __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ or (Config.Debug.IS_TRACE_ENTITIES and Config.Debug.IS_DEVELOPMENT) then
             LG.setColor(1, 1, 0, 0.8)
             LG.line(src_x, src_y, _t.x2, _t.y2)
             LG.setColor(0, 1, 1, 1.0)
-            LG.print(('%.2f dist'):format(dist), _t.x2, _t.y2, (PI * 0.5) + angle_radians, PHI, PHI, -8, -8)
+            LG.print(('%.2f dist'):format(dist), _t.x2, _t.y2, (PI * 0.5) + angle, PHI, PHI, -8, -8)
             LG.setColor(0.2, 1.0, 0.8)
-            LG.print(('%.2f rad'):format(angle_radians), _t.x2, _t.y2, angle_radians, 2, 2, -4, 4)
+            LG.print(('%.2f rad'):format(angle), _t.x2, _t.y2, angle, 2, 2, -4, 4)
             LG.setColor(0.5, 0.5, 0.8, 1.0)
-            LG.print(('%.2f deg'):format(math.deg(angle_radians)), _t.x2, _t.y2, (0.25 * PI) + angle_radians, 2.5, 2.5)
+            LG.print(('%.2f deg'):format(math.deg(angle)), _t.x2, _t.y2, (0.25 * PI) + angle, 2.5, 2.5)
         end
     end
 end
@@ -2251,7 +2264,7 @@ function love.draw()
 
             --- PERF: A glow radial gradient texture may help shader switch calls
             Shaders.phong_lighting.shade_any_to_player_pov(function()
-                LG.setColor(1, 1, 1, 1)
+                -- LG.setColor(1, 1, 1, 1)
                 LG.rectangle('fill', 0, 0, arena_w, arena_h)
             end)
             LG.setBlendMode(blend_mode)
