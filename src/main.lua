@@ -2238,8 +2238,9 @@ function love.draw()
             local blend_mode = LG.getBlendMode()
             LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied') -- screen|lighten work well
 
+            --- PERF: A glow radial gradient texture may help shader switch calls
             Shaders.phong_lighting.shade_any_to_player_pov(function()
-                LG.setColor(0, 1, 1, 0.0)
+                LG.setColor(1, 1, 1, 1)
                 LG.rectangle('fill', 0, 0, arena_w, arena_h)
             end)
             LG.setBlendMode(blend_mode)
