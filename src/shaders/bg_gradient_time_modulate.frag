@@ -2,11 +2,12 @@ extern vec2 screen;
 extern float time;//> love.timer.getTime()
 
 // See also http://dev.thi.ng/gradients/
+// green-cyan [[0.000 0.500 0.500] [0.000 0.500 0.500] [0.000 0.333 0.500] [0.000 0.667 0.500]]
 vec3 palette(float t){
-     vec3 a=vec3(1.,.5,.5);
-     vec3 b=vec3(.0275,.0196,.0196);
-     vec3 c=vec3(.75,1.,.667);
-     vec3 d=vec3(.8,1.,.333);
+     vec3 a=vec3(0.,.5,.5);
+     vec3 b=vec3(0.,.5,.5);
+     vec3 c=vec3(.0,.333,.5);
+     vec3 d=vec3(.0,.6667,.500);
      
      return a+b*cos(6.28318*(c*t+d));
 }
@@ -34,8 +35,22 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      vec3 col=vec3(0.);
      vec3 final_col=vec3(0.);
      
-     for(float i=1.;i<5.;++i){
-          f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i;/*f/=i;*/
+     float t=.0625*time;
+     
+     // Debug simulation time
+     // t*=.5;
+     t*=2.;
+     float f_smooth_d=.25;
+     
+     for(float i=1.;i<4.;++i){
+          // f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i;/*f/=i;*/
+          
+          float width=1.;
+          
+          // #1 Fade to night
+          // width/=clamp(pow(d,4)*pow(i,4),-32,32);
+          
+          f=.5-.5*sin(width*uv[0]*3.14159+t)*i;/*f/=i;*/
           
           // Color this iteration
           col=vec3(d,uv[0]-f,uv[1]-f);col/=i;
@@ -43,11 +58,25 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
           // Accentuate darker contrast
           d=pow(d,1.2);d=abs(d);
           
+          // Seed from cosine gradient generator palette
+          col.r/=mix(palette(t).r,col.r,clamp((sin(t/d)/8)/i,.382,1.));
+          
+          col.gb+=.125*mix(palette(i*(-t)).gb,col.gb,clamp(f/i,.382,.618));
+          
+          // Inverted gradient across screen
+          col.r*=pow(f/i,4.*sin(t*pow(.5*d,f_smooth_d)));
+          
+          // #2 Fade to night
+          // col*=f/pow(i,.5);
+          
           // Feather radient edges
           col.gb*=clamp(1.-sin(uvs/d)/i,.1,.8);col.gb*=col.gb/d;
           
           final_col+=col;
      }
+     
+     // Darken
+     // final_col*=.8;
      
      return pixel*vec4(final_col,1.);// red-pink-yellow
 }
