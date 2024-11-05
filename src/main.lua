@@ -275,14 +275,16 @@ function fire_player_projectile() --- Fire projectile from players's position.
     end
 end
 
-local MAX_SPEED_BOOST_MULTIPLIER = 1.05 -- PHI
+local MAX_SPEED_BOOST_MULTIPLIER = 1.25
 local IS_SMOOTH_BOOST = true
 --- TODO: Use dash timer for Renderer to react to it, else use key event to detect dash (hack).
 function boost_player_entity_speed(dt)
     local cs = curr_state
     local prev_vel_x = cs.player_vel_x
     local prev_vel_y = cs.player_vel_y
-    local ease = INV_PHI
+    local game_freq = lume.clamp(math.sin(4 * game_timer_t) / 2, 0., 1.)
+    local ease = smoothstep(game_freq ^ 0.8, game_freq ^ 1.2, game_freq) --* PHI
+
     -- can use lerp here for smooth speed easing
     if IS_SMOOTH_BOOST then
         cs.player_vel_x = smoothstep(prev_vel_x, prev_vel_x * MAX_SPEED_BOOST_MULTIPLIER, ease)
@@ -821,6 +823,8 @@ function handle_player_input_this_frame(dt)
     do
         if is_boosting then
             player_action = Common.PLAYER_ACTION.BOOST
+            -- cs.player_invulnerability_timer = 1.0 - cs.player_invulnerability_timer
+            cs.player_invulnerability_timer = 1.0
         elseif has_companions then
             player_action = Common.PLAYER_ACTION.COMPANION
         elseif is_stop_and_beserk_in_place then
@@ -865,7 +869,8 @@ function draw_player_trail(alpha)
     local amplitude = 1
     local wiggle_rate = 1.0
     local wiggle_freq = alpha
-    local game_freq = math.sin(game_timer_t * 8) / 8
+    -- local game_freq = math.sin(game_timer_t * 8) / 8
+    local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
     wiggle_freq = smoothstep(wiggle_freq, game_freq, game_freq)
 
     local last_f = 0.
@@ -1439,7 +1444,7 @@ end
 
 function draw_background_shader(alpha)
     if Config.IS_GAME_SLOW then
-        moonshine_love_shaders.background(function() _draw_background_shader(alpha) end)
+        moonshine_shaders.background(function() _draw_background_shader(alpha) end)
     else
         _draw_background_shader(alpha)
     end
@@ -1511,8 +1516,9 @@ function draw_player_status_bar(alpha)
             LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
             local invulnerable_tween = invulnerability_timer
             if Config.IS_GRUG_BRAIN then invulnerable_tween = lerp(invulnerability_timer - game_timer_dt, invulnerability_timer, alpha) end
-            LG.setColor(0, 1, 1) -- cyan?????
-            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, invulnerability_bar_height * sh) -- current invulnerability
+            -- LG.setColor(0, 1, 1) -- cyan?????
+            LG.setColor(Common.COLOR.player_boost_dash_modifier) -- recharging ...
+            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, 1 + invulnerability_bar_height * sh) -- current invulnerability
         else
             temp_last_ouch_x = nil
             temp_last_ouch_y = nil
@@ -1558,7 +1564,7 @@ function draw_keybindings_text()
     local cs = curr_state
     local player_x = cs.player_x
     local player_y = cs.player_y
-    local target_distance = 320
+    local target_distance = 300
 
     -- Calculate wrapped distance along the x and y axis.
     local dx = math.min(math.abs(player_x - x), arena_w - math.abs(player_x - x))
@@ -1567,7 +1573,7 @@ function draw_keybindings_text()
     -- Calculate the Manhattan distance using wrapped coordinates
     local distance = dx + dy
     if distance <= target_distance then
-        local f = math.min(1.0, (target_distance - distance) / target_distance)
+        local f = lume.clamp(math.min(1.0, (target_distance - distance) / target_distance), 0.0, 1.)
         LG.setColor(1., 1., 1., 1. * f)
         LG.print([[Z-beserk  X-boost  C-companions SPC-fire]], x, y, 0., 0.9, 0.9)
     end
@@ -1694,14 +1700,12 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
-    Shaders.phong_lighting.shade_active_creatures_to_player_pov(function() draw_creatures(alpha) end)
+    draw_creatures(alpha)
+
     -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function() draw_creatures(alpha) end)
     -- draw_creatures(alpha)--[[]]
-    do
-        draw_keybindings_text()
-        draw_timer_text()
-        draw_player_status_bar(alpha)
-    end
+
+    draw_keybindings_text()
 
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
@@ -1862,11 +1866,11 @@ end
 function load_shaders()
     Shaders = require 'shaders'
 
-    --- @class (exact) glsl_love_shaders
+    --- @class (exact) GlslShaders
     --- @field gradient_basic love.Shader
     --- @field gradient_timemod love.Shader
     --- @field lighting_phong love.Shader
-    glsl_love_shaders = {
+    glsl_shaders = {
         gradient_basic = LG.newShader(Shaders.bg_gradient.glsl_frag),
         gradient_timemod = LG.newShader(Shaders.bg_gradient_time_modulate.glsl_frag),
         lighting_phong = LG.newShader(Shaders.phong_lighting.glsl_frag),
@@ -1876,57 +1880,20 @@ function load_shaders()
     local moonshine = require 'lib.moonshine'
     local fx = moonshine.effects
 
-    --- @class (exact) moonshine_love_shaders
-    --- @field background table
+    --- @class (exact) MoonshineShaders
     --- @field post_processing table
-    moonshine_love_shaders = {
-        background = moonshine(
-                arena_w,
-                arena_h, --
-                fx.desaturate --
-            )--[[]]
-            .chain(
-                fx.glow --
-            ) --[[]]
-            .chain(
-                fx.fastgaussianblur --
-            ) --[[]],
-        post_processing = moonshine(arena_w, arena_h, fx.godsray) --[[]]
-            -- .chain(fx.chromasep)
-            -- .chain(fx.colorgradesimple)
-            .chain(fx.vignette),
-        fog = moonshine(arena_w, arena_h, fx.fog),
+    --- @field fog table
+    moonshine_shaders = {
+        post_processing = moonshine(arena_w, arena_h, fx.godsray).chain(fx.colorgradesimple).chain(fx.vignette),
+        fog = moonshine(arena_w, arena_h, fx.fog).chain(fx.desaturate) --[[ .chain(fx.chromasep) ]],
     }
 
     -- Setup moonshine shaders
     if true then
         -- moonshine_love_shaders.fog.fog.fog_color = { 0.1, 0.0, 0.0 }
-        moonshine_love_shaders.fog.fog.fog_color = { 0.0, 0.0, 0.0 }
-        moonshine_love_shaders.fog.fog.speed = { 0.2, 0.9 }
-        moonshine_love_shaders.fog.fog.octaves = 1
-    end
-    if true then
-        if not true then
-            moonshine_love_shaders.background.pixelate.size = { 4, 4 } -- Default: {5, 5}
-            moonshine_love_shaders.background.pixelate.feedback = INV_PHI -- Default: 0
-        end
-        if not true then
-            moonshine_love_shaders.background.godsray.decay = ({ 0.80, 0.69, 0.70 })[Config.CURRENT_THEME] -- Choices: dark .60|light .75
-            moonshine_love_shaders.background.godsray.density = 0.15 -- WARN: Performance Hog!
-            moonshine_love_shaders.background.godsray.exposure = ({ 0.32, 0.125, 0.25 })[Config.CURRENT_THEME]
-            moonshine_love_shaders.background.godsray.light_position = { 0.50, -0.99 } -- twice the height above ((rays from top))
-            moonshine_love_shaders.background.godsray.samples = 48 -- lower sample helps to spread out rays
-            moonshine_love_shaders.background.godsray.weight = ({ 0.65, 0.45, 0.65 })[Config.CURRENT_THEME]
-        end
-        if not true then
-            moonshine_love_shaders.background.chromasep.angle = 180 -- 180 light from above reflects rays downwards
-            moonshine_love_shaders.background.chromasep.radius = 3
-        end
-        if Config.MoonshineShaderSettings.scanlines.enable then
-            moonshine_love_shaders.background.scanlines.opacity = 1 * (1 - INV_PHI)
-            moonshine_love_shaders.background.scanlines.thickness = 2 * INV_PHI
-            moonshine_love_shaders.background.scanlines.width = 3 -- * 0.25 (HIGHER VALUES GIVE TRIPPY WATERY HORIZONTAL LINE VIBES FOR BG SHADER on low_light background)
-        end
+        moonshine_shaders.fog.fog.fog_color = { 0.0, 0.0, 0.0 }
+        moonshine_shaders.fog.fog.speed = { 0.2, 0.9 }
+        moonshine_shaders.fog.fog.octaves = 1
     end
     if Config.MoonshineShaderSettings.chromatic_abberation.enable then
         local mode_settings = {
@@ -1936,8 +1903,8 @@ function load_shaders()
         }
         local mode = Config.MoonshineShaderSettings.chromatic_abberation.mode
         local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
-        moonshine_love_shaders.post_processing.chromasep.angle = settings.angle
-        moonshine_love_shaders.post_processing.chromasep.radius = settings.radius
+        moonshine_shaders.post_processing.chromasep.angle = settings.angle
+        moonshine_shaders.post_processing.chromasep.radius = settings.radius
     end
     if Config.MoonshineShaderSettings.curved_monitor.enable then
         local mode_settings = {
@@ -1948,32 +1915,31 @@ function load_shaders()
         local minimal = mode_settings.minimal
         local advanced = mode_settings.advanced
         local amount = Config.MoonshineShaderSettings.curved_monitor.amount
-        moonshine_love_shaders.post_processing.crt.distortionFactor = {
+        moonshine_shaders.post_processing.crt.distortionFactor = {
             lerp(minimal.distortion_factor[1], advanced.distortion_factor[1], amount),
             lerp(minimal.distortion_factor[2], advanced.distortion_factor[2], amount),
         }
-        moonshine_love_shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
-        moonshine_love_shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
+        moonshine_shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
+        moonshine_shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
     end
     if Config.MoonshineShaderSettings.filmgrain.enable then
         local amount = Config.MoonshineShaderSettings.filmgrain.amount
         local defaults = { opacity = lerp(0.3, 1.0, amount), size = lerp(1, 4, amount) }
-        moonshine_love_shaders.post_processing.filmgrain.opacity = defaults.opacity
-        moonshine_love_shaders.post_processing.filmgrain.size = defaults.size
+        moonshine_shaders.post_processing.filmgrain.opacity = defaults.opacity
+        moonshine_shaders.post_processing.filmgrain.size = defaults.size
     end
     if true then
-        moonshine_love_shaders.post_processing.godsray.decay = ({ 0.75, 0.69, 0.70 })[Config.CURRENT_THEME]
-        moonshine_love_shaders.post_processing.godsray.density = 0.15
-        moonshine_love_shaders.post_processing.godsray.exposure = ({ 0.20, 0.12, 0.25 })[Config.CURRENT_THEME]
-        moonshine_love_shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-        moonshine_love_shaders.post_processing.godsray.samples = (Config.IS_GAME_SLOW and 8 ^ 2 or math.floor(8 ^ 1.68)) --- 64 | 32 `(default: 70)`
-        moonshine_love_shaders.post_processing.godsray.weight = ({ 0.50, 0.45, 0.65 })[Config.CURRENT_THEME]
+        moonshine_shaders.post_processing.godsray.decay = ({ 0.80, 0.69, 0.70 })[Config.CURRENT_THEME]
+        moonshine_shaders.post_processing.godsray.density = 0.15
+        moonshine_shaders.post_processing.godsray.exposure = ({ 0.20, 0.12, 0.25 })[Config.CURRENT_THEME]
+        moonshine_shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
+        moonshine_shaders.post_processing.godsray.samples = 2 ^ 6 --- 64 | 32 `(default: 70)`
+        moonshine_shaders.post_processing.godsray.weight = ({ 0.50, 0.45, 0.65 })[Config.CURRENT_THEME]
     end
     if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-        moonshine_love_shaders.post_processing.vignette.radius = 0.8 * PHI -- avoid health bar at the top
-        -- moonshine_love_shaders.post_processing.vignette.softness = (1.5 - 0.5)
-        -- moonshine_love_shaders.post_processing.vignette.opacity = 0.5 + 0.1 -- + 0.3
-        -- shaders.post_processing.vignette.color = common.Color.background
+        moonshine_shaders.post_processing.vignette.radius = 0.8 + 0.4 -- avoid health bar at the top
+        -- moonshine_shaders.post_processing.vignette.softness = 0.3
+        -- moonshine_shaders.post_processing.vignette.opacity = 0.5 + 0.3 -- + 0.3
     end
 end
 
@@ -2231,9 +2197,9 @@ function love.update(dt)
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
     do
-        glsl_love_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() })
-        glsl_love_shaders.gradient_timemod:send('time', love.timer.getTime())
-        moonshine_love_shaders.fog.fog.time = game_timer_t
+        glsl_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() })
+        glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
+        moonshine_shaders.fog.fog.time = game_timer_t
     end
 
     -- #4 Frame Rate Independence: Fixed timestep loop.
@@ -2256,20 +2222,45 @@ function love.draw()
     if Config.Debug.IS_ASSERT then assert_consistent_state() end
 
     local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
-
-    moonshine_love_shaders.post_processing(function()
+    moonshine_shaders.post_processing(function()
         do
-            LG.setShader(glsl_love_shaders.gradient_timemod)
+            LG.setShader(glsl_shaders.gradient_timemod)
             if has_background then
                 LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
             end
             draw_background_shader(alpha)
             LG.setShader() -- > background_gradient_shader
         end
+
         do
-            moonshine_love_shaders.fog(function() draw_background_shader(alpha) end)
-            -- moonshine_love_shaders.fog(function() end)
+            local blend_mode = LG.getBlendMode()
+            LG.setBlendMode('screen', 'premultiplied')
+            moonshine_shaders.fog(function() end)
+            LG.setBlendMode(blend_mode)
         end
+
+        -- Draw background fill, else background color shows up (maybe use LG.clearBackground())
+        do
+            local blend_mode = LG.getBlendMode()
+            LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied') -- screen|lighten work well
+
+            --- PERF: A glow radial gradient texture may help shader switch calls
+            Shaders.phong_lighting.shade_any_to_player_pov(function()
+                LG.setColor(1, 1, 1, 1)
+                LG.rectangle('fill', 0, 0, arena_w, arena_h)
+            end)
+            LG.setBlendMode(blend_mode)
+            -- if player_action == Common.PLAYER_ACTION.BOOST then
+            --     local shader = glsl_shaders.lighting_phong
+            --     LG.setShader(shader)
+
+            --     local name = 'lights[' .. 0 .. ']'
+
+            --     shader:send(name .. '.power', 8)
+            --     LG.setShader()
+            -- end
+        end
+
         -- • Objects that are partially off the edge of the screen can be seen on the other side.
         -- • Coordinate system is translated to different positions and everything is drawn at each position around the screen and in the center.
         -- • Draw off-screen object partially wrap around without glitch
@@ -2277,13 +2268,15 @@ function love.draw()
             for x = -1, 1 do
                 LG.origin()
                 LG.translate(x * arena_w, y * arena_h)
-
                 draw_screenshake_fx(alpha)
                 draw_game(alpha)
                 LG.origin() -- Reverse any previous calls to love.graphics.
             end
         end
-        -- moonshine_love_shaders.fog(function() draw_player(alpha) end)
+        do
+            draw_timer_text()
+            draw_player_status_bar(alpha)
+        end
     end)
 
     if is_debug_hud_enable then draw_hud() end
