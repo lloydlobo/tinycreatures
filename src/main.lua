@@ -817,6 +817,7 @@ function handle_player_input_this_frame(dt)
     end
 
     -- Update and assign new player action
+    -- NOTE: What if the actions are actual keyboard like one-shot modes─like CAPSLOCK, so it needs to be switched that way....
     do
         if is_boosting then
             player_action = Common.PLAYER_ACTION.BOOST
@@ -1522,34 +1523,27 @@ function draw_player_status_bar(alpha)
 end
 
 function draw_timer_text()
-    local x = (arena_w * 0.5)
-    local y = 14
-
     local text = string.format('%.2f', game_timer_t)
     local tw, th = font:getWidth(text), font:getHeight()
 
-    -- Draw rounded rectangle button like backdrop.
-    if true then
-        if true then
-            local game_freq = math.sin(game_timer_t * 4) / 4
-            -- local f = lume.clamp((1 - game_freq), INV_PHI, PHI)
-            local f = lume.clamp((1 + game_freq), INV_PHI, PHI)
-            f = smoothstep(f, 1 + f * INV_PHI_SQ, f ^ 1.2)
+    local x = (arena_w * 0.5)
+    local y = 14
 
-            local rect_w = tw * (INV_PHI + 0.15)
-            -- Save state.
-            local blend_mode = LG.getBlendMode()
-            LG.setBlendMode('lighten', 'premultiplied')
-            LG.setColor(0.2, 0.2, 0.2, 0.5)
-            LG.rectangle('fill', x - rect_w * 0.5, y - th * f, rect_w, th * f * 2)
-            LG.circle('fill', x - rect_w * 0.5, y, th * f)
-            LG.circle('fill', x + rect_w * 0.5, y, th * f)
-            -- Restore state.
-            LG.setBlendMode(blend_mode)
-        else
-            LG.setColor(1.0, 1.0, 1.0, 1.0)
-            LG.ellipse('fill', x, y, tw * 0.7, tw * 0.7)
-        end
+    if Config.IS_GRUG_BRAIN then
+        -- Draw rounded rectangle button like backdrop.
+        local game_freq = math.sin(game_timer_t * 4) / 4
+        local f = lume.clamp((1 + game_freq), INV_PHI, PHI)
+        f = smoothstep(f, 1 + f * INV_PHI_SQ, f ^ 1.2)
+        -- Save state.
+        local blend_mode = LG.getBlendMode()
+        LG.setBlendMode('lighten', 'premultiplied')
+        LG.setColor(0.2, 0.2, 0.2, 0.5)
+        local rect_w = tw * (INV_PHI + 0.15)
+        LG.rectangle('fill', x - rect_w * 0.5, y - th * f, rect_w, th * f * 2)
+        LG.circle('fill', x - rect_w * 0.5, y, th * f)
+        LG.circle('fill', x + rect_w * 0.5, y, th * f)
+        -- Restore state.
+        LG.setBlendMode(blend_mode)
     end
 
     -- Draw timer text.
