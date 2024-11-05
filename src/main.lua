@@ -275,14 +275,16 @@ function fire_player_projectile() --- Fire projectile from players's position.
     end
 end
 
-local MAX_SPEED_BOOST_MULTIPLIER = 1.05 -- PHI
+local MAX_SPEED_BOOST_MULTIPLIER = 1.25
 local IS_SMOOTH_BOOST = true
 --- TODO: Use dash timer for Renderer to react to it, else use key event to detect dash (hack).
 function boost_player_entity_speed(dt)
     local cs = curr_state
     local prev_vel_x = cs.player_vel_x
     local prev_vel_y = cs.player_vel_y
-    local ease = INV_PHI
+    local game_freq = lume.clamp(math.sin(4 * game_timer_t) / 2, 0., 1.)
+    local ease = smoothstep(game_freq ^ 0.8, game_freq ^ 1.2, game_freq) --* PHI
+
     -- can use lerp here for smooth speed easing
     if IS_SMOOTH_BOOST then
         cs.player_vel_x = smoothstep(prev_vel_x, prev_vel_x * MAX_SPEED_BOOST_MULTIPLIER, ease)
@@ -821,6 +823,8 @@ function handle_player_input_this_frame(dt)
     do
         if is_boosting then
             player_action = Common.PLAYER_ACTION.BOOST
+            -- cs.player_invulnerability_timer = 1.0 - cs.player_invulnerability_timer
+            cs.player_invulnerability_timer = 1.0
         elseif has_companions then
             player_action = Common.PLAYER_ACTION.COMPANION
         elseif is_stop_and_beserk_in_place then
@@ -865,7 +869,8 @@ function draw_player_trail(alpha)
     local amplitude = 1
     local wiggle_rate = 1.0
     local wiggle_freq = alpha
-    local game_freq = math.sin(game_timer_t * 8) / 8
+    -- local game_freq = math.sin(game_timer_t * 8) / 8
+    local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
     wiggle_freq = smoothstep(wiggle_freq, game_freq, game_freq)
 
     local last_f = 0.
