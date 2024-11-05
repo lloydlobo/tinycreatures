@@ -1,6 +1,7 @@
 extern vec2 screen;
 extern float time;//> love.timer.getTime()
 
+// Copied from [SkyVaultGames ─ Love2D | Shader Tutorial 1 | Introduction](https://www.youtube.com/watch?v=DOyJemh_7HE&t=1s)
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      vec4 pixel=Texel(image,uvs);
 

@@ -1896,8 +1896,8 @@ function load_shaders()
     --- @field lighting_phong love.Shader
     glsl_shaders = {
         gradient_basic = LG.newShader(Shaders.bg_gradient.glsl_frag),
-        gradient_timemod = LG.newShader(Shaders.bg_gradient_time_modulate.glsl_frag),
-        lighting_phong = LG.newShader(Shaders.phong_lighting.glsl_frag),
+        gradient_timemod = LG.newShader 'shaders/bg_gradient_time_modulate.frag',
+        lighting_phong = LG.newShader 'shaders/phong_lighting.frag',
     }
 
     -- Load moonshine shaders
