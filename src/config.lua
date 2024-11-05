@@ -183,14 +183,14 @@ return {
     LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 8, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = 0.5 * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
+    LASER_RADIUS = _inv_phi * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
-    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 2),
+    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 3),
     PARALLAX_ENTITY_MAX_DEPTH = 4, --- @type integer
-    PARALLAX_ENTITY_MIN_DEPTH = 1, --- @type integer
+    PARALLAX_ENTITY_MIN_DEPTH = 0, --- @type integer
     PARALLAX_ENTITY_RADIUS_FACTOR = 16, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
-    PARALLAX_OFFSET_FACTOR_X = 0.01, -- NOTE: Should be lower to avoid puking
-    PARALLAX_OFFSET_FACTOR_Y = 0.01,
+    PARALLAX_OFFSET_FACTOR_X = 0.00, -- NOTE: Should be lower to avoid puking
+    PARALLAX_OFFSET_FACTOR_Y = 0.00,
     PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
     PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
@@ -200,5 +200,5 @@ return {
     PLAYER_MAX_HEALTH = 4,
     PLAYER_MAX_TRAIL_COUNT = 8, -- (-2 + math.floor(math.pi * math.sqrt(_player_radius * _inv_phi))), -- player_radius(32)*PHI==20(approx)
     PLAYER_RADIUS = _player_radius,
-    PLAYER_TRAIL_THICKNESS = (1.0 * math.ceil(_player_radius * _inv_phi)), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
+    PLAYER_TRAIL_THICKNESS = (1.2 * math.ceil(_player_radius * _inv_phi)), -- HACK: 32 is player_radius global var in love.load (same size as dark of eye looks good)
 }
