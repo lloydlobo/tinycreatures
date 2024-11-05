@@ -54,36 +54,37 @@ local light_active_creatures_screen_coords = { gw, gh }
 local light_player_trail_screen_coords = { gw, gh }
 
 --- @class (exact) Light
-local light_active_creatures = {
-    position = { 0, 0 },
-    diffuse = LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR,
-    power = 64,
-}
-
---- @class (exact) Light
 local light_player_trail = {
     position = { 0, 0 },
     diffuse = LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR,
     power = 32,
 }
 
-local function shade_active_creatures_to_player_pov(fun)
-    local shader = glsl_love_shaders.lighting_phong
+--- @class (exact) Light
+local light_any_to_player_pov = {
+    position = { 0, 0 },
+    diffuse = LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR,
+    power = 64,
+}
+
+local function shade_any_to_player_pov(fun)
+    local shader = glsl_shaders.lighting_phong
     LG.setShader(shader)
 
     local cs = curr_state
     light_active_creatures_screen_coords[1], light_active_creatures_screen_coords[2] = LG.getDimensions() -- shader:send('screen', { LG.getWidth(), LG.getHeight() })
-    light_active_creatures.position[1], light_active_creatures.position[2] = cs.player_x, cs.player_y -- TODO: use func args
-    light_active_creatures.diffuse = LIGHT_DIFFUSE_COLORS[player_action] or LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR -- TODO: send color in func args
+    light_any_to_player_pov.position[1], light_any_to_player_pov.position[2] = cs.player_x, cs.player_y -- TODO: use func args
+    -- light_any_to_player_pov.diffuse = { 0.5, 0.5, 0.5 }
+    light_any_to_player_pov.diffuse = LIGHT_DIFFUSE_COLORS[player_action] or LIGHT_DEFAULT_ACTIVE_CREATURES_DIFFUSE_COLOR -- TODO: send color in func args
 
     shader:send('screen', light_active_creatures_screen_coords)
     shader:send('num_lights', 1)
 
     -- NOTE: First array offset is 0 in glsl. Lua uses 1 as index.
     local name = 'lights[' .. 0 .. ']'
-    shader:send(name .. '.position', light_active_creatures.position)
-    shader:send(name .. '.diffuse', light_active_creatures.diffuse)
-    shader:send(name .. '.power', light_active_creatures.power)
+    shader:send(name .. '.position', light_any_to_player_pov.position)
+    shader:send(name .. '.diffuse', light_any_to_player_pov.diffuse)
+    shader:send(name .. '.power', light_any_to_player_pov.power)
     -- Draw here with callback function.
     fun()
 
@@ -97,7 +98,7 @@ local multiple_lights = {
     { position = { 600, 600 }, diffuse = { 0.5, 0.3, 1 }, power = 64 },
 }
 local function shade_active_creatures_multiple_lights(fun, lights)
-    local shader = glsl_love_shaders.lighting_phong
+    local shader = glsl_shaders.lighting_phong
     LG.setShader(shader)
 
     lights = lights or multiple_lights
@@ -120,7 +121,7 @@ local function shade_active_creatures_multiple_lights(fun, lights)
 end
 
 local function shade_player_trail(fun)
-    local shader = glsl_love_shaders.lighting_phong
+    local shader = glsl_shaders.lighting_phong
     LG.setShader(shader)
 
     local cs = curr_state
@@ -143,7 +144,7 @@ end
 return {
     glsl_frag = glsl_frag,
 
-    shade_active_creatures_to_player_pov = shade_active_creatures_to_player_pov,
+    shade_any_to_player_pov = shade_any_to_player_pov,
     shade_active_creatures_multiple_lights = shade_active_creatures_multiple_lights,
     shade_player_trail = shade_player_trail,
 }
