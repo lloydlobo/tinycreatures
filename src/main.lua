@@ -1511,8 +1511,9 @@ function draw_player_status_bar(alpha)
             LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
             local invulnerable_tween = invulnerability_timer
             if Config.IS_GRUG_BRAIN then invulnerable_tween = lerp(invulnerability_timer - game_timer_dt, invulnerability_timer, alpha) end
-            LG.setColor(0, 1, 1) -- cyan?????
-            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, invulnerability_bar_height * sh) -- current invulnerability
+            -- LG.setColor(0, 1, 1) -- cyan?????
+            LG.setColor(Common.COLOR.player_boost_dash_modifier) -- recharging ...
+            LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, 1 + invulnerability_bar_height * sh) -- current invulnerability
         else
             temp_last_ouch_x = nil
             temp_last_ouch_y = nil
@@ -2264,7 +2265,6 @@ function love.draw()
                 LG.translate(x * arena_w, y * arena_h)
                 draw_screenshake_fx(alpha)
                 draw_game(alpha)
-
                 LG.origin() -- Reverse any previous calls to love.graphics.
             end
         end
