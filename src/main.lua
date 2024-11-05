@@ -602,6 +602,7 @@ function update_player_fired_projectiles_this_frame(dt)
     local cs = curr_state
 
     -- #region Update laser positions.
+
     for laser_index = 1, #cs.lasers_x do
         if cs.lasers_is_active[laser_index] == Common.STATUS.ACTIVE then
             cs.lasers_time_left[laser_index] = cs.lasers_time_left[laser_index] - dt
@@ -625,11 +626,14 @@ function update_player_fired_projectiles_this_frame(dt)
             end
         end
     end
+
     -- Update fire cooldown timer.
     laser_fire_timer = laser_fire_timer - dt
+
     -- #endregion
 
     -- #region Handle laser collisions.
+
     local laser_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
 
@@ -639,27 +643,30 @@ function update_player_fired_projectiles_this_frame(dt)
         if not (cs.lasers_is_active[laser_index] == Common.STATUS.ACTIVE) then --[[]]
             goto continue_not_is_active_laser
         end
+
         laser_circle = {
             x = cs.lasers_x[laser_index],
             y = cs.lasers_y[laser_index],
             radius = Config.LASER_RADIUS,
         }
+
         for creature_index = 1, Config.CREATURE_TOTAL_CAPACITY do
             if not (cs.creatures_is_active[creature_index] == Common.STATUS.ACTIVE) then --[[]]
                 goto continue_not_is_active_creature
             end
+
             local curr_stage_id = cs.creatures_evolution_stage[creature_index] --- @type integer
             if Config.Debug.IS_ASSERT then assert(curr_stage_id >= 1 and curr_stage_id <= #stages, curr_stage_id) end
+
             creature_circle = {
                 x = cs.creatures_x[creature_index],
                 y = cs.creatures_y[creature_index],
                 radius = stages[curr_stage_id].radius,
             }
-            if Collision.is_intersect_circles {
-                a = creature_circle,
-                b = laser_circle,
-            } then
+
+            if Collision.is_intersect_circles { a = creature_circle, b = laser_circle } then
                 temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
+
                 screenshake.duration = 0.15 -- got'em!
 
                 -- Deactivate projectile if touch creature.
@@ -679,20 +686,27 @@ function update_player_fired_projectiles_this_frame(dt)
 
                 -- Split the creature into two smaller ones.
                 if curr_stage_id > 1 then
-                    -- Note: initial stage is `#creature_evolution_stages`.
+                    -- Update state: initial stage is `#creature_evolution_stages`.
                     local new_stage_id = curr_stage_id - 1
+
                     cs.creatures_evolution_stage[creature_index] = new_stage_id
                     for i = 1, 2 do
                         local new_creature_index = find_inactive_creature_index()
                         if new_creature_index ~= nil then
                             spawn_new_creature(new_creature_index, creature_index, new_stage_id)
                         else
-                            if Config.Debug.IS_TRACE_ENTITIES then print('Failed to spawn more creatures.\n', 'stage:', curr_stage_id, 'i:', i) end
-                            break -- Yeet outta this loop if we can't spawn anymore.
+                            if Config.Debug.IS_TRACE_ENTITIES then --[[]]
+                                print('Failed to spawn more creatures.\n', 'stage:', curr_stage_id, 'i:', i)
+                            end
+
+                            -- _Yeet_ outta this loop if we can't spawn anymore.
+                            break
                         end
                     end
                 end
-                break -- This projectile has now served it's purpose.
+
+                -- This projectile has now served it's purpose.
+                break
             end
             ::continue_not_is_active_creature::
         end
@@ -713,6 +727,7 @@ function update_player_fired_projectiles_this_frame(dt)
             sound_fire_combo_hit:play()
         end
     end
+
     -- #endregion
 end
 
@@ -888,6 +903,7 @@ function handle_player_input_this_frame(dt)
     --[[Tradeoffs to aid microdecisions]]
     if is_boosting then -- Can't shoot while boosting.
         --[[TODO: Make player invulnerable while boost timer─which is unimplemented, does not runs out]]
+        cs.player_invulnerability_timer = 1.0
         boost_player_entity_speed(dt)
         do
             local should_play_once = (not music_sci_fi_engine:isPlaying()) or music_sci_fi_engine_is_fading_out
@@ -910,8 +926,6 @@ function handle_player_input_this_frame(dt)
     do
         if is_boosting then
             player_action = Common.PLAYER_ACTION.BOOST
-            -- cs.player_invulnerability_timer = 1.0 - cs.player_invulnerability_timer
-            cs.player_invulnerability_timer = 1.0
         elseif has_companions then
             player_action = Common.PLAYER_ACTION.COMPANION
         elseif is_stop_and_beserk_in_place then
@@ -1315,7 +1329,8 @@ function _draw_not_active_creature(i, alpha)
 
         -- !!!! can this paint them individually with set color
         -- FIXME: If color passed has an alpha channel, this will panic
-        creatures_sprite_batch:setColor(Common.COLOR.creature_healed)
+        local rgb = Common.COLOR.creature_healed
+        creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3])
         creatures_sprite_batch:add(curr_x, curr_y, 0, _sx, _sy, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
         -- PERF: Use a different sprite batch for healed departing creature
@@ -1581,10 +1596,12 @@ function draw_debug_hud()
     local pos_y = 0
     LG.setColor(0, 0, 0, 0.7)
     LG.rectangle('fill', pos_x, pos_y, 222, arena_h)
+
     local stats = LG.getStats()
     local fps = love.timer.getFPS()
     local dt = love.timer.getDelta()
     local active_counter = 0 --- @type integer
+
     for _, value in ipairs(cs.creatures_is_active) do
         if value == Common.STATUS.ACTIVE then --
             active_counter = active_counter + 1
@@ -1668,10 +1685,58 @@ function draw_game(alpha)
     draw_player(alpha)
 end
 
+local _t_points_player_and_collectible = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
 function curr_state:draw_player_collectible_indicators(alpha)
     --[[]]
 
-    LG.print('»', self.player_x, self.player_y, 0.0, 3, 3)
+    local src_x = self.player_x
+    local src_y = self.player_y
+    local dest_x = player_shield_collectible_pos_x
+    local dest_y = player_shield_collectible_pos_y
+    local is_spawn = dest_x ~= nil and dest_y ~= nil
+    local __TEMP_OVERRIDE__ = not true
+    if is_spawn then
+        --- @cast dest_x number
+        --- @cast dest_y number
+
+        local _t = _t_points_player_and_collectible
+        _t.x1 = src_x
+        _t.y1 = src_y
+        _t.x2 = dest_x
+        _t.y2 = dest_y
+        local dist = Common.manhattan_distance(_t_points_player_and_collectible)
+        local dx = _t.x2 - _t.x1
+        local dy = _t.y2 - _t.y1
+        ---@diagnostic disable-next-line: deprecated # WARN: math.atan leads to weird behavior
+        local angle_radians = math.atan2(dy, dx)
+
+        -- Draw indicator.
+        do
+            local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
+            local scale0 = smoothstep(2.20 - game_freq, 2.20 + game_freq, game_freq)
+            LG.setColor(1, 1, 1, 1.0)
+            LG.print('»', src_x, src_y, angle_radians, scale0, scale0, -10, 10)
+            local scale1 = smoothstep(1.5 - game_freq, 1.5 + game_freq, game_freq)
+            LG.setColor(0.5, 0.8, 0.8, 1.0)
+            LG.print('»', src_x, src_y, angle_radians, scale1, scale1, -10, 10)
+            local scale2 = smoothstep(2.0 - game_freq, 2.0 + game_freq, game_freq)
+            LG.setColor(1.0, 0.5, 0.7, 1.0)
+            LG.print('»', src_x, src_y, angle_radians, scale2, scale2, -10, 10)
+            LG.setColor(1, 1, 1) -- reset
+        end
+
+        -- Debug coordinates.
+        if __TEMP_OVERRIDE__ or (Config.Debug.IS_TRACE_ENTITIES and Config.Debug.IS_DEVELOPMENT) then
+            LG.setColor(1, 1, 0, 0.8)
+            LG.line(src_x, src_y, _t.x2, _t.y2)
+            LG.setColor(0, 1, 1, 1.0)
+            LG.print(('%.2f dist'):format(dist), _t.x2, _t.y2, (PI * 0.5) + angle_radians, PHI, PHI, -8, -8)
+            LG.setColor(0.2, 1.0, 0.8)
+            LG.print(('%.2f rad'):format(angle_radians), _t.x2, _t.y2, angle_radians, 2, 2, -4, 4)
+            LG.setColor(0.5, 0.5, 0.8, 1.0)
+            LG.print(('%.2f deg'):format(math.deg(angle_radians)), _t.x2, _t.y2, (0.25 * PI) + angle_radians, 2.5, 2.5)
+        end
+    end
 end
 
 --
@@ -2190,15 +2255,6 @@ function love.draw()
                 LG.rectangle('fill', 0, 0, arena_w, arena_h)
             end)
             LG.setBlendMode(blend_mode)
-            -- if player_action == Common.PLAYER_ACTION.BOOST then
-            --     local shader = glsl_shaders.lighting_phong
-            --     LG.setShader(shader)
-
-            --     local name = 'lights[' .. 0 .. ']'
-
-            --     shader:send(name .. '.power', 8)
-            --     LG.setShader()
-            -- end
         end
 
         -- • Objects that are partially off the edge of the screen can be seen on the other side.
