@@ -73,6 +73,93 @@ local PI, INV_PI = Config.PI, Config.INV_PI
 --- NOTE: This is used by `game_level` to mutate `initial_large_creatures` these are mutated after
 ---       each level::: i can't bother changing case as of now... will do when time permits??
 
+-- #region  Declare global data structures.
+-- vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+--- @class GameState
+curr_state = {
+    creatures_angle = {},
+    creatures_evolution_stage = {},
+    creatures_health = {},
+    creatures_is_active = {},
+    creatures_vel_x = {},
+    creatures_vel_y = {},
+    creatures_x = {},
+    creatures_y = {},
+    lasers_angle = {},
+    lasers_is_active = {},
+    lasers_time_left = {},
+    lasers_x = {},
+    lasers_y = {},
+    player_damaged_last_timestamp = 0.0,
+    player_health = 0,
+    player_invulnerability_timer = 0,
+    player_rot_angle = 0,
+    player_vel_x = 0,
+    player_vel_y = 0,
+    player_x = 0,
+    player_y = 0,
+}
+
+--- @class GameState
+prev_state = {
+    creatures_angle = {},
+    creatures_evolution_stage = {},
+    creatures_health = {},
+    creatures_is_active = {},
+    creatures_vel_x = {},
+    creatures_vel_y = {},
+    creatures_x = {},
+    creatures_y = {},
+    lasers_angle = {},
+    lasers_is_active = {},
+    lasers_time_left = {},
+    lasers_x = {},
+    lasers_y = {},
+    player_damaged_last_timestamp = 0.0,
+    player_health = 0,
+    player_invulnerability_timer = 0,
+    player_rot_angle = 0,
+    player_vel_x = 0,
+    player_vel_y = 0,
+    player_x = 0,
+    player_y = 0,
+}
+
+--- @class (exact) ParallaxEntities
+--- @field depth number[]
+--- @field radius number[]
+--- @field x number[] Without arena_w world coordinate scaling
+--- @field y number[] Without arena_h world coordinate scaling
+parallax_entities = {
+    depth = {},
+    radius = {},
+    x = {},
+    y = {},
+}
+
+--- @class (exact) PlayerTrails
+--- @field index integer # 1..`MAX_PLAYER_TRAIL_COUNT`
+--- @field is_active STATUS[]
+--- @field rot_angle number[]
+--- @field time_left number[]
+--- @field vel_x number[]
+--- @field vel_y number[]
+--- @field x number[]
+--- @field y number[]
+player_trails = {
+    index = 1,
+    is_active = {},
+    rot_angle = {},
+    time_left = {},
+    vel_x = {},
+    vel_y = {},
+    x = {},
+    y = {},
+}
+-- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-- #endregion
+
 --
 --
 --
@@ -442,18 +529,18 @@ function update_background_shader(dt)
             vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
             vel_y = vel_y - smoothstep(vel_y * (-love.math.random(-0.5, 2.5)), vel_y * love.math.random(0, 8), smoothValue)
         end
-        parallax_entities.pos_x[i] = parallax_entities.pos_x[i] - math.sin(parallax_entities.depth[i] * vel_x)
-        parallax_entities.pos_x[i + 1] = parallax_entities.pos_x[i + 1] - math.sin(parallax_entities.depth[i + 1] * vel_x)
-        parallax_entities.pos_x[i + 2] = parallax_entities.pos_x[i + 2] - math.sin(parallax_entities.depth[i + 2] * vel_x)
-        parallax_entities.pos_x[i + 3] = parallax_entities.pos_x[i + 3] - math.sin(parallax_entities.depth[i + 3] * vel_x)
-        parallax_entities.pos_y[i] = parallax_entities.pos_y[i] - (vel_y / parallax_entities.depth[i])
-        parallax_entities.pos_y[i + 1] = parallax_entities.pos_y[i + 1] - (vel_y / parallax_entities.depth[i + 1])
-        parallax_entities.pos_y[i + 2] = parallax_entities.pos_y[i + 2] - (vel_y / parallax_entities.depth[i + 2])
-        parallax_entities.pos_y[i + 3] = parallax_entities.pos_y[i + 3] - (vel_y / parallax_entities.depth[i + 3])
-        if parallax_entities.pos_y[i] < 0 then parallax_entities.pos_y[i] = 1 end
-        if parallax_entities.pos_y[i + 1] < 0 then parallax_entities.pos_y[i + 1] = 1 end
-        if parallax_entities.pos_y[i + 2] < 0 then parallax_entities.pos_y[i + 2] = 1 end
-        if parallax_entities.pos_y[i + 3] < 0 then parallax_entities.pos_y[i + 4] = 1 end
+        parallax_entities.x[i] = parallax_entities.x[i] - math.sin(parallax_entities.depth[i] * vel_x)
+        parallax_entities.x[i + 1] = parallax_entities.x[i + 1] - math.sin(parallax_entities.depth[i + 1] * vel_x)
+        parallax_entities.x[i + 2] = parallax_entities.x[i + 2] - math.sin(parallax_entities.depth[i + 2] * vel_x)
+        parallax_entities.x[i + 3] = parallax_entities.x[i + 3] - math.sin(parallax_entities.depth[i + 3] * vel_x)
+        parallax_entities.y[i] = parallax_entities.y[i] - (vel_y / parallax_entities.depth[i])
+        parallax_entities.y[i + 1] = parallax_entities.y[i + 1] - (vel_y / parallax_entities.depth[i + 1])
+        parallax_entities.y[i + 2] = parallax_entities.y[i + 2] - (vel_y / parallax_entities.depth[i + 2])
+        parallax_entities.y[i + 3] = parallax_entities.y[i + 3] - (vel_y / parallax_entities.depth[i + 3])
+        if parallax_entities.y[i] < 0 then parallax_entities.y[i] = 1 end
+        if parallax_entities.y[i + 1] < 0 then parallax_entities.y[i + 1] = 1 end
+        if parallax_entities.y[i + 2] < 0 then parallax_entities.y[i + 2] = 1 end
+        if parallax_entities.y[i + 3] < 0 then parallax_entities.y[i + 4] = 1 end
     end
 end
 
@@ -503,12 +590,12 @@ function update_player_trails_this_frame(dt)
     local player_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x, alpha)
     local player_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y, alpha)
 
-    player_trails_x[player_trails_index] = player_x
-    player_trails_y[player_trails_index] = player_y
-    player_trails_vel_x[player_trails_index] = player_vel_x
-    player_trails_vel_y[player_trails_index] = player_vel_y
-    player_trails_rot_angle[player_trails_index] = player_rot_angle
-    player_trails_index = (player_trails_index % Config.PLAYER_MAX_TRAIL_COUNT) + 1
+    player_trails.x[player_trails.index] = player_x
+    player_trails.y[player_trails.index] = player_y
+    player_trails.vel_x[player_trails.index] = player_vel_x
+    player_trails.vel_y[player_trails.index] = player_vel_y
+    player_trails.rot_angle[player_trails.index] = player_rot_angle
+    player_trails.index = (player_trails.index % Config.PLAYER_MAX_TRAIL_COUNT) + 1
 end
 
 function update_player_fired_projectiles_this_frame(dt)
@@ -892,21 +979,21 @@ function draw_player_trail(alpha)
             f = smoothstep(i, PHI * i, game_freq)
             f = -f ^ 0.1
             last_f = f
-            LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
+            LG.circle('line', player_trails.x[i], player_trails.y[i], radius * f)
         elseif player_action == Common.PLAYER_ACTION.BESERK then
             f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
             f = 1.5 * smoothstep(-f ^ 0.8, -f ^ 0.3, game_freq)
             last_f = f
-            LG.circle('line', player_trails_x[i], player_trails_y[i], radius * f)
+            LG.circle('line', player_trails.x[i], player_trails.y[i], radius * f)
         elseif player_action == Common.PLAYER_ACTION.BOOST then
             f = smoothstep(last_f < 0.4 and lume.clamp(last_f, 0.4, 2) or last_f, radius, game_freq) * i
             f = lume.clamp((f / (i ^ 1.2)), 0, 1)
             last_f = f
-            LG.circle('line', player_trails_x[NI + 1 - i], player_trails_y[NI + 1 - i], radius * f ^ 1.2)
-            LG.circle('line', player_trails_x[NI + 1 - i], player_trails_y[NI + 1 - i], radius * f ^ 1.2)
+            LG.circle('line', player_trails.x[NI + 1 - i], player_trails.y[NI + 1 - i], radius * f ^ 1.2)
+            LG.circle('line', player_trails.x[NI + 1 - i], player_trails.y[NI + 1 - i], radius * f ^ 1.2)
         else
             f, last_f = 1, 1
-            LG.circle('fill', player_trails_x[i], player_trails_y[i], radius)
+            LG.circle('fill', player_trails.x[i], player_trails.y[i], radius)
         end
     end
 end
@@ -916,6 +1003,7 @@ function draw_player_direction_ray(alpha)
     local IS_PLAYER_RAY_CASTED = true
     local PLAYER_RAY_RADIUS = Config.PLAYER_RADIUS * (1 - INV_PHI) * 0.5
     local PLAYER_RAY_COLOR = { 1, 1, 1 } -- { 0.6, 0.6, 0.6, 0.15 }
+    local AIR_RESISTANCE = Config.AIR_RESISTANCE
 
     local cs = curr_state
 
@@ -925,8 +1013,8 @@ function draw_player_direction_ray(alpha)
     local ray_vel_x = 0
     local ray_vel_y = 0
     local hack_len_short_factor = 0.5
-    ray_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x * Config.AIR_RESISTANCE, alpha)
-    ray_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y * Config.AIR_RESISTANCE, alpha)
+    ray_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x * AIR_RESISTANCE, alpha)
+    ray_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y * AIR_RESISTANCE, alpha)
     ray_vel_x = ray_vel_x * hack_len_short_factor + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
     ray_vel_y = ray_vel_y * hack_len_short_factor + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
 
@@ -938,15 +1026,16 @@ function draw_player_direction_ray(alpha)
     -- #endregion
 
     if IS_PLAYER_RAY_CASTED then
-        ray_x = (ray_x + ray_vel_x * Config.AIR_RESISTANCE) % arena_w
-        ray_y = (ray_y + ray_vel_y * Config.AIR_RESISTANCE) % arena_h
+        ray_x = (ray_x + ray_vel_x * AIR_RESISTANCE) % arena_w
+        ray_y = (ray_y + ray_vel_y * AIR_RESISTANCE) % arena_h
 
         LG.setColor(PLAYER_RAY_COLOR)
         LG.line(cs.player_x, cs.player_y, ray_x, ray_y)
     else -- jump to dot
         local last_ray_radius_if_multiple_rays = 2
         for i = -1, 1, 1 do
-            local ease = (0.125 - (i * 0.0125 * INV_PHI)) -- like the flash of a torch on zz ground
+            -- Like the flash of a torch on zz ground...
+            local ease = (0.125 - (i * 0.0125 * INV_PHI))
             ray_x = (ray_x + ray_vel_x * ease) % arena_w
             ray_y = (ray_y + ray_vel_y * ease) % arena_h
             local curr_radius = PLAYER_RAY_RADIUS + (ease * math.log(i) * last_ray_radius_if_multiple_rays)
@@ -1077,152 +1166,28 @@ function draw_player(alpha)
     LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
 end
 
--- function draw_player(alpha)
---     local cs = curr_state
+function draw_plus_icon(x_, y_, size_, linewidth)
+    local half_size = size_ * 0.5
+    -- Draw horizontal line.
+    LG.setLineWidth(linewidth or 2)
+    LG.line(x_ - half_size, y_, x_ + half_size, y_)
+    -- Draw vertical line.
+    LG.line(x_, y_ - half_size, x_, y_ + half_size)
+end
 
---     local IS_EYE_TWINKLE_ENABLE = true
-
---     local juice_frequency = 1 + math.sin(Config.FIXED_FPS * game_timer_dt)
---     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
-
---     -- Draw player entity.
---     local player_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
---     local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
---     local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
---     local player_radius = Config.PLAYER_RADIUS
-
---     -- #region fire_pos_x
---     -- Draw player player firing trigger • (circle)
---     local fire_pos_x = player_x + math.cos(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
---     local fire_pos_y = player_y + math.sin(player_angle) * Config.PLAYER_FIRING_EDGE_MAX_RADIUS
---     local firing_trigger_radius = Config.PLAYER_FIRING_EDGE_RADIUS
---     local invulnerability_timer = cs.player_invulnerability_timer
---     local t_ = lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.)
---     local trigger_radius = lerp(firing_trigger_radius - 1, firing_trigger_radius - 0, t_)
---     if invulnerability_timer > 0 then
---         t_ = lume.clamp(math.sin(game_timer_t * 2.) / 2., 0., 1.) * invulnerability_timer
---         trigger_radius = lerp(trigger_radius + (3 * invulnerability_timer), trigger_radius + (2 * invulnerability_timer), t_)
---     end
---     do -- Simulate the twinkle in eye to go opposite to player's direction
---         if IS_EYE_TWINKLE_ENABLE then
---             local inertia_x = 0
---             local inertia_y = 0
---             do -- Simulate inertia on movement.
---                 if love.keyboard.isDown('up', 'w') then
---                     inertia_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
---                     inertia_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
---                 end
---                 local is_player_going_backwards = not true
---                 if love.keyboard.isDown('down', 's') then
---                     is_player_going_backwards = true
---                     reverse_damp_dist = 0.5
---                     inertia_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
---                     inertia_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * game_timer_dt
---                 else
---                     is_player_going_backwards = not true
---                 end
---                 inertia_x = cs.player_vel_x * Config.AIR_RESISTANCE
---                 inertia_y = cs.player_vel_y * Config.AIR_RESISTANCE
---             end
---             do -- Apply inertia to dest position.
---                 local dfactor = true and 0.328 or (INV_PHI * 0.8) -- ideal: .328 (distance factor)
---                 local amplitude_factor = is_player_going_backwards and 0.125 or 0.35
---                 fire_pos_x = fire_pos_x - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_x * game_timer_dt)
---                 fire_pos_y = fire_pos_y - (dfactor * amplitude_factor * Config.PLAYER_FIRING_EDGE_MAX_RADIUS) * (inertia_y * game_timer_dt)
---             end
---         end
---     end
---     -- TODO: THIS CAN ALSO BE USED FOR SIGNALING WHERE POWER-UPS OR COLLECTIBLES ARE
---     if player_action ~= Common.PLAYER_ACTION.IDLE then
---         local prev_line_width = LG.getLineWidth()
---         LG.setLineWidth(2.5 * (1. + math.abs(invulnerability_timer)))
---         do
---             local triangle_size = player_radius * INV_PHI_SQ
---             local angle = cs.player_rot_angle
---             local pos_x_
---             local pos_y_
---             pos_x_ = player_x
---             pos_y_ = player_y
---             -- pos_x_ = fire_pos_x
---             -- pos_y_ = fire_pos_y
---             local x1 = pos_x_ + math.cos(angle) * triangle_size -- ze pointy end
---             local y1 = pos_y_ + math.sin(angle) * triangle_size
---             local x2 = pos_x_ + math.cos(angle + PI * 0.75) * triangle_size
---             local y2 = pos_y_ + math.sin(angle + PI * 0.75) * triangle_size
---             local x3 = pos_x_ + math.cos(angle - PI * 0.75) * triangle_size
---             local y3 = pos_y_ + math.sin(angle - PI * 0.75) * triangle_size
---             LG.setColor(Common.PLAYER_ACTION_TO_DESATURATED_COLOR[player_action])
-
---             local has_companion = true -- NOTE: Unimplemented
---             if has_companion then
---                 local pulse_freq = lume.clamp(lume.pingpong(math.abs(invulnerability_timer)) + math.sin(game_timer_t * 2) / 2, 0.0, 1.)
---                 pulse_freq = pulse_freq ^ 1.2 -- more tighter curves
-
---                 local f_companion = 2 * smoothstep(PHI, INV_PHI, pulse_freq)
---                 for y = -1, 1 do
---                     for x = -1, 1 do
---                         local nx, ny = f_companion * triangle_size * x, f_companion * triangle_size * y
---                         local is_any_corner = x ~= 0 and y ~= 0
---                         if is_any_corner then goto continue end
---                         LG.polygon('line', x1 + nx, y1 + ny, x2 + nx, y2 + ny, x3 + nx, y3 + ny)
---                         ::continue::
---                     end
---                 end
---             else
---                 LG.polygon('line', x1, y1, x2, y2, x3, y3)
---             end
-
---             local has_outer_ring = not true
---             if has_outer_ring then --
---                 LG.circle('line', player_x, player_y, lerp(player_radius + 4, player_radius - 4, math.abs(invulnerability_timer)))
---             end
---         end
---         LG.setLineWidth(prev_line_width)
---     else
---     end
---     -- #endregion fire_pos_x
-
---     local is_interpolate_player = true
---     if is_interpolate_player then
---         local player_speed_x = lerp(prev_state.player_vel_x, cs.player_vel_x * Config.AIR_RESISTANCE, alpha)
---         local player_speed_y = lerp(prev_state.player_vel_y, cs.player_vel_y * Config.AIR_RESISTANCE, alpha)
---         player_x = (player_x + player_speed_x * game_timer_dt) % arena_w
---         player_y = (player_y + player_speed_y * game_timer_dt) % arena_h
---         LG.setColor(Common.COLOR.player_entity_firing_edge_darker)
---         LG.circle('fill', player_x, player_y, Config.PLAYER_RADIUS)
---         -- Draw if Last shield
---         if (cs.player_health == 1) and (love.math.random() < 0.1 * alpha) then
---             local clr = Common.COLOR.creature_healing
---             LG.setColor(clr[1], clr[2], clr[3], lerp(0.2, 0.4, alpha))
---             LG.circle('fill', player_x, player_y, player_radius)
---         end
---     end
-
---     -- Draw player inner cornea (black).
---     local player_iris_radius = (
---         (Config.PLAYER_RADIUS * Config.PLAYER_CIRCLE_IRIS_TO_EYE_RATIO) --[[]]
---         * (1 + juice_frequency * juice_frequency_damper)
---     )
---     if cs.player_invulnerability_timer > 0 then -- eye winces and widens
---         player_iris_radius = lerp( --
---             player_iris_radius,
---             (player_iris_radius * 1.328),
---             cs.player_invulnerability_timer * alpha
---         )
---     end
---     LG.setColor(Common.COLOR.player_entity)
---     LG.circle('fill', player_x, player_y, player_iris_radius)
-
---     LG.setColor(Common.COLOR.player_entity_firing_edge_dark)
---     LG.circle('fill', fire_pos_x, fire_pos_y, trigger_radius)
--- end
+local COLLECTIBLE_SHIELD_RADIUS = Config.PLAYER_RADIUS * (1 - INV_PHI) * 3
 
 function draw_player_shield_collectible(alpha)
-    local COLLECTIBLE_SHIELD_RADIUS = Config.PLAYER_RADIUS * (1 - INV_PHI) * 3
-    local is_spawned_shield = (player_shield_collectible_pos_x ~= nil and player_shield_collectible_pos_y ~= nil)
+    local pos_x = player_shield_collectible_pos_x
+    local pos_y = player_shield_collectible_pos_y
+
+    local is_spawned_shield = (pos_x ~= nil and pos_y ~= nil)
     if not is_spawned_shield then -- exists
         return
     end
+
+    --- @cast pos_x number
+    --- @cast pos_y number
 
     local glowclr = Common.COLOR.player_dash_pink_modifier
     local freq = 127 -- Hz
@@ -1231,21 +1196,21 @@ function draw_player_shield_collectible(alpha)
     do
         local radius = (COLLECTIBLE_SHIELD_RADIUS * (1.2 + math.sin(0.03 * alpha)) + tween)
         LG.setColor(glowclr[1], glowclr[2], glowclr[3], 1.0 - math.sin(0.03 * alpha)) -- LG.setColor { 0.9, 0.9, 0.4 }
-        LG.circle('fill', player_shield_collectible_pos_x, player_shield_collectible_pos_y, radius)
+        LG.circle('fill', pos_x, pos_y, radius)
     end
 
     local fxclr = Common.COLOR.player_entity
     LG.setColor(fxclr[1], fxclr[2], fxclr[3], 0.2)
-    LG.circle('fill', player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
+    LG.circle('fill', pos_x, pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
 
     LG.setColor(1, 1, 1, 0.2)
-    draw_plus_icon(player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
+    draw_plus_icon(pos_x, pos_y, COLLECTIBLE_SHIELD_RADIUS + tween_fx)
 
     LG.setColor(fxclr)
-    LG.circle('fill', player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+    LG.circle('fill', pos_x, pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
 
     LG.setColor(1, 1, 1)
-    draw_plus_icon(player_shield_collectible_pos_x, player_shield_collectible_pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
+    draw_plus_icon(pos_x, pos_y, COLLECTIBLE_SHIELD_RADIUS + tween)
 
     LG.setColor(1, 1, 1) -- reset
 end
@@ -1255,6 +1220,7 @@ function _draw_active_projectile(i, alpha)
 
     local pos_x = curr_state.lasers_x[i]
     local pos_y = curr_state.lasers_y[i]
+
     if prev_state.lasers_is_active[i] == Common.STATUS.ACTIVE then
         pos_x = lerp(prev_state.lasers_x[i], pos_x, alpha)
         pos_y = lerp(prev_state.lasers_y[i], pos_y, alpha)
@@ -1267,8 +1233,10 @@ function _draw_active_projectile(i, alpha)
     local rgb = Common.PLAYER_ACTION_TO_COLOR[player_action] or { 0.4, 0.4, 0.4 }
     laser_sprite_batch:setColor(rgb) --- @diagnostic disable-line: param-type-mismatch
     laser_sprite_batch:add(pos_x, pos_y, 0, scale, scale, origin_x, origin_y)
+
+    -- Since we are firing‥‥
     do
-        player_action = prev_player_action -- since we are firing
+        player_action = prev_player_action
     end
 end
 
@@ -1391,15 +1359,6 @@ function draw_creatures(alpha)
     LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
 end
 
-function draw_plus_icon(x_, y_, size_, linewidth)
-    local half_size = size_ * 0.5
-    -- Draw horizontal line.
-    LG.setLineWidth(linewidth or 2)
-    LG.line(x_ - half_size, y_, x_ + half_size, y_)
-    -- Draw vertical line.
-    LG.line(x_, y_ - half_size, x_, y_ + half_size)
-end
-
 local _parallax_draw_offset_x = 0
 local _parallax_draw_offset_y = 0
 local _parallax_entity_alpha_color = ({ (INV_PHI ^ (Config.IS_GAME_SLOW and -1 or -1)) * 0.56, 0.7, 1.0 })[Config.CURRENT_THEME]
@@ -1422,8 +1381,8 @@ function _draw_background_shader(alpha)
     for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT do
         local depth_inv = parallax_entities.depth[i]
         local radius = parallax_entities.radius[i]
-        local x = (parallax_entities.pos_x[i] - (dx * depth_inv)) * arena_w
-        local y = (parallax_entities.pos_y[i] - (dy * depth_inv)) * arena_h
+        local x = (parallax_entities.x[i] - (dx * depth_inv)) * arena_w
+        local y = (parallax_entities.y[i] - (dy * depth_inv)) * arena_h
         local point_alpha = _parallax_entity_alpha_color * depth_inv
 
         -- Add sprite to batch with position, rotation, scale and color
@@ -1443,11 +1402,8 @@ function _draw_background_shader(alpha)
 end
 
 function draw_background_shader(alpha)
-    if Config.IS_GAME_SLOW then
-        moonshine_shaders.background(function() _draw_background_shader(alpha) end)
-    else
-        _draw_background_shader(alpha)
-    end
+    --[[Placeholder for post-processing or optimization]]
+    _draw_background_shader(alpha)
 end
 
 --- @diagnostic disable-next-line: unused-local
@@ -1516,7 +1472,6 @@ function draw_player_status_bar(alpha)
             LG.rectangle('fill', bar_x, bar_y + bar_height * sh, bar_width * sw, invulnerability_bar_height * sh) -- missing health
             local invulnerable_tween = invulnerability_timer
             if Config.IS_GRUG_BRAIN then invulnerable_tween = lerp(invulnerability_timer - game_timer_dt, invulnerability_timer, alpha) end
-            -- LG.setColor(0, 1, 1) -- cyan?????
             LG.setColor(Common.COLOR.player_boost_dash_modifier) -- recharging ...
             LG.rectangle('fill', bar_x, bar_y + bar_height * sh, (bar_width * invulnerable_tween) * sw, 1 + invulnerability_bar_height * sh) -- current invulnerability
         else
@@ -1640,7 +1595,8 @@ function draw_debug_hud()
     LG.print(
         table.concat({
             'curr_state.creatures.active: ' .. active_counter,
-            'curr_state.creatures.count: ' .. #cs.creatures_x, -- FIXME: This does not decrease as we allocate and increase the buffer size at each level increment.
+            -- FIXME: This does not decrease as we allocate and increase the buffer size at each level increment.
+            'curr_state.creatures.count: ' .. #cs.creatures_x,
             'initial_large_creatures_this_game_level: ' .. initial_large_creatures_this_game_level,
             'buffer creatures.count: ' .. #cs.creatures_x,
             'player.angle: ' .. cs.player_rot_angle,
@@ -1701,18 +1657,21 @@ end
 --- fluctute super fast
 function draw_game(alpha)
     draw_creatures(alpha)
-
-    -- Shaders.phong_lighting.shade_active_creatures_multiple_lights(function() draw_creatures(alpha) end)
-    -- draw_creatures(alpha)--[[]]
-
     draw_keybindings_text()
-
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
-    -- Shaders.phong_lighting.shade_player_trail(function() draw_player_trail(alpha) end)
-    if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then draw_player_direction_ray(alpha) end
+    if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then --[[]]
+        draw_player_direction_ray(alpha)
+    end
     draw_player_shield_collectible(alpha)
+    curr_state:draw_player_collectible_indicators(alpha)
     draw_player(alpha)
+end
+
+function curr_state:draw_player_collectible_indicators(alpha)
+    --[[]]
+
+    LG.print('»', self.player_x, self.player_y, 0.0, 3, 3)
 end
 
 --
@@ -1943,6 +1902,123 @@ function load_shaders()
     end
 end
 
+--- Function: Global game state reset function (handle with care).
+function reset_game()
+    -- Reset game states.
+    do
+        curr_state.player_invulnerability_timer = 0
+        curr_state.player_health = Config.PLAYER_MAX_HEALTH
+        curr_state.player_rot_angle = 0
+        curr_state.player_vel_x = 0
+        curr_state.player_vel_y = 0
+        curr_state.player_x = arena_w * 0.5
+        curr_state.player_y = arena_h * 0.5
+
+        prev_state.player_invulnerability_timer = 0
+        prev_state.player_health = nil --- NOTE: What should this be?
+        prev_state.player_rot_angle = 0
+        prev_state.player_vel_x = 0
+        prev_state.player_vel_y = 0
+        prev_state.player_x = arena_w * 0.5
+        prev_state.player_y = arena_h * 0.5
+    end
+
+    -- Reset decorative data structures.
+    do
+        for i = 1, Config.PLAYER_MAX_TRAIL_COUNT do
+            player_trails.x[i] = 0
+            player_trails.y[i] = 0
+            player_trails.vel_x[i] = 0
+            player_trails.vel_y[i] = 0
+            player_trails.rot_angle[i] = 0
+            player_trails.is_active[i] = Common.STATUS.NOT_ACTIVE
+            player_trails.time_left[i] = 0
+        end
+
+        for i = 1, Config.LASER_MAX_CAPACITY do
+            curr_state.lasers_angle[i] = 0
+            curr_state.lasers_is_active[i] = Common.STATUS.NOT_ACTIVE
+            curr_state.lasers_time_left[i] = Config.LASER_FIRE_TIMER_LIMIT
+            curr_state.lasers_x[i] = 0
+            curr_state.lasers_y[i] = 0
+        end
+    end
+
+    -- Initialize and setup creatures.
+    do
+        -- HACK: Avoid exponential overpopulation initial creatures.
+        do
+            -- FIXME: THIS IS NOT IN CONFIGURATION (did not notice it while renaming ^_^) -- FIXME: vvv Avoiding exponential-like (not really) overpopulation
+            initial_large_creatures_this_game_level = Config.CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT * game_level
+            initial_large_creatures_this_game_level = (math.floor(Config.CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT * (game_level ^ (1 / 4))))
+
+            -- FIXME: Should not modify Configuration!!!!  --[[AUTO-UPDATE]]
+            EXPECTED_FINAL_HEALED_CREATURE_COUNT = ((initial_large_creatures_this_game_level ^ 2) - initial_large_creatures_this_game_level) --[[@type integer # This count excludes the initial ancestor count.]]
+            Config.CREATURE_TOTAL_CAPACITY = 2 * (initial_large_creatures_this_game_level ^ 2) --[[@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`]]
+        end
+
+        local _largest_creature_stage = #Config.CREATURE_STAGES
+        local _not_active_status = Common.STATUS.NOT_ACTIVE
+
+        -- Pre-allocate all creature's including stage combinations.
+        for i = 1, Config.CREATURE_TOTAL_CAPACITY do
+            curr_state.creatures_angle[i] = 0
+            curr_state.creatures_evolution_stage[i] = _largest_creature_stage
+            curr_state.creatures_health[i] = 0
+            curr_state.creatures_is_active[i] = _not_active_status
+            curr_state.creatures_x[i] = 0
+            curr_state.creatures_y[i] = 0
+            curr_state.creatures_vel_x[i] = 0
+            curr_state.creatures_vel_y[i] = 0
+        end
+
+        local _active_status = Common.STATUS.ACTIVE
+        -- Activate initial creatures.
+        for i = 1, initial_large_creatures_this_game_level do
+            curr_state.creatures_angle[i] = love.math.random() * Config.TWO_PI
+            curr_state.creatures_evolution_stage[i] = _largest_creature_stage -- Start at smallest stage
+            curr_state.creatures_health[i] = -1 --[[-1 to 0 to 1.... like dash timer, or fade timer ( -1 to 0 to 1 )]]
+            curr_state.creatures_is_active[i] = _active_status
+            curr_state.creatures_vel_x[i] = 0
+            curr_state.creatures_vel_y[i] = 0
+            -- Avoid creature spawning at window corners. (when value is 0)
+            do -- FIXME: Ensure creature doesn't intersect with player at new level load
+                curr_state.creatures_x[i] = love.math.random(32, arena_w - 32)
+                curr_state.creatures_y[i] = love.math.random(32, arena_h - 32)
+            end
+        end
+    end
+
+    -- Reset declared global variables.
+    do
+        game_timer_dt = 0.0
+        game_timer_t = 0.0
+
+        laser_fire_timer = 0
+        laser_index = 1 -- circular buffer index (duplicated below!)
+        laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
+        laser_intersect_final_creature_counter = 0 -- count tiniest creature to save─collision with laser
+
+        player_fire_cooldown_timer = 0
+        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
+
+        player_shield_collectible_pos_x = nil --- @type number|nil
+        player_shield_collectible_pos_y = nil --- @type number|nil
+    end
+
+    -- Copy once and Synchronize state.
+    do
+        copy_game_state(prev_state, curr_state)
+        sync_prev_state()
+        if Config.Debug.IS_ASSERT then --[[Sane assumptions]]
+            assert(laser_index == 1)
+        end
+        if Config.Debug.IS_ASSERT then--[[Match prev_state with curr_state]]
+            assert_consistent_state()
+        end
+    end
+end --< reset_game()
+
 --
 --
 --
@@ -1954,27 +2030,37 @@ end
 --
 
 function love.load()
-    do -- Copy once from global variables declared in `conf.lua`.
+    -- Set LOVE defaults.
+    do
+        -- Smoother edges.
+        love.graphics.setDefaultFilter('linear', 'linear')
+
+        -- Disabled by default.
+        love.keyboard.setKeyRepeat(true)
+    end
+
+    -- Copy once from global variables declared in `conf.lua`.
+    do
         arena_h = gh
         arena_w = gw
     end
-    font = LG.getFont()
 
-    -- Smoother edges
-    LG.setDefaultFilter('linear', 'linear')
-
+    -- Initialize font/audio/shader/spritebatch assets
     do
+        font = LG.getFont()
+
         load_audio()
+
         load_shaders()
-        do --[[Load sprite batches.]]
-            local drawutil = require 'drawutil'
-            bg_parallax_sprite_batch = drawutil.SpriteBatchFn.make_bg_parallax_entities() --- @type love.SpriteBatch
-            creatures_sprite_batch = drawutil.SpriteBatchFn.make_creatures() --- @type love.SpriteBatch
-            laser_sprite_batch = drawutil.SpriteBatchFn.make_lasers() --- @type love.SpriteBatch
-        end
+
+        -- Load sprite batches.
+        local graphics_util = require 'drawutil'
+        bg_parallax_sprite_batch = graphics_util.SpriteBatchFn.make_bg_parallax_entities() --- @type love.SpriteBatch
+        creatures_sprite_batch = graphics_util.SpriteBatchFn.make_creatures() --- @type love.SpriteBatch
+        laser_sprite_batch = graphics_util.SpriteBatchFn.make_lasers() --- @type love.SpriteBatch
     end
 
-    -- Global variables.
+    -- Initialize global variables.
     do
         creature_swarm_range = Config.PLAYER_RADIUS * 4 -- FIXME: should be evolution_stage.radius specific
         dt_accum = 0.0 --- @type number Accumulator keeps track of time passed between frames.
@@ -1998,185 +2084,39 @@ function love.load()
         end
     end
 
-    -- Declare global data structures.
-    --[[stylua: ignore]]
-    do
-        prev_state = { --[[@type GameState]]
-            creatures_angle = {},   creatures_evolution_stage = {},     creatures_health = {},         creatures_is_active = {},
-            creatures_vel_x = {},   creatures_vel_y = {},               creatures_x = {},              creatures_y = {},
-            lasers_angle = {},      lasers_is_active = {},              lasers_time_left = {},         lasers_x = {}, lasers_y = {},
-            player_health = 0,      player_invulnerability_timer = 0,   player_rot_angle = 0,          player_damaged_last_timestamp = 0.0,
-            player_vel_x = 0,       player_vel_y = 0, player_x = 0,     player_y = 0,
-        }
-        curr_state = { --[[@type GameState]]
-            creatures_angle = {},   creatures_evolution_stage = {},     creatures_health = {},         creatures_is_active = {},
-            creatures_vel_x = {},   creatures_vel_y = {},               creatures_x = {},              creatures_y = {},
-            lasers_angle = {},      lasers_is_active = {},              lasers_time_left = {},         lasers_x = {}, lasers_y = {},
-            player_health = 0,      player_invulnerability_timer = 0,   player_rot_angle = 0,          player_damaged_last_timestamp = 0.0,
-            player_vel_x = 0,       player_vel_y = 0, player_x = 0,     player_y = 0,
-        }
-
-        --[[Trailblazer]]
-        do
-            player_trails_index = 1 --- @type integer # 1..`MAX_PLAYER_TRAIL_COUNT`
-            player_trails_is_active = {} --- @type STATUS[]
-            player_trails_rot_angle = {} --- @type number[]
-            player_trails_time_left = {} --- @type number[]
-            player_trails_vel_x = {} --- @type number[]
-            player_trails_vel_y = {} --- @type number[]
-            player_trails_x = {} --- @type number[]
-            player_trails_y = {} --- @type number[]
-        end
-    end
-
-    --- @class (exact) ParallaxEntities
-    --- @field depth number[]
-    --- @field pos_x number[]
-    --- @field pos_y number[]
-    --- @field radius number[]
-    parallax_entities = {
-        depth = {}, --- @type number[]
-        pos_x = {}, --- @type number[] without arena_w world coordinate scaling
-        pos_y = {}, --- @type number[] without arena_h world coordinate scaling
-        radius = {}, --- @type number[]
-    }
-
-    -- Initialize parallax entities
+    -- Initialize parallax entities.
     do
         for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT do
-            parallax_entities.pos_x[i] = love.math.random() --- 0.0..1.0
-            parallax_entities.pos_y[i] = love.math.random() --- 0.0..1.0
+            parallax_entities.x[i] = love.math.random() --- 0.0..1.0
+            parallax_entities.y[i] = love.math.random() --- 0.0..1.0
             local depth = love.math.random(Config.PARALLAX_ENTITY_MIN_DEPTH, Config.PARALLAX_ENTITY_MAX_DEPTH)
             parallax_entities.depth[i] = depth
             parallax_entities.radius[i] = Config.PARALLAX_ENTITY_RADIUS_FACTOR * math.ceil(math.sqrt(depth) * (Config.PARALLAX_ENTITY_MAX_DEPTH / depth))
         end
         if not true then
-            local condition = #parallax_entities.pos_x == math.sqrt(#parallax_entities.pos_x) * math.sqrt(#parallax_entities.pos_x)
+            local condition = #parallax_entities.x == math.sqrt(#parallax_entities.x) * math.sqrt(#parallax_entities.x)
             assert(condition, 'Assert count of parallax entity is a perfect square')
         end
     end
 
-    --- Global game state reset function (handle with care).
-    function reset_game() -- MUTATE GLOBAL VARS0
-        curr_state.player_invulnerability_timer = 0
-        curr_state.player_health = Config.PLAYER_MAX_HEALTH
-        curr_state.player_rot_angle = 0
-        curr_state.player_vel_x = 0
-        curr_state.player_vel_y = 0
-        curr_state.player_x = arena_w * 0.5
-        curr_state.player_y = arena_h * 0.5
-
-        prev_state.player_invulnerability_timer = 0
-        prev_state.player_health = nil --- NOTE: What should this be?
-        prev_state.player_rot_angle = 0
-        prev_state.player_vel_x = 0
-        prev_state.player_vel_y = 0
-        prev_state.player_x = arena_w * 0.5
-        prev_state.player_y = arena_h * 0.5
-
-        for i = 1, Config.PLAYER_MAX_TRAIL_COUNT do
-            player_trails_x[i] = 0
-            player_trails_y[i] = 0
-            player_trails_vel_x[i] = 0
-            player_trails_vel_y[i] = 0
-            player_trails_rot_angle[i] = 0
-            player_trails_is_active[i] = Common.STATUS.NOT_ACTIVE
-            player_trails_time_left[i] = 0
-        end
-
-        for i = 1, Config.LASER_MAX_CAPACITY do
-            curr_state.lasers_angle[i] = 0
-            curr_state.lasers_is_active[i] = Common.STATUS.NOT_ACTIVE
-            curr_state.lasers_time_left[i] = Config.LASER_FIRE_TIMER_LIMIT
-            curr_state.lasers_x[i] = 0
-            curr_state.lasers_y[i] = 0
-        end
-
-        -- Initialize and setup creatures.
-        do
-            do--[[HACKS]]
-                do -- FIXME: THIS IS NOT IN CONFIGURATION (did not notice it while renaming ^_^) -- FIXME: vvv Avoiding exponential-like (not really) overpopulation
-                    initial_large_creatures_this_game_level = Config.CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT * game_level
-                    initial_large_creatures_this_game_level = (math.floor(Config.CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT * (game_level ^ (1 / 4))))
-                end
-                do -- FIXME: Should not modify Configuration!!!!  --[[AUTO-UPDATE]]
-                    EXPECTED_FINAL_HEALED_CREATURE_COUNT = ((initial_large_creatures_this_game_level ^ 2) - initial_large_creatures_this_game_level) --[[@type integer # This count excludes the initial ancestor count.]]
-                    Config.CREATURE_TOTAL_CAPACITY = 2 * (initial_large_creatures_this_game_level ^ 2) --[[@type integer # Double buffer size of possible creatures count i.e. `initial count ^ 2`]]
-                end
-            end
-
-            local _largest_creature_stage = #Config.CREATURE_STAGES
-            local _not_active_status = Common.STATUS.NOT_ACTIVE
-            for i = 1, Config.CREATURE_TOTAL_CAPACITY do -- Pre-allocate all creature's including stage combinations
-                curr_state.creatures_angle[i] = 0
-                curr_state.creatures_evolution_stage[i] = _largest_creature_stage
-                curr_state.creatures_health[i] = 0
-                curr_state.creatures_is_active[i] = _not_active_status
-                curr_state.creatures_x[i] = 0
-                curr_state.creatures_y[i] = 0
-                curr_state.creatures_vel_x[i] = 0
-                curr_state.creatures_vel_y[i] = 0
-            end
-
-            local _active_status = Common.STATUS.ACTIVE
-            for i = 1, initial_large_creatures_this_game_level do --[[Activate initial creatures.]]
-                curr_state.creatures_angle[i] = love.math.random() * Config.TWO_PI
-                curr_state.creatures_evolution_stage[i] = _largest_creature_stage -- Start at smallest stage
-                curr_state.creatures_health[i] = -1 --[[-1 to 0 to 1.... like dash timer, or fade timer ( -1 to 0 to 1 )]]
-                curr_state.creatures_is_active[i] = _active_status
-                curr_state.creatures_vel_x[i] = 0
-                curr_state.creatures_vel_y[i] = 0
-                do --[[Avoid creature spawning at window corners. (when value is 0)]] -- FIXME: Ensure creature doesn't intersect with player at new level load
-                    curr_state.creatures_x[i] = love.math.random(32, arena_w - 32)
-                    curr_state.creatures_y[i] = love.math.random(32, arena_h - 32)
-                end
-            end
-        end
-
-        -- Reset declared global variables.
-        do
-            game_timer_dt = 0.0
-            game_timer_t = 0.0
-
-            laser_fire_timer = 0
-            laser_index = 1 -- circular buffer index (duplicated below!)
-            laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
-            laser_intersect_final_creature_counter = 0 -- count tiniest creature to save─collision with laser
-
-            player_fire_cooldown_timer = 0
-            player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
-
-            player_shield_collectible_pos_x = nil --- @type number|nil
-            player_shield_collectible_pos_y = nil --- @type number|nil
-        end
-
-        -- Copy once and Synchronize state.
-        do
-            copy_game_state(prev_state, curr_state)
-            sync_prev_state()
-            if Config.Debug.IS_ASSERT then --[[Sane assumptions]]
-                assert(laser_index == 1)
-            end
-            if Config.Debug.IS_ASSERT then--[[Match prev_state with curr_state]]
-                assert_consistent_state()
-            end
-        end
+    -- Reset the game (once!) on load.
+    do
+        reset_game()
     end
 
-    -- Reset the game on load once.
-    reset_game()
+    -- Apply final touches before takeoff.
+    do
+        -- WARN: Background shaders over-write this... but this may be useful for menus...
+        LG.setBackgroundColor(0.1, 0.1, 0.1) -- or (Common.COLOR.BACKGROUND)
 
-    -- NOTE: Background shaders over-write this... but this may be useful for menus...
-    -- LG.setBackgroundColor(Common.COLOR.BACKGROUND)
-    LG.setBackgroundColor(0.1, 0.1, 0.1)
+        -- Set master volume.
+        love.audio.setVolume(not Config.Debug.IS_DEVELOPMENT and 1.0 or 0.5) -- volume # number # 1.0 is max and 0.0 is off.
 
-    -- Master volume
-    love.audio.setVolume(not Config.Debug.IS_DEVELOPMENT and 1.0 or 0.5) -- volume # number # 1.0 is max and 0.0 is off.
-
-    -- Play on load
-    sound_upgrade_level:play()
-    music_ambience_underwater:play()
-end
+        -- Play music and effects once/looped once on load.
+        sound_upgrade_level:play()
+        music_ambience_underwater:play()
+    end
+end --< love.load()
 
 function love.update(dt)
     if Config.Debug.IS_DEVELOPMENT then -- FIXME: Maybe make stuff global that are not hot-reloading?
@@ -2213,7 +2153,7 @@ function love.update(dt)
 
     -- #5 Update any other frame-based effects (e.g., screen shake).
     update_screenshake(dt)
-end
+end --< love.update()
 
 local has_background = true
 function love.draw()
@@ -2281,8 +2221,8 @@ function love.draw()
 
     if is_debug_hud_enable then draw_hud() end
     if is_debug_hud_enable then draw_debug_hud() end
-end
+end --< love.draw()
 
-function love.keypressed(key, _, _) update_on_love_keypressed(key) end
+function love.keypressed(key) update_on_love_keypressed(key) end
 
 function love.keyreleased(key) update_on_love_keyreleased(key) end
