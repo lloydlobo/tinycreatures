@@ -522,8 +522,8 @@ function update_background_shader(dt)
     local a, b, t = (parallax_sign1_ * 0.003 * alpha), (parallax_sign2_ * 0.03 * alpha), math.sin(0.003 * alpha)
     local smoothValue = smoothstep(a, b, t)
     local freq = (smoothstep(Common.sign(smoothValue) * (dt + 0.001), Common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
-    local vel_x = 0.001 * 5 * freq * dt
-    local vel_y = 4 * math.abs(0.4 * 2 * freq) * dt
+    local vel_x = 0.02 * 5 * freq * dt
+    local vel_y = 4 * 4 * math.abs(0.4 * 2 * freq) * dt
     for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT, 4 do
         if Config.IS_GRUG_BRAIN and screenshake.duration > 0 then
             vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
@@ -1413,8 +1413,8 @@ function _draw_background_shader(alpha)
         -- bg_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
         -- bg_parallax_sprite_batch:setColor(0.025, 0.015, 0.10, point_alpha)
 
-        bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, 1.) -- PERF: prevent drawing transluscent or textures with alpha?
-        -- bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, point_alpha)
+        -- bg_parallax_sprite_batch:setColor(1., 1., 1., 1.) -- PERF: prevent drawing transluscent or textures with alpha?
+        bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, point_alpha)
         bg_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
     end
     LG.setColor(1, 1, 1, 1) -- Reset color before drawing
@@ -1431,7 +1431,7 @@ function draw_screenshake_fx(alpha)
     if not (screenshake.duration > 0) then return end
     if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
         local flash_alpha = Common.SCREEN_FLASH_ALPHA_LEVEL.LOW
-        LG.setColor(({ { 0.15, 0.15, 0.15, flash_alpha }, { 0.5, 0.5, 0.5, flash_alpha }, { 1, 1, 1, flash_alpha } })[Config.CURRENT_THEME])
+        LG.setColor(({ { 0.10, 0.10, 0.10, flash_alpha }, { 0.5, 0.5, 0.5, flash_alpha }, { 1, 1, 1, flash_alpha } })[Config.CURRENT_THEME])
         LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
     end
     LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
@@ -1678,6 +1678,7 @@ end
 --- monitor, alpha seems to be faster -> which causes the juice frequency to
 --- fluctute super fast
 function draw_game(alpha)
+    draw_screenshake_fx(alpha)
     draw_creatures(alpha)
     draw_keybindings_text()
     draw_player_fired_projectiles(alpha)
@@ -1930,7 +1931,7 @@ function load_shaders()
     -- Setup moonshine shaders
     if true then
         -- moonshine_love_shaders.fog.fog.fog_color = { 0.1, 0.0, 0.0 }
-        moonshine_shaders.fog.fog.fog_color = { 0.0, 0.0, 0.0 }
+        moonshine_shaders.fog.fog.fog_color = { 0.0, 0.1, 0.0 }
         moonshine_shaders.fog.fog.speed = { 0.2, 0.9 }
         moonshine_shaders.fog.fog.octaves = 1
     end
@@ -2222,7 +2223,7 @@ function love.update(dt)
         -- glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
         glsl_shaders.warp:send('screen', { screen_w, screen_h })
         glsl_shaders.warp:send('time', love.timer.getTime())
-        moonshine_shaders.fog.fog.time = game_timer_t
+        moonshine_shaders.fog.fog.time = love.timer.getTime()
     end
 
     -- #4 Frame Rate Independence: Fixed timestep loop.
@@ -2244,7 +2245,9 @@ function love.draw()
 
     if Config.Debug.IS_ASSERT then assert_consistent_state() end
 
-    local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
+    --- @type number
+    local alpha = dt_accum * Config.FIXED_DT_INV
+
     moonshine_shaders.post_processing(function()
         if not true then
             LG.setShader(glsl_shaders.gradient_timemod)
@@ -2253,44 +2256,51 @@ function love.draw()
             end
             draw_background_shader(alpha)
             LG.setShader() -- > background_gradient_shader
-        end
-
-        do
-            LG.setShader(glsl_shaders.warp)
-            if has_background then
-                LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
-            end
-            draw_background_shader(alpha)
-            LG.setShader() -- > warp
-        end
-
-        do
+        else
             local blend_mode = LG.getBlendMode()
-            LG.setBlendMode('screen', 'premultiplied')
-            moonshine_shaders.fog(function() end)
-            LG.setBlendMode(blend_mode)
+            LG.setBlendMode('alpha', 'premultiplied')
+            do
+                LG.setShader(glsl_shaders.warp)
+                do
+                    -- Draw background fill, else background color shows up─if menu/pause, or use `LG.clearBackground())`
+                    if has_background then LG.rectangle('fill', 0, 0, arena_w, arena_h) end
+                end
+                LG.setShader() --> glsl_shader.warp
+            end
+            do
+                if true then
+                    LG.setBlendMode('add', 'premultiplied')
+                    do
+                        draw_background_shader(alpha)
+                    end
+                    LG.setBlendMode('screen', 'premultiplied')
+                end
+                if true then moonshine_shaders.fog(function() end) end
+            end
+            LG.setBlendMode(blend_mode) -- end of 'screen'
         end
 
         -- Draw background fill, else background color shows up (maybe use LG.clearBackground())
-        do
+        --- PERF: A glow radial gradient texture may help shader switch calls
+        if true then
             local blend_mode = LG.getBlendMode()
-            LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied') -- screen|lighten work well
 
-            --- PERF: A glow radial gradient texture may help shader switch calls
+            -- screen|lighten work well
+            LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied')
             Shaders.phong_lighting.shade_any_to_player_pov(function() LG.rectangle('fill', 0, 0, arena_w, arena_h) end)
             LG.setBlendMode(blend_mode)
         end
 
         -- • Objects that are partially off the edge of the screen can be seen on the other side.
-        -- • Coordinate system is translated to different positions and everything is drawn at each position around the screen and in the center.
+        -- • Coordinate system is translated to different positions and everything is drawn at each
+        --   position around the screen and in the center.
         -- • Draw off-screen object partially wrap around without glitch
         for y = -1, 1 do
             for x = -1, 1 do
                 LG.origin()
                 LG.translate(x * arena_w, y * arena_h)
-                draw_screenshake_fx(alpha)
                 draw_game(alpha)
-                LG.origin() -- Reverse any previous calls to love.graphics.
+                LG.origin()
             end
         end
         do

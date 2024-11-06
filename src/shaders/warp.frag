@@ -85,8 +85,7 @@ const mat2 MTX=mat2(.8,.6,-.6,.8);
 
 float fbm(vec2 p)
 {
-    float t=time*.0625;
-    // /* DEBUGGING */t*=8.;
+    float t=time*.0625; t*=4.;
     
     float f=0.;
     
@@ -107,26 +106,14 @@ float pattern(in vec2 p)
 
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords)
 {
-    float f_aspect=0.;
-    f_aspect=screen.x/screen.y;
-    
+    float f_aspect=screen.x/screen.y;
     vec2 uv=screen_coords/screen;
     vec2 uv0=uv;
-    
     uv.x*=f_aspect;
-    
     vec4 pixel=Texel(image,uvs);
-    
-    float f_shade;
-    {// suppress unused variable error
-        f_shade/=f_aspect*time;
-        f_shade*=.000000001*time;
-    }
-    f_shade+=pattern(uv);
-    
+    float f_shade=pattern(uv);
     vec3 col=palette(f_shade);
-    
-    return pixel*vec4(col,1.);
+    return pixel*vec4(col*.5,1.);
 }
 
 
