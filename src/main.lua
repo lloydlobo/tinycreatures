@@ -519,15 +519,33 @@ local parallax_sign1_ = ({ -1, 1 })[love.math.random(1, 2)]
 local parallax_sign2_ = ({ -3, 3 })[love.math.random(1, 2)]
 function update_background_shader(dt)
     local alpha = dt_accum * Config.FIXED_DT_INV
-    local a, b, t = (parallax_sign1_ * 0.003 * alpha), (parallax_sign2_ * 0.03 * alpha), math.sin(0.003 * alpha)
-    local smoothValue = smoothstep(a, b, t)
-    local freq = (smoothstep(Common.sign(smoothValue) * (dt + 0.001), Common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
-    local vel_x = 0.02 * 5 * freq * dt
-    local vel_y = 4 * 4 * math.abs(0.4 * 2 * freq) * dt
+    -- local a, b, t = (parallax_sign1_ * 0.003 * alpha), (parallax_sign2_ * 0.03 * alpha), math.sin(0.003 * alpha)
+    -- local smoothValue = smoothstep(a, b, t)
+    -- local freq = (smoothstep(Common.sign(smoothValue) * (dt + 0.001), Common.sign(smoothValue) * (smoothValue + 0.001), 0.5))
+
+    local speed_y = (arena_h / 32) * 0.001
+
+    local game_freq_x = math.sin(2 * game_timer_t) / 2
+    local game_freq_y = math.sin((4 + love.math.random()) * game_timer_t * 0.0625) / 4
+
+    local vel_x = 0.25 * 0.001 * lume.clamp(game_freq_x, -1, 1)
+    -- do
+    --     vel_x = vel_x + 0.5 * 0.001 * math.sin(8 * love.math.random()) / 8
+    -- end
+
+    local vel_y = speed_y * (INV_PHI_SQ * math.abs(game_freq_y))
+    vel_y = math.max(smoothstep(vel_y, 0.001 * 5, 0.4), vel_y)
+    -- vel_y = smoothstep(vel_y * PHI, vel_y * 2, love.math.random() - game_freq_x)
+
+    if vel_y < 0.000005 then assert(false, vel_y) end
+    do
+        -- vel_y = smoothstep(vel_y, (0.125 * 0.001 * math.abs(love.math.random()) + 1) * speed_y, game_freq_y)
+    end
+
     for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT, 4 do
         if Config.IS_GRUG_BRAIN and screenshake.duration > 0 then
-            vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), smoothValue)
-            vel_y = vel_y - smoothstep(vel_y * (-love.math.random(-0.5, 2.5)), vel_y * love.math.random(0, 8), smoothValue)
+            vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), game_freq_x)
+            vel_y = vel_y - smoothstep(vel_y * (-love.math.random(-0.5, 2.5)), vel_y * love.math.random(0, 8), game_freq_y)
         end
         parallax_entities.x[i] = parallax_entities.x[i] - math.sin(parallax_entities.depth[i] * vel_x)
         parallax_entities.x[i + 1] = parallax_entities.x[i + 1] - math.sin(parallax_entities.depth[i + 1] * vel_x)
@@ -2254,28 +2272,32 @@ function love.draw()
             if has_background then
                 LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
             end
-            draw_background_shader(alpha)
             LG.setShader() -- > background_gradient_shader
         else
             local blend_mode = LG.getBlendMode()
-            LG.setBlendMode('alpha', 'premultiplied')
+            LG.setBlendMode('screen', 'premultiplied')
             do
                 LG.setShader(glsl_shaders.warp)
                 do
-                    -- Draw background fill, else background color shows up─if menu/pause, or use `LG.clearBackground())`
-                    if has_background then LG.rectangle('fill', 0, 0, arena_w, arena_h) end
+                    if has_background then
+                        -- Draw background fill, else background color shows up─if menu/pause, or
+                        -- use `LG.clearBackground())`
+                        LG.rectangle('fill', 0, 0, arena_w, arena_h)
+                    end
                 end
                 LG.setShader() --> glsl_shader.warp
             end
             do
                 if true then
+                    --[[ LG.setBlendMode('alpha', 'premultiplied') ]]
+                    moonshine_shaders.fog(function() end)
+                    --[[ LG.setBlendMode('screen', 'premultiplied') ]]
+                end
+                if true then
                     LG.setBlendMode('add', 'premultiplied')
-                    do
-                        draw_background_shader(alpha)
-                    end
+                    draw_background_shader(alpha)
                     LG.setBlendMode('screen', 'premultiplied')
                 end
-                if true then moonshine_shaders.fog(function() end) end
             end
             LG.setBlendMode(blend_mode) -- end of 'screen'
         end
@@ -2299,6 +2321,7 @@ function love.draw()
             for x = -1, 1 do
                 LG.origin()
                 LG.translate(x * arena_w, y * arena_h)
+                draw_background_shader(alpha)
                 draw_game(alpha)
                 LG.origin()
             end
