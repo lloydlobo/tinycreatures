@@ -1907,10 +1907,12 @@ function load_shaders()
     --- @field gradient_basic love.Shader
     --- @field gradient_timemod love.Shader
     --- @field lighting_phong love.Shader
+    --- @field warp love.Shader
     glsl_shaders = {
         gradient_basic = LG.newShader(Shaders.bg_gradient.glsl_frag),
         gradient_timemod = LG.newShader 'shaders/bg_gradient_time_modulate.frag',
         lighting_phong = LG.newShader 'shaders/phong_lighting.frag',
+        warp = LG.newShader 'shaders/warp.frag',
     }
 
     -- Load moonshine shaders
@@ -2215,8 +2217,11 @@ function love.update(dt)
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
     do
-        glsl_shaders.gradient_timemod:send('screen', { LG.getWidth(), LG.getHeight() })
-        glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
+        local screen_w, screen_h = LG.getDimensions()
+        -- glsl_shaders.gradient_timemod:send('screen', { screen_w, screen_h })
+        -- glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
+        glsl_shaders.warp:send('screen', { screen_w, screen_h })
+        glsl_shaders.warp:send('time', love.timer.getTime())
         moonshine_shaders.fog.fog.time = game_timer_t
     end
 
@@ -2241,13 +2246,22 @@ function love.draw()
 
     local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
     moonshine_shaders.post_processing(function()
-        do
+        if not true then
             LG.setShader(glsl_shaders.gradient_timemod)
             if has_background then
                 LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
             end
             draw_background_shader(alpha)
             LG.setShader() -- > background_gradient_shader
+        end
+
+        do
+            LG.setShader(glsl_shaders.warp)
+            if has_background then
+                LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
+            end
+            draw_background_shader(alpha)
+            LG.setShader() -- > warp
         end
 
         do
@@ -2263,10 +2277,7 @@ function love.draw()
             LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied') -- screen|lighten work well
 
             --- PERF: A glow radial gradient texture may help shader switch calls
-            Shaders.phong_lighting.shade_any_to_player_pov(function()
-                -- LG.setColor(1, 1, 1, 1)
-                LG.rectangle('fill', 0, 0, arena_w, arena_h)
-            end)
+            Shaders.phong_lighting.shade_any_to_player_pov(function() LG.rectangle('fill', 0, 0, arena_w, arena_h) end)
             LG.setBlendMode(blend_mode)
         end
 
