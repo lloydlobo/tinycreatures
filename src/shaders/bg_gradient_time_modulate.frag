@@ -42,6 +42,8 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
      t*=2.;
      float f_smooth_d=.25;
      
+     float f_invert_speed_density=8.;
+     
      for(float i=1.;i<4.;++i){
           // f=.5-.5*sin((uv[0]*3.14159+time*.0625))*i;/*f/=i;*/
           
@@ -64,7 +66,7 @@ vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords){
           col.gb+=.125*mix(palette(i*(-t)).gb,col.gb,clamp(f/i,.382,.618));
           
           // Inverted gradient across screen
-          col.r*=pow(f/i,4.*sin(t*pow(.5*d,f_smooth_d)));
+          col.r*=pow(f/i,f_invert_speed_density*sin(t*pow(.5*d,f_smooth_d)));
           
           // #2 Fade to night
           // col*=f/pow(i,.5);
