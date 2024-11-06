@@ -1,10 +1,12 @@
 # Tiny Blood Cells
 
-[![Lua Tests](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml) • [![format](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml)
+[![Lua Tests](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/test.yml)
+
+<!-- • [![format](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml/badge.svg)](https://github.com/lloydlobo/tinycreatures/actions/workflows/fmt.yml) -->
 
 You play as the Observer in this `asteroidlike` top down shooter, but wait you are also the medic i.e. the protector cell that is healing unhealthy cells
 
-![tinycreatures_20241104125912](static/screencasts/tinycreatures_20241104125912.gif)
+![tinycreatures_20241106165246](static/screencasts/tinycreatures_20241106165246.gif)
 
 > Initially built during a game jam for Ludum Dare 56's Tiny Creatures theme.
 
@@ -211,6 +213,7 @@ This project is open source under the MIT License. See the LICENSE file for more
 ![tinycreatures_20241025180525](static/screencasts/tinycreatures_20241025180525.gif)
 ![tinycreatures_20241102145514](static/screencasts/tinycreatures_20241102145514.gif)
 ![tinycreatures_20241104125912](static/screencasts/tinycreatures_20241104125912.gif)
+![tinycreatures_20241106165246](static/screencasts/tinycreatures_20241106165246.gif)
 
 </details>
 
