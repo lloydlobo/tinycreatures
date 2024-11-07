@@ -41,7 +41,8 @@ local SpriteBatchFn = {
     make_creatures = function()
         local color = Common.COLOR.creature_infected
         local radius = Config.CREATURE_STAGES[#Config.CREATURE_STAGES].radius --[[local creature_circle_image = create_circle_image(radius, color[1], color[2], color[3], 1.0)]]
-        local img = create_circle_image { radius = radius, color = { 0.3, 0.3, 0.3 } }
+        -- local img = create_circle_image { radius = radius, color = { 0.3, 0.3, 0.3 } }
+        local img = create_circle_image { radius = radius, color = { 1.0, 1.0, 1.0 } }
         return LG.newSpriteBatch(img, Config.CREATURE_TOTAL_CAPACITY, 'static') -- maybe static?
     end,
 

@@ -442,9 +442,9 @@ end
 
 --- @enum EngineMoveKind
 local EngineMoveKind = {
-    idle = 0,
-    forward = 1,
-    backward = 2,
+    IDLE = 0,
+    FORWARD = 1,
+    BACKWARD = 2,
 }
 
 --- @param dt number # Delta time.
@@ -457,14 +457,14 @@ function play_player_engine_sound(dt, movekind)
         -- Stop overlapping sound waves by making the consecutive one softer
         local curr_pos = sound_player_engine:tell 'samples'
         local last_pos = sound_player_engine:getDuration 'samples'
-        if movekind == EngineMoveKind.forward then
+        if movekind == EngineMoveKind.FORWARD then
             sound_player_engine:setVolume(1.3)
             sound_player_engine:setAirAbsorption(dt) --- LOL (: warble effect due to using variable dt
-        elseif movekind == EngineMoveKind.backward then
+        elseif movekind == EngineMoveKind.BACKWARD then
             sound_player_engine:setVolume(0.8)
             sound_player_engine:setAirAbsorption(0) --- LOL (: warble effect due to using variable dt
         elseif curr_pos >= INV_PHI * last_pos and curr_pos <= 0.99 * last_pos then
-            sound_player_engine:setVolume(movekind == EngineMoveKind.forward and 0.6 or 0.7)
+            sound_player_engine:setVolume(movekind == EngineMoveKind.FORWARD and 0.6 or 0.7)
             sound_player_engine:setAirAbsorption(10) --- LOL (: warble effect due to using variable dt
         elseif curr_pos > 0.99 * last_pos then
             sound_player_engine:setVolume(1)
@@ -510,16 +510,16 @@ end
 --- @param status PlayerDamageStatus
 function player_damage_status_actions(status)
     if status == Common.PLAYER_DAMAGE_STATUS.DEAD then
-        screenshake.duration = 0.15 * PHI * PHI
+        screenshake.duration = SCREENSHAKE_DURATION.ON_DEATH
         sound_player_took_damage_interference:play()
         sound_player_took_damage:play()
         reset_game()
     elseif status == Common.PLAYER_DAMAGE_STATUS.DAMAGED then
-        screenshake.duration = 0.15 * PHI
+        screenshake.duration = SCREENSHAKE_DURATION.ON_DAMAGE
         sound_player_took_damage_interference:play()
         sound_player_took_damage:play()
     elseif status == Common.PLAYER_DAMAGE_STATUS.INVULNERABLE then
-        screenshake.duration = 0.45
+        screenshake.duration = SCREENSHAKE_DURATION.ON_INVULNERABLE
         --- just use a fade in Timer here
         sound_player_engine:play() -- indicate player to move while they still can ^_^
     end -- no-op
@@ -686,7 +686,7 @@ function update_player_fired_projectiles_this_frame(dt)
             if Collision.is_intersect_circles { a = creature_circle, b = laser_circle } then
                 temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
 
-                screenshake.duration = 0.15 -- got'em!
+                screenshake.duration = SCREENSHAKE_DURATION.ON_LASER_HIT_CREATURE
 
                 -- Deactivate projectile if touch creature.
                 cs.lasers_is_active[laser_index] = Common.STATUS.NOT_ACTIVE
@@ -884,6 +884,17 @@ end
 local _F_REVERSE_ACCELERATION = 0.9
 local _CONTROL_KEY = Common.CONTROL_KEY
 local love_keyboard_isDown = love.keyboard.isDown
+
+--- @enum ScreenshakeDuration
+SCREENSHAKE_DURATION = {
+    ON_BOOST = 0.05,
+    ON_FIRE_LASER = 0.05,
+    ON_INVULNERABLE = 0.45,
+    ON_LASER_HIT_CREATURE = 0.15,
+    ON_DAMAGE = 0.15 * PHI,
+    ON_DEATH = 0.15 * PHI * PHI,
+}
+
 function handle_player_input_this_frame(dt)
     local cs = curr_state
 
@@ -906,7 +917,7 @@ function handle_player_input_this_frame(dt)
         if love.keyboard.isDown('up', 'w') then
             cs.player_vel_x = cs.player_vel_x + math.cos(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
             cs.player_vel_y = cs.player_vel_y + math.sin(cs.player_rot_angle) * Config.PLAYER_ACCELERATION * dt
-            play_player_engine_sound(dt, EngineMoveKind.forward)
+            play_player_engine_sound(dt, EngineMoveKind.FORWARD)
         end
 
         local reverese_acceleration = Config.PLAYER_ACCELERATION * _F_REVERSE_ACCELERATION
@@ -914,15 +925,19 @@ function handle_player_input_this_frame(dt)
             cs.player_vel_x = cs.player_vel_x - math.cos(cs.player_rot_angle) * reverese_acceleration * dt
             cs.player_vel_y = cs.player_vel_y - math.sin(cs.player_rot_angle) * reverese_acceleration * dt
         end
-        play_player_engine_sound(dt, EngineMoveKind.backward)
+        play_player_engine_sound(dt, EngineMoveKind.BACKWARD)
     end
 
-    if is_firing and not is_boosting then fire_player_projectile() end
+    if is_firing and not is_boosting then
+        screenshake.duration = SCREENSHAKE_DURATION.ON_FIRE_LASER
+        fire_player_projectile()
+    end
 
     --[[Tradeoffs to aid microdecisions]]
     if is_boosting then -- Can't shoot while boosting.
         --[[TODO: Make player invulnerable while boost timer─which is unimplemented, does not runs out]]
         cs.player_invulnerability_timer = 1.0
+        screenshake.duration = SCREENSHAKE_DURATION.ON_BOOST
         boost_player_entity_speed(dt)
         do
             local should_play_once = (not music_sci_fi_engine:isPlaying()) or music_sci_fi_engine_is_fading_out
@@ -1302,16 +1317,20 @@ function _draw_active_creature(i, alpha)
     local origin_y = radius
     local rgb = Common.COLOR.creature_infected -- !!!! can this paint them individually with set color
 
-    creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3], 1.) ---@diagnostic disable-line: param-type-mismatch
+    -- creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3], 1.) ---@diagnostic disable-line: param-type-mismatch
+    creatures_sprite_batch:setColor(0.03, 0.03, 0.03) ---@diagnostic disable-line: param-type-mismatch
     creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 end
 
 function _draw_not_active_creature(i, alpha)
     local cs = curr_state
 
+    local game_freq = math.sin(game_timer_t * 8) / 8
+
     local curr_x = cs.creatures_x[i]
     local curr_y = cs.creatures_y[i]
-    local evolution_stage = Config.CREATURE_STAGES[cs.creatures_evolution_stage[i]] --- @type CreatureStage
+    local evolution_stage_id = cs.creatures_evolution_stage[i]
+    local evolution_stage = Config.CREATURE_STAGES[evolution_stage_id] --- @type CreatureStage
     local radius = evolution_stage.radius
     local scale = radius * MAX_CREATURE_RADIUS_INV --- since sprite batch item has radius of largest creature
 
@@ -1343,19 +1362,23 @@ function _draw_not_active_creature(i, alpha)
             local __is_overide = true
             if __is_overide or Config.IS_GRUG_BRAIN then
                 local shrinkage = lume.clamp(cs.creatures_health[i], -radius, 0.200)
-                shrink_factor = shrinkage
+                local shrink_factor = lume.clamp(shrinkage, 0, 1)
                 local s_lo = scale - INV_PHI * shrink_factor
                 local s_hi = scale - PHI * shrink_factor
-                _sx = smoothstep(s_lo, s_hi, game_timer_dt)
-                _sy = smoothstep(s_lo, s_hi, game_timer_dt)
+                _sx = smoothstep(s_lo, s_hi, game_freq)
+                _sy = smoothstep(s_lo, s_hi, game_freq)
             end
         end
 
         -- !!!! can this paint them individually with set color
         -- FIXME: If color passed has an alpha channel, this will panic
         local rgb = Common.COLOR.creature_healed
+        rgb = Common.CREATURE_STAGE_EYE_COLORS[1]
+        -- creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3])
+        -- creatures_sprite_batch:add(curr_x, curr_y, 0, _sx, _sy, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
-        creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3])
+        -- creatures_sprite_batch:setColor(0.9, 0.2, 0.3)
+        creatures_sprite_batch:setColor(rgb[1], rgb[2] * INV_PHI, rgb[3] * INV_PHI, 0.8)
         creatures_sprite_batch:add(curr_x, curr_y, 0, _sx, _sy, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
         -- PERF: Use a different sprite batch for healed departing creature
@@ -1383,6 +1406,7 @@ function _draw_not_active_creature(i, alpha)
     end
 end
 
+local _IS_CREATURES_BLINK_ENABLE = not true
 --- PERF: Use sprite batch for eyes
 function draw_creatures_eye(alpha)
     local cs = curr_state
@@ -1438,8 +1462,28 @@ function draw_creatures_eye(alpha)
                 LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])
                 LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
             else
+                local radius_ = radius * INV_PHI_SQ * INV_PHI
                 LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])
-                LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+
+                if _IS_CREATURES_BLINK_ENABLE then
+                    local radius_blink = 0
+                    local f_blink_speed_damper = 2 -- 1..infinity
+                    local f_blink_ease = 4
+                    local f_blink_rate = lume.clamp(f_blink_speed_damper * math.sin(((i % 11) % 9 + f_blink_ease * game_freq)), 0, 1)
+                    radius_blink = smoothstep(radius_, -0.4, f_blink_rate)
+                    -- if radius_blink < 0.7 then radius_blink = 0 end
+                    local is_eye_shut = radius_blink < 0.2
+                    if is_eye_shut then radius_blink = 0 end
+                    if not is_eye_shut then
+                        radius_blink = lume.clamp(radius_blink, 0.00, radius_ * (1 + INV_PHI_SQ))
+                        LG.ellipse('fill', x, y, radius_, radius_blink)
+                    end
+                    -- Draw actual eyes no blinking
+                    if Config.Debug.IS_DEVELOPMENT then LG.circle('line', x, y, radius * INV_PHI_SQ * INV_PHI) end
+                else
+                    -- Draw actual eyes no blinking
+                    LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+                end
             end
         end
     end
@@ -1503,15 +1547,26 @@ function draw_background_shader(alpha)
     LG.draw(bg_parallax_sprite_batch) -- Draw all sprites in one batch
 end
 
---- @diagnostic disable-next-line: unused-local
+local _IS_SCREENFLASH_ENABLE = true -- (TODO: Make it optional, and sensory warning perhaps?)
+local _SCREENFLASH_FROM_SCREENSHAKE_MIN_DURATION = 0.125
+local _SCREENFLASH_FROM_SCREENSHAKE_MAX_DURATION = 0.96
+local _SCREENFLASH_ALPHA = Common.SCREEN_FLASH_ALPHA_LEVEL.LOW
+local _SCREENFLASH_COLOR = { 0.1, 0.1, 0.1, _SCREENFLASH_ALPHA }
+
 function draw_screenshake_fx(alpha)
-    if not (screenshake.duration > 0) then return end
-    if screenshake.duration >= 0.125 and screenshake.duration <= 0.96 then -- snappy screenflash
-        local flash_alpha = Common.SCREEN_FLASH_ALPHA_LEVEL.LOW
-        LG.setColor(({ { 0.10, 0.10, 0.10, flash_alpha }, { 0.5, 0.5, 0.5, flash_alpha }, { 1, 1, 1, flash_alpha } })[Config.CURRENT_THEME])
-        LG.rectangle('fill', 0, 0, arena_w, arena_h) -- Simulate screenflash (TODO: Make it optional, and sensory warning perhaps?)
+    local screenshake_duration = screenshake.duration
+    if screenshake_duration <= 0 then return end
+
+    -- Simulate screenflash.
+    local is_snappy_interval = (screenshake_duration >= _SCREENFLASH_FROM_SCREENSHAKE_MIN_DURATION)
+        and (screenshake_duration <= _SCREENFLASH_FROM_SCREENSHAKE_MAX_DURATION)
+    if _IS_SCREENFLASH_ENABLE and is_snappy_interval then
+        LG.setColor(_SCREENFLASH_COLOR)
+        LG.rectangle('fill', 0, 0, arena_w, arena_h)
     end
-    LG.translate(screenshake.offset_x, screenshake.offset_y) -- Simulate screenshake
+
+    -- Simulate screenshake.
+    LG.translate(screenshake.offset_x, screenshake.offset_y)
 end
 
 local temp_last_ouch_x = nil

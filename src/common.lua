@@ -55,13 +55,14 @@ M.SCREEN_FLASH_ALPHA_LEVEL = {
 }
 
 --- @enum CreatureStageEyeColors
+--- Should follow ­­──»──VIBGYOR──»──
 --- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
 M.CREATURE_STAGE_EYE_COLORS = {
+    { 0.98, 0.3, 0.7 }, -- red-pink
     -- { 0.92, 0.90, 0.50 }, -- yellow
-    { 0.98, 0.3, 0.7 }, -- yellow
-    { 0.50, 0.80, 0.65 }, -- jade
-    { 0.75, 0.84, 0.35 }, -- green
-    { 0.105, 0.105, 0.09 }, -- badland gray
+    { 0.50, 0.85, 0.65 }, -- emerald-green
+    { 0.45, 0.3, 0.85 }, -- navy-violet
+    { 0.09, 0.08, 0.1 }, -- badland gray
 }
 
 --- @enum CreatureStageColors
