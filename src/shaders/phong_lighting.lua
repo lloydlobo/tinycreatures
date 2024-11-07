@@ -1,7 +1,7 @@
 local LG = love.graphics
 local common = require 'common'
 
-local LIGHT_DEFAULT_ANY_TO_PLAYER_POV_DIFFUSE_COLOR = { 0.7, 0.7, 0.6 } -- error.. shouldn't be triggered, as player action must always be defined
+local LIGHT_DEFAULT_ANY_TO_PLAYER_POV_DIFFUSE_COLOR = { 0.8, 0.8, 0.7 } -- error.. shouldn't be triggered, as player action must always be defined
 local LIGHT_DEFAULT_PLAYER_TRAIL_DIFFUSE_COLOR = { 0.5, 0.5, 0.5 } -- error.. shouldn't be triggered, as player action must always be defined
 local LIGHT_DIFFUSE_COLORS = common.PLAYER_ACTION_TO_COLOR
 
@@ -19,7 +19,7 @@ local light_player_trail = {
 local light_any_to_player_pov = {
     position = { 0, 0 },
     diffuse = LIGHT_DEFAULT_ANY_TO_PLAYER_POV_DIFFUSE_COLOR,
-    power = 48,
+    power = 64,
 }
 
 local function shade_any_to_player_pov(fun)

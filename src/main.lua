@@ -2185,45 +2185,34 @@ function love.update(dt)
     update_screenshake(dt)
 end --< love.update()
 
-local has_background = true
 function love.draw()
+    local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
+
     if Config.Debug.IS_ASSERT then assert_consistent_state() end
 
-    -- This clears crt and background color each frame start.
-    if not true then LG.clear(1, 1, 1, 1) end
-
-    --- @type number
-    local alpha = dt_accum * Config.FIXED_DT_INV
-
-    local blend_mode = LG.getBlendMode()
-
-    LG.setBlendMode('screen', 'premultiplied')
+    -- Draw Background shader effects.
     do
-        do
-            LG.setShader(glsl_shaders.warp)
-            if has_background then -- Draw background fill, else background color shows up─if menu/pause else use LG.clearBackground())
-                LG.rectangle('fill', 0, 0, arena_w, arena_h)
-            end
-            LG.setShader() --> glsl_shader.warp
-        end
-
-        LG.setBlendMode('add', 'premultiplied')
-        moonshine_shaders.fog(function() end)
-        Shaders.phong_lighting.shade_any_to_player_pov(function()
-            draw_background_shader(alpha) --[[]]
-        end)
-    end
-    LG.setBlendMode(blend_mode) -- end of 'screen'
-
-    -- Draw background fill, else background color shows up (maybe use LG.clearBackground())
-    --- PERF: A glow radial gradient texture may help shader switch calls
-    if true then
         local blend_mode = LG.getBlendMode()
+        LG.setBlendMode('screen', 'premultiplied') --> set `screen` blend mode
+        LG.setShader(glsl_shaders.warp) --> set `warp` shader
+        do
+            -- #1 Warp shader pixels to work with.
+            LG.rectangle('fill', 0, 0, arena_w, arena_h)
 
-        -- screen|lighten work well
-        LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied')
-        Shaders.phong_lighting.shade_any_to_player_pov(function() LG.rectangle('fill', 0, 0, arena_w, arena_h) end)
-        LG.setBlendMode(blend_mode)
+            -- #2 Draw interactive parallax
+            -- Layer 0 : Draw fog shader
+            -- Layer 1 : Draw rectangle mask dropback glow around player
+            -- Layer 2 : Shine on star diamonds when around player
+            LG.setBlendMode('add', 'premultiplied') --> set `add` blend mode
+            moonshine_shaders.fog(function() end)
+            Shaders.phong_lighting.shade_any_to_player_pov(function()
+                LG.rectangle('fill', 0, 0, arena_w, arena_h)
+                draw_background_shader(alpha)
+            end)
+            LG.setBlendMode('screen', 'premultiplied') --< reset `add` blend  mode
+        end
+        LG.setShader() --< end of `glsl_shader.warp`
+        LG.setBlendMode(blend_mode) --< end of 'screen'
     end
 
     -- • Objects that are partially off the edge of the screen can be seen on the other side.
