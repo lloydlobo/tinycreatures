@@ -136,6 +136,7 @@ parallax_entities = {
     radius = {},
     x = {},
     y = {},
+    -- FEAT: Add active timer to disappear it
 }
 
 --- @class (exact) PlayerTrails
@@ -529,36 +530,16 @@ function update_background_shader(dt)
     local game_freq_y = math.sin((4 + love.math.random()) * game_timer_t * 0.0625) / 4
 
     local vel_x = 0.25 * 0.001 * lume.clamp(game_freq_x, -1, 1)
-    -- do
-    --     vel_x = vel_x + 0.5 * 0.001 * math.sin(8 * love.math.random()) / 8
-    -- end
-
     local vel_y = speed_y * (INV_PHI_SQ * math.abs(game_freq_y))
     vel_y = math.max(smoothstep(vel_y, 0.001 * 5, 0.4), vel_y)
-    -- vel_y = smoothstep(vel_y * PHI, vel_y * 2, love.math.random() - game_freq_x)
 
-    if vel_y < 0.000005 then assert(false, vel_y) end
-    do
-        -- vel_y = smoothstep(vel_y, (0.125 * 0.001 * math.abs(love.math.random()) + 1) * speed_y, game_freq_y)
-    end
+    if Config.Debug.IS_ASSERT and vel_y < 0.000005 then assert(false, vel_y) end
 
-    for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT, 4 do
-        if Config.IS_GRUG_BRAIN and screenshake.duration > 0 then
-            vel_x = vel_x - smoothstep(vel_x * (-love.math.random(-4, 4)), vel_x * love.math.random(-4, 4), game_freq_x)
-            vel_y = vel_y - smoothstep(vel_y * (-love.math.random(-0.5, 2.5)), vel_y * love.math.random(0, 8), game_freq_y)
-        end
-        parallax_entities.x[i] = parallax_entities.x[i] - math.sin(parallax_entities.depth[i] * vel_x)
-        parallax_entities.x[i + 1] = parallax_entities.x[i + 1] - math.sin(parallax_entities.depth[i + 1] * vel_x)
-        parallax_entities.x[i + 2] = parallax_entities.x[i + 2] - math.sin(parallax_entities.depth[i + 2] * vel_x)
-        parallax_entities.x[i + 3] = parallax_entities.x[i + 3] - math.sin(parallax_entities.depth[i + 3] * vel_x)
-        parallax_entities.y[i] = parallax_entities.y[i] - (vel_y / parallax_entities.depth[i])
-        parallax_entities.y[i + 1] = parallax_entities.y[i + 1] - (vel_y / parallax_entities.depth[i + 1])
-        parallax_entities.y[i + 2] = parallax_entities.y[i + 2] - (vel_y / parallax_entities.depth[i + 2])
-        parallax_entities.y[i + 3] = parallax_entities.y[i + 3] - (vel_y / parallax_entities.depth[i + 3])
+    for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT, 1 do
+        local depth = parallax_entities.depth[i]
+        parallax_entities.x[i] = parallax_entities.x[i] - math.sin(4 * depth * vel_x) / depth
+        parallax_entities.y[i] = parallax_entities.y[i] - (vel_y / depth)
         if parallax_entities.y[i] < 0 then parallax_entities.y[i] = 1 end
-        if parallax_entities.y[i + 1] < 0 then parallax_entities.y[i + 1] = 1 end
-        if parallax_entities.y[i + 2] < 0 then parallax_entities.y[i + 2] = 1 end
-        if parallax_entities.y[i + 3] < 0 then parallax_entities.y[i + 4] = 1 end
     end
 end
 
@@ -585,9 +566,6 @@ function update_player_vulnerability_timer_this_frame(dt)
     end
 end
 
--- TODO: update trails, in update_player_position_this_frame
--- TODO: Add a `laser_fire_timer` and `LASER_FIRE_TIMER_LIMIT` like constraints for this trail
-
 -- Use dt for position updates, because movement is time-dependent
 function update_player_position_this_frame(dt)
     local cs = curr_state
@@ -599,21 +577,25 @@ end
 
 function update_player_trails_this_frame(dt)
     local cs = curr_state
+    local ps = prev_state
+
     local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
 
     -- Interpolate Player Position and Rotation (COPIED FROM `draw_player()`)
-    local player_rot_angle = lerp(prev_state.player_rot_angle, cs.player_rot_angle, alpha)
-    local player_x = lerp(prev_state.player_x, cs.player_x, alpha)
-    local player_y = lerp(prev_state.player_y, cs.player_y, alpha)
-    local player_vel_x = lerp(prev_state.player_vel_x, cs.player_vel_x, alpha)
-    local player_vel_y = lerp(prev_state.player_vel_y, cs.player_vel_y, alpha)
+    local player_rot_angle = lerp(ps.player_rot_angle, cs.player_rot_angle, alpha)
+    local player_x = lerp(ps.player_x, cs.player_x, alpha)
+    local player_y = lerp(ps.player_y, cs.player_y, alpha)
+    local player_vel_x = lerp(ps.player_vel_x, cs.player_vel_x, alpha)
+    local player_vel_y = lerp(ps.player_vel_y, cs.player_vel_y, alpha)
 
-    player_trails.x[player_trails.index] = player_x
-    player_trails.y[player_trails.index] = player_y
-    player_trails.vel_x[player_trails.index] = player_vel_x
-    player_trails.vel_y[player_trails.index] = player_vel_y
-    player_trails.rot_angle[player_trails.index] = player_rot_angle
     player_trails.index = (player_trails.index % Config.PLAYER_MAX_TRAIL_COUNT) + 1
+
+    local index = player_trails.index
+    player_trails.rot_angle[index] = player_rot_angle
+    player_trails.vel_x[index] = player_vel_x
+    player_trails.vel_y[index] = player_vel_y
+    player_trails.x[index] = player_x
+    player_trails.y[index] = player_y
 end
 
 function update_player_fired_projectiles_this_frame(dt)
@@ -1353,6 +1335,7 @@ function _draw_not_active_creature(i, alpha)
         -- !!!! can this paint them individually with set color
         -- FIXME: If color passed has an alpha channel, this will panic
         local rgb = Common.COLOR.creature_healed
+
         creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3])
         creatures_sprite_batch:add(curr_x, curr_y, 0, _sx, _sy, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
 
@@ -1365,6 +1348,7 @@ function _draw_not_active_creature(i, alpha)
                 local juice_frequency_damper = lerp(0.25, 0.125, alpha)
                 local radius_factor = (1 + smooth_alpha * juice_frequency * lerp(1, juice_frequency_damper, smooth_alpha))
                 local radius = evolution_stage.radius * radius_factor
+
                 LG.setColor(Common.COLOR.creature_healing)
                 LG.circle('fill', curr_x, curr_y, radius)
 
@@ -1386,6 +1370,7 @@ function draw_creatures(alpha)
     local cs = curr_state
 
     creatures_sprite_batch:clear() -- clear previous frame's creatures_sprite_batch from canvas
+
     for i = 1, #cs.creatures_x do
         if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
             _draw_active_creature(i, alpha)
@@ -1393,6 +1378,7 @@ function draw_creatures(alpha)
             _draw_not_active_creature(i, alpha)
         end
     end
+
     LG.setColor(1, 1, 1, 1) -- Reset color before drawing
     LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
 end
