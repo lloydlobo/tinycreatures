@@ -14,6 +14,7 @@ extern vec2 screen;//> `love.graphics.getDimensions()`
 extern float time;//> `love.timer.getTime()`
 
 const float TWO_PI = 6.28318;
+const float F_BRIGHTNESS=.4;
 
 struct Palette{
     vec3 dc_offset;
@@ -83,9 +84,12 @@ float noise(vec2 p)
 
 const mat2 MTX=mat2(.8,.6,-.6,.8);
 
+/*
+Fractal Brownian Motion
+*/
 float fbm(vec2 p)
 {
-    float t=time*.0625; t*=4.;
+    float t=time*.0625; t*=8.;
     
     float f=0.;
     
@@ -104,18 +108,22 @@ float pattern(in vec2 p)
     return fbm(p+fbm(p));
 }
 
+
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords)
 {
+    vec4 pixel=Texel(image,uvs);
+    
     float f_aspect=screen.x/screen.y;
+    
+    // Normalize coordinates
     vec2 uv=screen_coords/screen;
     vec2 uv0=uv;
     uv.x*=f_aspect;
-    vec4 pixel=Texel(image,uvs);
+    
     float f_shade=pattern(uv);
-    vec3 col=palette(f_shade);
-    return pixel*vec4(col*.5,1.);
+    
+    return pixel*vec4(F_BRIGHTNESS*palette(f_shade),1.);
 }
-
 
 /*
 

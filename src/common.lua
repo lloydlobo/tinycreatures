@@ -94,7 +94,7 @@ M.COLOR = {
     player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
     player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
-    player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
+    player_entity_firing_edge_dark = { 0.95, 0.95, 0.95 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
     player_entity_firing_edge_darker = { 0.8, 0.8, 0.8 }, --- The lighter outer edge of the eye. (offwhite)
     player_entity_firing_projectile = { 1., 1., 1. }, --- The idle tail and projectile color. (white)
 

@@ -158,6 +158,25 @@ player_trails = {
     x = {},
     y = {},
 }
+
+-- TODO: after prototype add this to curr_state & prev_state datastructures
+drone = {
+    x = 0.0,
+    y = 0.0,
+    rot_angle = 0.0,
+    vel_x = 0.0,
+    vel_y = 0.0,
+    radius = Config.PLAYER_RADIUS,
+}
+prev_drone = {
+    x = 0.0,
+    y = 0.0,
+    rot_angle = 0.0,
+    vel_x = 0.0,
+    vel_y = 0.0,
+    radius = Config.PLAYER_RADIUS,
+}
+
 -- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 -- #endregion
 
@@ -1381,6 +1400,43 @@ function draw_creatures(alpha)
 
     LG.setColor(1, 1, 1, 1) -- Reset color before drawing
     LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
+
+    local game_freq = math.sin(2 * game_timer_t)
+    game_freq = lume.clamp(game_freq, 0., 1.)
+
+    for i = 1, #cs.creatures_x do
+        if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
+            local stage = cs.creatures_evolution_stage[i]
+            local radius = Config.CREATURE_STAGES[stage].radius
+            -- TEMPORARY
+
+            -- Draw creatures eye.
+            LG.setColor(1, 1, 1)
+            local stage_offset = Config.CREATURE_STAGES_COUNT - stage
+            local size = (stage_offset * radius / 4)
+
+            if stage_offset ~= 0 then size = size + (radius / stage) / stage_offset end
+
+            local x = cs.creatures_x[i] + size
+            local y = cs.creatures_y[i] + size
+
+            -- Random blinking
+            do
+                local DX = 0.05
+                local DY = 0.05
+                x = smoothstep(x + -DX * size, x + DX * size, game_freq)
+                y = smoothstep(y + -DY * size, y + DY * size, game_freq)
+
+                if love.math.random() < 0.005 then
+                    x = smoothstep(x - game_freq, x + game_freq, game_freq)
+                    y = smoothstep(y - game_freq, y + game_freq, game_freq)
+                end
+            end
+            -- LG.setColor(0.2, 0.8, 0.5)
+            LG.setColor(Common.CREATURE_STAGE_COLORS[stage])
+            LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+        end
+    end
 end
 
 local _parallax_draw_offset_x = 0
@@ -1616,9 +1672,13 @@ function draw_debug_stats_hud()
             'curr_state.creatures.count: ' .. #cs.creatures_x,
             'initial_large_creatures_this_game_level: ' .. initial_large_creatures_this_game_level,
             'buffer creatures.count: ' .. #cs.creatures_x,
+            'drone.vel_x: ' .. drone.vel_x,
+            'drone.vel_y: ' .. drone.vel_y,
+            'drone.x: ' .. drone.x,
+            'drone.y: ' .. drone.y,
             'player.angle: ' .. cs.player_rot_angle,
-            'player.speed_x: ' .. cs.player_vel_x,
-            'player.speed_y: ' .. cs.player_vel_y,
+            'player.vel_x: ' .. cs.player_vel_x,
+            'player.vel_y: ' .. cs.player_vel_y,
             'player.x: ' .. cs.player_x,
             'player.y: ' .. cs.player_y,
             'stats.canvases: ' .. stats.canvases,
@@ -1667,6 +1727,42 @@ function update_game(dt) ---@param dt number # Fixed delta time.
         music_bgm:setEffect('on_damage_lowpass', not true)
         music_bgm:setEffect('on_damage_reverb', not true)
     end
+
+    -- #1 Update drone
+    do
+        local DRONE_ACCELERATION = Config.PLAYER_ACCELERATION
+        local accel = DRONE_ACCELERATION
+        local air_resist = Config.AIR_RESISTANCE
+
+        -- Pathfind to player.
+        do
+            dist_btw_player_and_drone = Common.manhattan_distance { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
+
+            do -- NAIVE closing sddistance [[follow the player without touching]]
+                drone.x = smoothstep(drone.x, curr_state.player_x, 0.1)
+                drone.y = smoothstep(drone.y, curr_state.player_y, 0.1)
+            end
+        end
+
+        -- Update drone AI input.
+        drone.rot_angle = PI + curr_state.player_rot_angle
+        drone.vel_x = drone.vel_x + math.cos(drone.rot_angle) * accel * dt
+        drone.vel_y = drone.vel_y + math.sin(drone.rot_angle) * accel * dt
+
+        -- Update position.
+        drone.vel_x = drone.vel_x * air_resist
+        drone.vel_y = drone.vel_y * air_resist
+        drone.x = (drone.x + drone.vel_x * dt) % arena_w
+        drone.y = (drone.y + drone.vel_y * dt) % arena_h
+
+        do -- Synchronize
+            prev_drone.rot_angle = drone.rot_angle
+            prev_drone.vel_x = drone.vel_x
+            prev_drone.vel_y = drone.vel_y
+            prev_drone.x = drone.x
+            prev_drone.y = drone.y
+        end
+    end
 end
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
@@ -1684,6 +1780,25 @@ function draw_game(alpha)
     draw_player_shield_collectible(alpha)
     draw_player(alpha)
     curr_state:draw_player_collectible_indicators(alpha)
+
+    -- WIP: DRONE
+    do
+        -- #2 Draw drone
+        do
+            do --interpolate
+                drone.vel_x = lerp(prev_drone.vel_x, drone.vel_x, alpha)
+                drone.vel_y = lerp(prev_drone.vel_y, drone.vel_y, alpha)
+                drone.x = lerp(prev_drone.x, drone.x, alpha) % arena_w
+                drone.y = lerp(prev_drone.y, drone.y, alpha) % arena_h
+            end
+            LG.setColor(1.0, 0.3, 0.4)
+            LG.circle('fill', drone.x, drone.y, drone.radius)
+        end
+        if dist_btw_player_and_drone ~= nil then
+            --
+            LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
+        end
+    end
 end
 
 local COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR = 1.75
