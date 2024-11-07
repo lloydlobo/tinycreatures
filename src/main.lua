@@ -1400,22 +1400,24 @@ end
 local _parallax_draw_offset_x = 0
 local _parallax_draw_offset_y = 0
 local _parallax_entity_alpha_color = ({ (INV_PHI ^ (Config.IS_GAME_SLOW and -1 or -1)) * 0.56, 0.7, 1.0 })[Config.CURRENT_THEME]
+local _is_follow_player_parallax = not true
 
 --- Stats:
 ---     Without sprite batch:        draw calls 2474 for (2^8 entities)
 ---     With sprite batch:           draw calls  162 for (2^8 entities)
-function _draw_background_shader(alpha)
+function draw_background_shader(alpha)
     local cs = curr_state
     local dx = 0
     local dy = 0
-    local is_follow_player_parallax = true
-    if is_follow_player_parallax then
+    if _is_follow_player_parallax then
         _parallax_draw_offset_x = cs.player_x / arena_w -- FIXME: should lerp on wrap
         _parallax_draw_offset_y = cs.player_y / arena_h
         dx = _parallax_draw_offset_x * Config.PARALLAX_OFFSET_FACTOR_X
         dy = _parallax_draw_offset_y * Config.PARALLAX_OFFSET_FACTOR_Y
     end
+
     bg_parallax_sprite_batch:clear() -- Clear and update sprite batch
+
     for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT do
         local depth_inv = parallax_entities.depth[i]
         local radius = parallax_entities.radius[i]
@@ -1425,23 +1427,12 @@ function _draw_background_shader(alpha)
 
         -- Add sprite to batch with position, rotation, scale and color
         local scale = radius * 0.03125 -- Scale based on original circle radius as 32 was parallax entity image size
-        local origin_x = radius
-        local origin_y = radius
-
-        -- bg_parallax_sprite_batch:setColor(0.9, 0.9, 0.9, point_alpha)
-        -- bg_parallax_sprite_batch:setColor(0.025, 0.015, 0.10, point_alpha)
-
-        -- bg_parallax_sprite_batch:setColor(1., 1., 1., 1.) -- PERF: prevent drawing transluscent or textures with alpha?
         bg_parallax_sprite_batch:setColor(1.0, 1.0, 1.0, point_alpha)
-        bg_parallax_sprite_batch:add(x, y, 0, scale, scale, origin_x, origin_y) -- origin x, y (center of the circle)
+        bg_parallax_sprite_batch:add(x, y, 0, scale, scale, radius, radius) -- origin x, y (center of the circle)
     end
+
     LG.setColor(1, 1, 1, 1) -- Reset color before drawing
     LG.draw(bg_parallax_sprite_batch) -- Draw all sprites in one batch
-end
-
-function draw_background_shader(alpha)
-    --[[Placeholder for post-processing or optimization]]
-    _draw_background_shader(alpha)
 end
 
 --- @diagnostic disable-next-line: unused-local
@@ -1939,65 +1930,16 @@ function load_shaders()
     local fx = moonshine.effects
 
     --- @class (exact) MoonshineShaders
-    --- @field post_processing table
     --- @field fog table
     moonshine_shaders = {
-        post_processing = moonshine(arena_w, arena_h, fx.godsray).chain(fx.colorgradesimple).chain(fx.vignette),
-        fog = moonshine(arena_w, arena_h, fx.fog).chain(fx.desaturate) --[[ .chain(fx.chromasep) ]],
+        fog = moonshine(arena_w, arena_h, fx.fog).chain(fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]],
     }
 
     -- Setup moonshine shaders
     if true then
-        -- moonshine_love_shaders.fog.fog.fog_color = { 0.1, 0.0, 0.0 }
         moonshine_shaders.fog.fog.fog_color = { 0.0, 0.1, 0.0 }
         moonshine_shaders.fog.fog.speed = { 0.2, 0.9 }
         moonshine_shaders.fog.fog.octaves = 1
-    end
-    if Config.MoonshineShaderSettings.chromatic_abberation.enable then
-        local mode_settings = {
-            default = { angle = 0, radius = 0.0 },
-            minimal = { angle = 0, radius = 0.5 },
-            advanced = { angle = 180, radius = 1.2 },
-        }
-        local mode = Config.MoonshineShaderSettings.chromatic_abberation.mode
-        local settings = mode_settings[mode] or error('Invalid mode: ' .. mode, 3)
-        moonshine_shaders.post_processing.chromasep.angle = settings.angle
-        moonshine_shaders.post_processing.chromasep.radius = settings.radius
-    end
-    if Config.MoonshineShaderSettings.curved_monitor.enable then
-        local mode_settings = {
-            default = { distortion_factor = { 1.06, 1.065 }, feather = 0.02, scale_factor = 1 },
-            minimal = { distortion_factor = { 1.0, 1.0 }, feather = 0.0, scale_factor = 1 },
-            advanced = { distortion_factor = { 0.92, 1.08 }, feather = 0.02, scale_factor = 0.99 },
-        }
-        local minimal = mode_settings.minimal
-        local advanced = mode_settings.advanced
-        local amount = Config.MoonshineShaderSettings.curved_monitor.amount
-        moonshine_shaders.post_processing.crt.distortionFactor = {
-            lerp(minimal.distortion_factor[1], advanced.distortion_factor[1], amount),
-            lerp(minimal.distortion_factor[2], advanced.distortion_factor[2], amount),
-        }
-        moonshine_shaders.post_processing.crt.feather = lerp(minimal.feather, advanced.feather, amount)
-        moonshine_shaders.post_processing.crt.scaleFactor = lerp(minimal.scale_factor, advanced.scale_factor, amount)
-    end
-    if Config.MoonshineShaderSettings.filmgrain.enable then
-        local amount = Config.MoonshineShaderSettings.filmgrain.amount
-        local defaults = { opacity = lerp(0.3, 1.0, amount), size = lerp(1, 4, amount) }
-        moonshine_shaders.post_processing.filmgrain.opacity = defaults.opacity
-        moonshine_shaders.post_processing.filmgrain.size = defaults.size
-    end
-    if true then
-        moonshine_shaders.post_processing.godsray.decay = ({ 0.80, 0.69, 0.70 })[Config.CURRENT_THEME]
-        moonshine_shaders.post_processing.godsray.density = 0.15
-        moonshine_shaders.post_processing.godsray.exposure = ({ 0.20, 0.12, 0.25 })[Config.CURRENT_THEME]
-        moonshine_shaders.post_processing.godsray.light_position = { 0.5, 0.5 }
-        moonshine_shaders.post_processing.godsray.samples = 2 ^ 6 --- 64 | 32 `(default: 70)`
-        moonshine_shaders.post_processing.godsray.weight = ({ 0.50, 0.45, 0.65 })[Config.CURRENT_THEME]
-    end
-    if true then -- NOTE: default vignette filters ray scattering by godsray neately so we disable settings below
-        moonshine_shaders.post_processing.vignette.radius = 0.8 + 0.4 -- avoid health bar at the top
-        -- moonshine_shaders.post_processing.vignette.softness = 0.3
-        -- moonshine_shaders.post_processing.vignette.opacity = 0.5 + 0.3 -- + 0.3
     end
 end
 
@@ -2259,78 +2201,61 @@ end --< love.update()
 
 local has_background = true
 function love.draw()
-    LG.clear(1, 1, 1, 1) -- this clears crt and background color each frame start
-
     if Config.Debug.IS_ASSERT then assert_consistent_state() end
+
+    -- This clears crt and background color each frame start.
+    if not true then LG.clear(1, 1, 1, 1) end
 
     --- @type number
     local alpha = dt_accum * Config.FIXED_DT_INV
 
-    moonshine_shaders.post_processing(function()
-        if not true then
-            LG.setShader(glsl_shaders.gradient_timemod)
-            if has_background then
-                LG.rectangle('fill', 0, 0, arena_w, arena_h) --- draw background fill, else background color shows up (maybe use LG.clearBackground())
-            end
-            LG.setShader() -- > background_gradient_shader
-        else
-            local blend_mode = LG.getBlendMode()
-            LG.setBlendMode('screen', 'premultiplied')
-            do
-                LG.setShader(glsl_shaders.warp)
-                do
-                    if has_background then
-                        -- Draw background fill, else background color shows up─if menu/pause, or
-                        -- use `LG.clearBackground())`
-                        LG.rectangle('fill', 0, 0, arena_w, arena_h)
-                    end
-                end
-                LG.setShader() --> glsl_shader.warp
-            end
-            do
-                if true then
-                    --[[ LG.setBlendMode('alpha', 'premultiplied') ]]
-                    moonshine_shaders.fog(function() end)
-                    --[[ LG.setBlendMode('screen', 'premultiplied') ]]
-                end
-                if true then
-                    LG.setBlendMode('add', 'premultiplied')
-                    draw_background_shader(alpha)
-                    LG.setBlendMode('screen', 'premultiplied')
-                end
-            end
-            LG.setBlendMode(blend_mode) -- end of 'screen'
-        end
+    local blend_mode = LG.getBlendMode()
 
-        -- Draw background fill, else background color shows up (maybe use LG.clearBackground())
-        --- PERF: A glow radial gradient texture may help shader switch calls
-        if true then
-            local blend_mode = LG.getBlendMode()
-
-            -- screen|lighten work well
-            LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied')
-            Shaders.phong_lighting.shade_any_to_player_pov(function() LG.rectangle('fill', 0, 0, arena_w, arena_h) end)
-            LG.setBlendMode(blend_mode)
-        end
-
-        -- • Objects that are partially off the edge of the screen can be seen on the other side.
-        -- • Coordinate system is translated to different positions and everything is drawn at each
-        --   position around the screen and in the center.
-        -- • Draw off-screen object partially wrap around without glitch
-        for y = -1, 1 do
-            for x = -1, 1 do
-                LG.origin()
-                LG.translate(x * arena_w, y * arena_h)
-                draw_background_shader(alpha)
-                draw_game(alpha)
-                LG.origin()
-            end
-        end
+    LG.setBlendMode('screen', 'premultiplied')
+    do
         do
-            draw_timer_text()
-            draw_player_status_bar(alpha)
+            LG.setShader(glsl_shaders.warp)
+            if has_background then -- Draw background fill, else background color shows up─if menu/pause else use LG.clearBackground())
+                LG.rectangle('fill', 0, 0, arena_w, arena_h)
+            end
+            LG.setShader() --> glsl_shader.warp
         end
-    end)
+
+        LG.setBlendMode('add', 'premultiplied')
+        moonshine_shaders.fog(function() end)
+        Shaders.phong_lighting.shade_any_to_player_pov(function()
+            draw_background_shader(alpha) --[[]]
+        end)
+    end
+    LG.setBlendMode(blend_mode) -- end of 'screen'
+
+    -- Draw background fill, else background color shows up (maybe use LG.clearBackground())
+    --- PERF: A glow radial gradient texture may help shader switch calls
+    if true then
+        local blend_mode = LG.getBlendMode()
+
+        -- screen|lighten work well
+        LG.setBlendMode(Config.Debug.IS_DEVELOPMENT and 'multiply' or 'screen', 'premultiplied')
+        Shaders.phong_lighting.shade_any_to_player_pov(function() LG.rectangle('fill', 0, 0, arena_w, arena_h) end)
+        LG.setBlendMode(blend_mode)
+    end
+
+    -- • Objects that are partially off the edge of the screen can be seen on the other side.
+    -- • Coordinate system is translated to different positions and everything is drawn at each
+    --   position around the screen and in the center.
+    -- • Draw off-screen object partially wrap around without glitch
+    for y = -1, 1 do
+        for x = -1, 1 do
+            LG.origin()
+            LG.translate(x * arena_w, y * arena_h)
+            draw_game(alpha)
+            LG.origin()
+        end
+    end
+    do
+        draw_timer_text()
+        draw_player_status_bar(alpha)
+    end
 
     if is_debug_hud_enable then draw_hud() end
     if is_debug_hud_enable then draw_debug_hud() end
