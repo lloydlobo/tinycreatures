@@ -14,7 +14,7 @@ extern vec2 screen;//> `love.graphics.getDimensions()`
 extern float time;//> `love.timer.getTime()`
 
 const float TWO_PI = 6.28318;
-const float F_BRIGHTNESS=.4;
+const float F_BRIGHTNESS=.5;
 
 struct Palette{
     vec3 dc_offset;

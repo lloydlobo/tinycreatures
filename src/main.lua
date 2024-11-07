@@ -932,12 +932,12 @@ function handle_player_input_this_frame(dt)
     elseif is_stop_and_beserk_in_place and not has_companions then
         -- Enhance attributes while spinning like a top.
         --[[TODO: On init, emit a burst of lasers automatically. Give player some respite]]
-        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED * PHI
+        player_turn_speed = Config.PLAYER_TURN_SPEED * Config.PLAYER_TURN_SPEED_BESERK_MULTIPLIER
         laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
     elseif has_companions then
-        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED * INV_PHI_SQ
+        player_turn_speed = Config.PLAYER_TURN_SPEED * INV_PHI_SQ
     else
-        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
+        player_turn_speed = Config.PLAYER_TURN_SPEED
     end
 
     -- Update and assign new player action
@@ -1383,39 +1383,31 @@ function _draw_not_active_creature(i, alpha)
     end
 end
 
---- FIXME: Creature still on screen after laser collision, after introducing batch draw
----             USE separate batches to draw active and non_active creatures
-function draw_creatures(alpha)
+--- PERF: Use sprite batch for eyes
+function draw_creatures_eye(alpha)
     local cs = curr_state
-
-    creatures_sprite_batch:clear() -- clear previous frame's creatures_sprite_batch from canvas
-
-    for i = 1, #cs.creatures_x do
-        if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
-            _draw_active_creature(i, alpha)
-        else
-            _draw_not_active_creature(i, alpha)
-        end
-    end
-
-    LG.setColor(1, 1, 1, 1) -- Reset color before drawing
-    LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
 
     local game_freq = math.sin(2 * game_timer_t)
     game_freq = lume.clamp(game_freq, 0., 1.)
 
     for i = 1, #cs.creatures_x do
         if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
-            local stage = cs.creatures_evolution_stage[i]
-            local radius = Config.CREATURE_STAGES[stage].radius
-            -- TEMPORARY
+            local evolution_stage_id = cs.creatures_evolution_stage[i] --- @type integer
+            local evolution_stage = Config.CREATURE_STAGES[evolution_stage_id] --- @type CreatureStage
+
+            local radius = evolution_stage.radius --- @type integer
+            local angle = cs.creatures_angle[i] --- @type number
 
             -- Draw creatures eye.
             LG.setColor(1, 1, 1)
-            local stage_offset = Config.CREATURE_STAGES_COUNT - stage
+            local stage_offset = Config.CREATURE_STAGES_COUNT - evolution_stage_id
             local size = (stage_offset * radius / 4)
 
-            if stage_offset ~= 0 then size = size + (radius / stage) / stage_offset end
+            local is_initial_stage = stage_offset == 0
+            if not is_initial_stage then
+                if Config.Debug.IS_ASSERT then assert(evolution_stage_id ~= Config.CREATURE_STAGES_COUNT) end
+                size = size + (radius / evolution_stage_id) / stage_offset
+            end
 
             local x = cs.creatures_x[i] + size
             local y = cs.creatures_y[i] + size
@@ -1432,11 +1424,45 @@ function draw_creatures(alpha)
                     y = smoothstep(y - game_freq, y + game_freq, game_freq)
                 end
             end
-            -- LG.setColor(0.2, 0.8, 0.5)
-            LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[stage])
-            LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+
+            if evolution_stage_id == Config.CREATURE_STAGES_COUNT then
+                local poly_size = (INV_PHI ^ 0) * radius / evolution_stage_id
+                local x1 = x + math.cos(angle) * poly_size -- pointy x
+                local y1 = y + math.sin(angle) * poly_size -- pointy y
+                local x2 = x + math.cos(angle + math.pi * 0.75) * poly_size
+                local y2 = y + math.sin(angle + math.pi * 0.75) * poly_size
+                local x3 = x + math.cos(angle - math.pi * 0.75) * poly_size
+                local y3 = y + math.sin(angle - math.pi * 0.75) * poly_size
+                LG.setColor(0.1, 0.1, 0.1)
+                LG.polygon('line', x1, y1, x2, y2, x3, y3) -- star like glitter edge
+                LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])
+                LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+            else
+                LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])
+                LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+            end
         end
     end
+end
+
+--- FIXME: Creature still on screen after laser collision, after introducing batch draw
+---             USE separate batches to draw active and non_active creatures
+function draw_creatures(alpha)
+    local cs = curr_state
+
+    creatures_sprite_batch:clear() -- clear previous frame's creatures_sprite_batch from canvas
+
+    for i = 1, #cs.creatures_x do
+        if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
+            _draw_active_creature(i, alpha)
+        else
+            _draw_not_active_creature(i, alpha)
+        end
+    end
+    LG.setColor(1, 1, 1, 1) -- Reset color before drawing
+    LG.draw(creatures_sprite_batch) -- Draw all sprites in one batch
+
+    draw_creatures_eye(alpha)
 end
 
 local _parallax_draw_offset_x = 0
@@ -2142,7 +2168,7 @@ function reset_game()
         laser_intersect_final_creature_counter = 0 -- count tiniest creature to save─collision with laser
 
         player_fire_cooldown_timer = 0
-        player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
+        player_turn_speed = Config.PLAYER_TURN_SPEED
 
         player_shield_collectible_pos_x = nil --- @type number|nil
         player_shield_collectible_pos_y = nil --- @type number|nil
@@ -2222,7 +2248,7 @@ function love.load()
             player_fire_cooldown_timer = 0
             player_shield_collectible_pos_x = nil --- @type number|nil
             player_shield_collectible_pos_y = nil --- @type number|nil
-            player_turn_speed = Config.PLAYER_DEFAULT_TURN_SPEED
+            player_turn_speed = Config.PLAYER_TURN_SPEED
         end
     end
 

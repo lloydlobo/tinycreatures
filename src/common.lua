@@ -57,10 +57,11 @@ M.SCREEN_FLASH_ALPHA_LEVEL = {
 --- @enum CreatureStageEyeColors
 --- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
 M.CREATURE_STAGE_EYE_COLORS = {
-    { 0.92, 0.90, 0.50 },
-    { 0.75, 0.70, 0.90 },
-    { 0.50, 0.80, 0.30 },
-    { 0.00, 0.00, 0.00 },
+    -- { 0.92, 0.90, 0.50 }, -- yellow
+    { 0.98, 0.3, 0.7 }, -- yellow
+    { 0.50, 0.80, 0.65 }, -- jade
+    { 0.75, 0.84, 0.35 }, -- green
+    { 0.105, 0.105, 0.09 }, -- badland gray
 }
 
 --- @enum CreatureStageColors
