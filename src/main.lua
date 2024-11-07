@@ -1549,7 +1549,7 @@ function draw_keybindings_text()
     end
 end
 
-function draw_hud()
+function draw_debug_general_hud()
     local cs = curr_state
 
     local hud_h = 128
@@ -1587,7 +1587,7 @@ function draw_hud()
     LG.setColor(1, 1, 1) -- reset color
 end
 
-function draw_debug_hud()
+function draw_debug_stats_hud()
     local cs = curr_state
 
     local pad_x = 8
@@ -2057,7 +2057,7 @@ end --< reset_game()
 --
 
 function love.load()
-    -- Set LOVE defaults.
+    -- #1 Set LOVE defaults.
     do
         -- Smoother edges.
         love.graphics.setDefaultFilter('linear', 'linear')
@@ -2066,13 +2066,13 @@ function love.load()
         love.keyboard.setKeyRepeat(true)
     end
 
-    -- Copy once from global variables declared in `conf.lua`.
+    -- #2 Copy once from global variables declared in `conf.lua`.
     do
         arena_h = gh
         arena_w = gw
     end
 
-    -- Initialize font/audio/shader/spritebatch assets
+    -- #3 Initialize font/audio/shader/spritebatch assets
     do
         font = LG.getFont()
 
@@ -2087,12 +2087,12 @@ function love.load()
         laser_sprite_batch = graphics_util.SpriteBatchFn.make_lasers() --- @type love.SpriteBatch
     end
 
-    -- Initialize global variables.
+    -- #4 Initialize global variables.
     do
         creature_swarm_range = Config.PLAYER_RADIUS * 4 -- FIXME: should be evolution_stage.radius specific
         dt_accum = 0.0 --- @type number Accumulator keeps track of time passed between frames.
         game_level = 1 --- @type integer
-        is_debug_hud_enable = not true --- Toggled by keys event.
+        is_debug_hud_enable = not true --- Toggled on key `h` `keyDown` event.
         player_action = Common.PLAYER_ACTION.IDLE --- @type PLAYER_ACTION
         screenshake = { amount = 5 * 0.5 * Config.INV_PHI, duration = 0.0, offset_x = 0.0, offset_y = 0.0, wait = 0.0 } --[[@type ScreenShake]]
 
@@ -2111,7 +2111,7 @@ function love.load()
         end
     end
 
-    -- Initialize parallax entities.
+    -- #5 Initialize parallax entities.
     do
         for i = 1, Config.PARALLAX_ENTITY_MAX_COUNT do
             parallax_entities.x[i] = love.math.random() --- 0.0..1.0
@@ -2126,12 +2126,10 @@ function love.load()
         end
     end
 
-    -- Reset the game (once!) on load.
-    do
-        reset_game()
-    end
+    -- #6 Reset the game (once!) on load.
+    reset_game()
 
-    -- Apply final touches before takeoff.
+    -- #7 Apply final touches before takeoff.
     do
         -- WARN: Background shaders over-write this... but this may be useful for menus...
         LG.setBackgroundColor(0.1, 0.1, 0.1) -- or (Common.COLOR.BACKGROUND)
@@ -2186,38 +2184,43 @@ function love.update(dt)
 end --< love.update()
 
 function love.draw()
-    local alpha = dt_accum * Config.FIXED_DT_INV --- @type number
+    --- Interpolation factor between previous and current state.
+    --- @type number
+    local alpha = dt_accum * Config.FIXED_DT_INV
 
-    if Config.Debug.IS_ASSERT then assert_consistent_state() end
+    if Config.Debug.IS_ASSERT then
+        assert_consistent_state() --> sanity check
+    end
 
-    -- Draw Background shader effects.
+    -- #1 Draw Background shader effects.
+    --
+    -- • Warp shader pixels to work with.
+    -- • Draw interactive parallax.
+    --   • Layer 0 : Draw fog shader
+    --   • Layer 1 : Draw rectangle mask dropback glow around player
+    --   • Layer 2 : Shine on star diamonds when around player
+    local blend_mode = LG.getBlendMode()
+    LG.setBlendMode('screen', 'premultiplied') --> set `screen` blend mode
+    LG.setShader(glsl_shaders.warp) --> set `warp` shader
     do
-        local blend_mode = LG.getBlendMode()
-        LG.setBlendMode('screen', 'premultiplied') --> set `screen` blend mode
-        LG.setShader(glsl_shaders.warp) --> set `warp` shader
+        LG.rectangle('fill', 0, 0, arena_w, arena_h)
+        LG.setBlendMode('add', 'premultiplied') --> set `add` blend mode
         do
-            -- #1 Warp shader pixels to work with.
-            LG.rectangle('fill', 0, 0, arena_w, arena_h)
-
-            -- #2 Draw interactive parallax
-            -- Layer 0 : Draw fog shader
-            -- Layer 1 : Draw rectangle mask dropback glow around player
-            -- Layer 2 : Shine on star diamonds when around player
-            LG.setBlendMode('add', 'premultiplied') --> set `add` blend mode
             moonshine_shaders.fog(function() end)
             Shaders.phong_lighting.shade_any_to_player_pov(function()
                 LG.rectangle('fill', 0, 0, arena_w, arena_h)
                 draw_background_shader(alpha)
             end)
-            LG.setBlendMode('screen', 'premultiplied') --< reset `add` blend  mode
         end
-        LG.setShader() --< end of `glsl_shader.warp`
-        LG.setBlendMode(blend_mode) --< end of 'screen'
+        LG.setBlendMode('screen', 'premultiplied') --< reset `add` blend  mode
     end
+    LG.setShader() --< end of `warp` shader
+    LG.setBlendMode(blend_mode) --< end of 'screen' blend mode
 
+    -- #2 Draw game.
+    --
     -- • Objects that are partially off the edge of the screen can be seen on the other side.
-    -- • Coordinate system is translated to different positions and everything is drawn at each
-    --   position around the screen and in the center.
+    -- • Translate coordinate system to different positions and draw everything at each position around the screen and in the center.
     -- • Draw off-screen object partially wrap around without glitch
     for y = -1, 1 do
         for x = -1, 1 do
@@ -2227,13 +2230,18 @@ function love.draw()
             LG.origin()
         end
     end
-    do
-        draw_timer_text()
-        draw_player_status_bar(alpha)
-    end
 
-    if is_debug_hud_enable then draw_hud() end
-    if is_debug_hud_enable then draw_debug_hud() end
+    -- #3 Draw textual and HUD elements.
+    draw_timer_text()
+    draw_player_status_bar(alpha)
+
+    -- #4 Draw debugging tools.
+    --
+    -- • Toggled on `h` `keyDown` event.
+    if is_debug_hud_enable then
+        draw_debug_general_hud()
+        draw_debug_stats_hud()
+    end
 end --< love.draw()
 
 function love.keypressed(key) update_on_love_keypressed(key) end
