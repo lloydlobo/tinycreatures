@@ -2,7 +2,7 @@ local M = {}
 
 local Config = require 'config'
 
---- @enum STATUS
+--- @enum Status
 M.STATUS = {
     NOT_ACTIVE = 0,
     ACTIVE = 1,
@@ -10,14 +10,14 @@ M.STATUS = {
 
 -- curr_state.creatures_is_spawn[] ???
 
---- @enum HEALTH_TRANSITIONS
+--- @enum HealthTransitions
 M.HEALTH_TRANSITIONS = {
     NONE = -1,
     HEALING = 0, --- Creature did spawn, and saved and now inactive but healing.
     HEALTHY = 1,
 }
 
---- @enum CONTROL_KEY
+--- @enum ControlKey
 M.CONTROL_KEY = {
     BESERK = 'z',
     BOOST = 'x', --- `x`─Boost player
@@ -31,7 +31,7 @@ M.CONTROL_KEY = {
     TOGGLE_HUD = 'h',
 }
 
---- @enum PLAYER_ACTION
+--- @enum PlayerAction
 M.PLAYER_ACTION = {
     BESERK = 'BESERK',
     BOOST = 'BOOST',
@@ -40,22 +40,30 @@ M.PLAYER_ACTION = {
     IDLE = 'IDLE',
 }
 
---- @enum PLAYER_DAMAGE_STATUS
+--- @enum PlayerDamageStatus
 M.PLAYER_DAMAGE_STATUS = {
     DAMAGED = 'DAMAGED',
     DEAD = 'DEAD',
     INVULNERABLE = 'INVULNERABLE',
 }
 
---- @enum SCREEN_FLASH_ALPHA_LEVEL
+--- @enum ScreenFlashAlphaLevel
 M.SCREEN_FLASH_ALPHA_LEVEL = {
     HIGH = 0.25, --- note: high level needs a fade out timer
     MEDIUM = 0.1,
     LOW = 0.045,
 }
 
---- @enum CREATURE_STAGE_COLORS
+--- @enum CreatureStageEyeColors
 --- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
+M.CREATURE_STAGE_EYE_COLORS = {
+    { 0.92, 0.90, 0.50 },
+    { 0.75, 0.70, 0.90 },
+    { 0.50, 0.80, 0.30 },
+    { 0.00, 0.00, 0.00 },
+}
+
+--- @enum CreatureStageColors
 M.CREATURE_STAGE_COLORS = {
     { 0.75, 0.1, 0.3 },
     { 0.70, 0.2, 0.3 },
@@ -115,7 +123,7 @@ function M.desaturate(color)
     }
 end
 
---- @type table<PLAYER_ACTION, [number, number, number]>
+--- @type table<PlayerAction, [number, number, number]>
 M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.COMPANION] = M.COLOR.player_companion_modifier,
     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
@@ -124,7 +132,7 @@ M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity_firing_edge_dark, -- for laser
 }
 
---- @type table<PLAYER_ACTION, [number, number, number]>
+--- @type table<PlayerAction, [number, number, number]>
 M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
     [M.PLAYER_ACTION.COMPANION] = M.desaturate(M.COLOR.player_companion_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),

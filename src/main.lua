@@ -37,14 +37,14 @@ local PI, INV_PI = Config.PI, Config.INV_PI
 --- @class (exact) GameState
 --- @field creatures_angle number[]
 --- @field creatures_evolution_stage integer[]
---- @field creatures_health HEALTH_TRANSITIONS[] # Transitions from `-1 to 0` and `0..1`.
---- @field creatures_is_active STATUS[]
+--- @field creatures_health HealthTransitions[] # Transitions from `-1 to 0` and `0..1`.
+--- @field creatures_is_active Status[]
 --- @field creatures_vel_x number[]
 --- @field creatures_vel_y number[]
 --- @field creatures_x number[]
 --- @field creatures_y number[]
 --- @field lasers_angle number[]
---- @field lasers_is_active STATUS[]
+--- @field lasers_is_active Status[]
 --- @field lasers_time_left number[]
 --- @field lasers_x number[]
 --- @field lasers_y number[]
@@ -141,7 +141,7 @@ parallax_entities = {
 
 --- @class (exact) PlayerTrails
 --- @field index integer # 1..`MAX_PLAYER_TRAIL_COUNT`
---- @field is_active STATUS[]
+--- @field is_active Status[]
 --- @field rot_angle number[]
 --- @field time_left number[]
 --- @field vel_x number[]
@@ -412,7 +412,7 @@ end
 
 --- Mutates `player_invulnerability_timer`. Returns player damage state.
 --- @param damage integer? Defaults to `1`.
---- @return PLAYER_DAMAGE_STATUS
+--- @return PlayerDamageStatus
 --- @nodiscard
 local function damage_player_fetch_status(damage)
     local cs = curr_state
@@ -507,7 +507,7 @@ end
 
 --- TODO: Add screen transition using a Timer.
 --- TODO: Fade to black and then back to player if reset_game
---- @param status PLAYER_DAMAGE_STATUS
+--- @param status PlayerDamageStatus
 function player_damage_status_actions(status)
     if status == Common.PLAYER_DAMAGE_STATUS.DEAD then
         screenshake.duration = 0.15 * PHI * PHI
@@ -1254,7 +1254,7 @@ function draw_player_shield_collectible(alpha)
 end
 
 function _draw_active_projectile(i, alpha)
-    local prev_player_action = player_action --- @type PLAYER_ACTION
+    local prev_player_action = player_action --- @type PlayerAction
 
     local pos_x = curr_state.lasers_x[i]
     local pos_y = curr_state.lasers_y[i]
@@ -1433,7 +1433,7 @@ function draw_creatures(alpha)
                 end
             end
             -- LG.setColor(0.2, 0.8, 0.5)
-            LG.setColor(Common.CREATURE_STAGE_COLORS[stage])
+            LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[stage])
             LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
         end
     end
@@ -2208,7 +2208,7 @@ function love.load()
         dt_accum = 0.0 --- @type number Accumulator keeps track of time passed between frames.
         game_level = 1 --- @type integer
         is_debug_hud_enable = not true --- Toggled on key `h` `keyDown` event.
-        player_action = Common.PLAYER_ACTION.IDLE --- @type PLAYER_ACTION
+        player_action = Common.PLAYER_ACTION.IDLE --- @type PlayerAction
         screenshake = { amount = 5 * 0.5 * Config.INV_PHI, duration = 0.0, offset_x = 0.0, offset_y = 0.0, wait = 0.0 } --[[@type ScreenShake]]
 
         -- Global variables that **must** be reset at each level.
