@@ -167,6 +167,8 @@ drone = {
     vel_x = 0.0,
     vel_y = 0.0,
     radius = Config.PLAYER_RADIUS,
+    shield = DRONE_SHIELD_COUNT,
+    is_active = true,
 }
 prev_drone = {
     x = 0.0,
@@ -175,6 +177,8 @@ prev_drone = {
     vel_x = 0.0,
     vel_y = 0.0,
     radius = Config.PLAYER_RADIUS,
+    shield = 0,
+    is_active = false,
 }
 
 -- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -655,6 +659,7 @@ function update_player_fired_projectiles_this_frame(dt)
 
     local laser_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
     local creature_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
+    local creature_drone_circle = { x = 0, y = 0, radius = 0 } --- @type Circle
 
     local stages = Config.CREATURE_STAGES --- @type CreatureStage[]
     local temp_hit_counter_this_frame = 0 --- @type integer Count hits for double hit sfx.
@@ -668,6 +673,43 @@ function update_player_fired_projectiles_this_frame(dt)
             y = cs.lasers_y[laser_index],
             radius = Config.LASER_RADIUS,
         }
+
+        -- TMPORARY
+        -- PLACEHOLDER
+        -- for i = 1, 2 do
+        if drone.is_active then
+            creature_drone_circle.x = drone.x
+            creature_drone_circle.y = drone.y
+            creature_drone_circle.radius = drone.radius
+
+            if Collision.is_intersect_circles {
+                a = creature_drone_circle,
+                b = laser_circle,
+            } then
+                Timer.after(dt, function()
+                    -- Push back.
+                    do
+                        drone.vel_x = smoothstep(-INV_PHI_SQ * drone.vel_x, -PHI * drone.vel_x, game_freq_t.sin4 * 4)
+                        drone.vel_y = smoothstep(-INV_PHI_SQ * drone.vel_y, -PHI * drone.vel_y, game_freq_t.sin4 * 4)
+                    end
+                    if drone.shield == 0 then
+                        drone.is_active = false
+                    else
+                        drone.shield = math.max(0, drone.shield - 1)
+                    end
+                end)
+
+                temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
+                screenshake.duration = SCREENSHAKE_DURATION.ON_LASER_HIT_CREATURE
+
+                -- Deactivate projectile if touch creature.
+                cs.lasers_is_active[laser_index] = Common.STATUS.NOT_ACTIVE
+            end
+        end
+        -- end
+        if not (cs.lasers_is_active[laser_index] == Common.STATUS.ACTIVE) then --[[]]
+            goto continue_not_is_active_laser
+        end
 
         for creature_index = 1, Config.CREATURE_TOTAL_CAPACITY do
             if not (cs.creatures_is_active[creature_index] == Common.STATUS.ACTIVE) then --[[]]
@@ -683,7 +725,10 @@ function update_player_fired_projectiles_this_frame(dt)
                 radius = stages[curr_stage_id].radius,
             }
 
-            if Collision.is_intersect_circles { a = creature_circle, b = laser_circle } then
+            if Collision.is_intersect_circles {
+                a = creature_circle,
+                b = laser_circle,
+            } then
                 temp_hit_counter_this_frame = temp_hit_counter_this_frame + 1
 
                 screenshake.duration = SCREENSHAKE_DURATION.ON_LASER_HIT_CREATURE
@@ -1012,6 +1057,7 @@ local _DRONE_DEFAULT_KIND = CreatureDroneKind.GRUNT
 local _temp_g_curr_drone_kind = CreatureDroneKind.EQUALIZER
 local _temp_g_curr_drone_kind_opts = CREATURE_DRONE_KIND_TO_OPTS[_temp_g_curr_drone_kind]
 function update_drone_this_frame(dt)
+    if not drone.is_active then return end
     local turn_speed = Config.PLAYER_ROT_TURN_SPEED * _temp_g_curr_drone_kind_opts.f_turn_speed
     local accel = (Config.PLAYER_ACCELERATION * _temp_g_curr_drone_kind_opts.f_acceleration)
     local air_resist = Config.AIR_RESISTANCE
@@ -1072,20 +1118,6 @@ function update_drone_this_frame(dt)
         if _IS_DRONE_OVERSHOOT_TRAJECTORY_BEFORE_COLLISION then
             drone.vel_x = smoothstep(drone.vel_x + math.cos(drone.rot_angle + PI) * accel * dt, drone.vel_x * PHI ^ 4, game_freq_smooth)
             drone.vel_y = smoothstep(drone.vel_y + math.sin(drone.rot_angle + PI) * accel * dt, drone.vel_y * PHI ^ 4, game_freq_smooth)
-            -- do
-            --     coords = { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
-            --     -- dist_btw_player_and_drone = Common.manhattan_distance(coords)
-
-            --     -- Calculate directional vector.
-            --     direction_x = (coords.x1 - coords.x2)
-            --     direction_y = (coords.y1 - coords.y2)
-            --     -- Update rotation turn direction.
-            --     drone_angle_to_player = math.atan2(direction_y, direction_x) % TWO_PI
-            --     delta_angle = (((drone_angle_to_player - drone.rot_angle) % TWO_PI) * _DRONE_ROT_TURN_SPEED * dt) -- * air_resist??????
-            --     drone.rot_angle = (drone.rot_angle + delta_angle) % TWO_PI
-            -- end
-            -- drone.vel_x = smoothstep(drone.vel_x, drone.vel_x - drone.vel_x ^ (love.math.random(1.2, 2)), game_freq_smooth)
-            -- drone.vel_y = smoothstep(drone.vel_y, drone.vel_y - drone.vel_y ^ (love.math.random(1.2, 2)), game_freq_smooth)
         else
             drone.vel_x = 0
             drone.vel_y = 0
@@ -1100,12 +1132,14 @@ function update_drone_this_frame(dt)
             --- @class Circle
             local drone_circle = { x = drone.x, y = drone.y, radius = drone.radius }
 
-            local is_intersect_drone_player =
-                Collision.is_intersect_circles_tolerant { a = drone_circle, b = player_circle, tolerance_factor = Collision.COLLISION_TOLERANCE.INNER_50 }
-            if is_intersect_drone_player then
-                screenshake.duration = SCREENSHAKE_DURATION.ON_DAMAGE * PHI
-                sound_player_took_damage:play()
-                sound_player_took_damage_interference:play()
+            if
+                Collision.is_intersect_circles_tolerant {
+                    a = drone_circle,
+                    b = player_circle,
+                    tolerance_factor = Collision.COLLISION_TOLERANCE.INNER_50,
+                }
+            then
+                player_damage_status_actions(damage_player_fetch_status())
             end
         end
     end
@@ -1130,6 +1164,7 @@ end
 --
 
 function draw_drone(alpha)
+    if not drone.is_active then return end
     -- #2 Draw drone
     -- should not mutate!!!!! interpolate
     local drone_vel_x = smoothstep(prev_drone.vel_x, drone.vel_x, alpha)
@@ -1175,8 +1210,10 @@ function draw_drone(alpha)
         LG.setColor(0.9, 0.4, 0.6)
         LG.polygon('line', x1, y1, x2, y2, x3, y3)
     end
-    if dist_btw_player_and_drone ~= nil then
-        --
+
+    if Config.Debug.IS_DEVELOPMENT and dist_btw_player_and_drone ~= nil then
+        LG.setColor(1, 1, 1)
+        LG.print(string.format('%f', drone.shield), drone_x, drone_y, 0, 1, 1)
         LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
     end
 end
@@ -2067,13 +2104,12 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input_this_frame(dt)
     update_background_shader(dt)
     update_player_vulnerability_timer_this_frame(dt)
-    do
-        update_drone_this_frame(dt)
-    end
     update_player_position_this_frame(dt)
     update_player_trails_this_frame(dt)
     update_player_fired_projectiles_this_frame(dt)
     update_player_shield_collectible_this_frame(dt)
+
+    update_drone_this_frame(dt)
     update_creatures_this_frame(dt)
 
     if curr_state.player_invulnerability_timer > 0 then
@@ -2090,80 +2126,17 @@ end
 --- fluctute super fast
 function draw_game(alpha)
     draw_screenshake_fx(alpha)
+    draw_keybindings_text()
 
     draw_creatures(alpha)
     draw_drone(alpha)
-
-    draw_keybindings_text()
 
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
     if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then draw_player_direction_ray(alpha) end
     draw_player_shield_collectible(alpha)
-    curr_state:draw_player_collectible_indicators(alpha)
+    draw_player_collectible_indicators(alpha)
     draw_player(alpha)
-end
-
-local COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR = 1.75
-local COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER = 16
-
-local _t_points_player_and_collectible = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
-local __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ = not true
-function curr_state:draw_player_collectible_indicators(alpha)
-    --[[  UPDATE  ]]
-
-    local src_x = self.player_x
-    local src_y = self.player_y
-    local dest_x = player_shield_collectible_pos_x
-    local dest_y = player_shield_collectible_pos_y
-
-    local is_spawn = dest_x ~= nil and dest_y ~= nil
-    if is_spawn then
-        --- @cast dest_x number
-        --- @cast dest_y number
-
-        -- Get distance, angle between player and collectible.
-        local _t = _t_points_player_and_collectible
-        do
-            -- Does this help with caching?
-            _t.x1 = src_x
-            _t.y1 = src_y
-            _t.x2 = dest_x
-            _t.y2 = dest_y
-        end
-
-        local dist = Common.manhattan_distance(_t_points_player_and_collectible)
-        local dx = _t.x2 - _t.x1
-        local dy = _t.y2 - _t.y1
-        --[[@diagnostic disable-next-line: deprecated # WARN: math.atan leads to weird behavior]]
-        local angle = math.atan2(dy, dx)
-
-        --[[  DRAW  ]]
-
-        -- Draw indicator.
-        local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
-        local f_scale = COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR
-        local scale0 = smoothstep(f_scale - game_freq, f_scale + game_freq, game_freq)
-
-        -- Just enough to avoid overlapping with player trail
-        local ox = -COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
-        local oy = COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
-
-        LG.setColor(0.1, 1., 0.4, 1)
-        LG.print('»', src_x, src_y, angle, scale0, scale0, ox, oy)
-
-        -- Debug coordinates.
-        if __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ or (Config.Debug.IS_TRACE_ENTITIES and Config.Debug.IS_DEVELOPMENT) then
-            LG.setColor(1, 1, 0, 0.8)
-            LG.line(src_x, src_y, _t.x2, _t.y2)
-            LG.setColor(0, 1, 1, 1.0)
-            LG.print(('%.2f dist'):format(dist), _t.x2, _t.y2, (PI * 0.5) + angle, PHI, PHI, -8, -8)
-            LG.setColor(0.2, 1.0, 0.8)
-            LG.print(('%.2f rad'):format(angle), _t.x2, _t.y2, angle, 2, 2, -4, 4)
-            LG.setColor(0.5, 0.5, 0.8, 1.0)
-            LG.print(('%.2f deg'):format(math.deg(angle)), _t.x2, _t.y2, (0.25 * PI) + angle, 2.5, 2.5)
-        end
-    end
 end
 
 --
@@ -2391,6 +2364,14 @@ function reset_game()
 
     -- Initialize and setup creatures.
     do
+        -- TEMPORARY
+        -- Using a single drone creature
+        -- TODO: Refactor into SOA like datastructures just like creatures
+        do
+            drone.is_active = true
+            DRONE_SHIELD_COUNT = 8
+            drone.shield = DRONE_SHIELD_COUNT
+        end
         -- HACK: Avoid exponential overpopulation initial creatures.
         do
             -- FIXME: THIS IS NOT IN CONFIGURATION (did not notice it while renaming ^_^) -- FIXME: vvv Avoiding exponential-like (not really) overpopulation
