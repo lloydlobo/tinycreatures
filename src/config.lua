@@ -142,7 +142,7 @@ return {
     IS_CREATURE_SWARM_ENABLED = not true,
     IS_GAME_SLOW = not true,
     IS_GRUG_BRAIN = not true, --- Whether to complicate life and the codebase.
-    IS_PLAYER_INVULNERABLE = not true,
+    IS_PLAYER_INVULNERABLE = true,
     IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = not true, --- Flags if fired projectile should wrap around arena.
 
     --
@@ -192,7 +192,7 @@ return {
     PARALLAX_OFFSET_FACTOR_Y = 0.00,
     PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
-    PLAYER_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
+    PLAYER_ROT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
     PLAYER_TURN_SPEED_BESERK_MULTIPLIER = _phi * _phi,
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[_speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
     PLAYER_FIRING_EDGE_MAX_RADIUS = (0.6 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.

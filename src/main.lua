@@ -22,7 +22,7 @@ local Timer = require 'timer'
 local LG = love.graphics
 local lerp, smoothstep = lume.lerp, lume.smooth
 local PHI, PHI_SQ, INV_PHI, INV_PHI_SQ = Config.PHI, Config.PHI_SQ, Config.INV_PHI, Config.INV_PHI_SQ
-local PI, INV_PI = Config.PI, Config.INV_PI
+local PI, TWO_PI, INV_PI = Config.PI, Config.TWO_PI, Config.INV_PI
 
 --
 --
@@ -909,7 +909,7 @@ function handle_player_input_this_frame(dt)
     if love.keyboard.isDown('left', 'a') then --
         cs.player_rot_angle = cs.player_rot_angle - player_turn_speed * dt
     end
-    cs.player_rot_angle = cs.player_rot_angle % (2 * PI) -- wrap player angle each 360°
+    cs.player_rot_angle = cs.player_rot_angle % TWO_PI -- wrap player angle each 360°
 
     -- Move player entity.
     local is_movement_enable = not is_stop_and_beserk_in_place -- or not is_boosting
@@ -947,12 +947,12 @@ function handle_player_input_this_frame(dt)
     elseif is_stop_and_beserk_in_place and not has_companions then
         -- Enhance attributes while spinning like a top.
         --[[TODO: On init, emit a burst of lasers automatically. Give player some respite]]
-        player_turn_speed = Config.PLAYER_TURN_SPEED * Config.PLAYER_TURN_SPEED_BESERK_MULTIPLIER
+        player_turn_speed = Config.PLAYER_ROT_TURN_SPEED * Config.PLAYER_TURN_SPEED_BESERK_MULTIPLIER
         laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
     elseif has_companions then
-        player_turn_speed = Config.PLAYER_TURN_SPEED * INV_PHI_SQ
+        player_turn_speed = Config.PLAYER_ROT_TURN_SPEED * INV_PHI_SQ
     else
-        player_turn_speed = Config.PLAYER_TURN_SPEED
+        player_turn_speed = Config.PLAYER_ROT_TURN_SPEED
     end
 
     -- Update and assign new player action
@@ -1308,18 +1308,24 @@ function _draw_active_creature(i, alpha)
 
     local curr_x = cs.creatures_x[i]
     local curr_y = cs.creatures_y[i]
-    local evolution_stage = Config.CREATURE_STAGES[cs.creatures_evolution_stage[i]] --- @type CreatureStage
+
+    --- @type CreatureStage
+    local evolution_stage = Config.CREATURE_STAGES[cs.creatures_evolution_stage[i]]
+
     local radius = evolution_stage.radius --- @type integer
 
     -- Add sprite to batch with position, rotation, scale and color
     local scale = radius * MAX_CREATURE_RADIUS_INV
+
     local origin_x = radius
     local origin_y = radius
-    local rgb = Common.COLOR.creature_infected -- !!!! can this paint them individually with set color
 
-    -- creatures_sprite_batch:setColor(rgb[1], rgb[2], rgb[3], 1.) ---@diagnostic disable-line: param-type-mismatch
-    creatures_sprite_batch:setColor(0.03, 0.03, 0.03) ---@diagnostic disable-line: param-type-mismatch
-    creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y) -- x, y, ?, sx, sy, ox, oy (origin x, y 'center of the circle')
+    -- !!!! can this paint them individually with set color
+    local rgb = Common.COLOR.creature_infected
+
+    --- @diagnostic disable-next-line: param-type-mismatch
+    creatures_sprite_batch:setColor(0.03, 0.03, 0.03)
+    creatures_sprite_batch:add(curr_x, curr_y, 0, scale, scale, origin_x, origin_y)
 end
 
 function _draw_not_active_creature(i, alpha)
@@ -1796,10 +1802,118 @@ end
 --
 --
 
+function update_drone_position_this_frame(dt)
+    local _DRONE_ACCELERATION = (Config.PLAYER_ACCELERATION * (1 + INV_PHI_SQ ^ 2))
+    local _DRONE_ROT_TURN_SPEED = Config.PLAYER_ROT_TURN_SPEED
+    local _IS_DRONE_LOCKSTEP_MOVEMENT_ENABLE = not true
+
+    --- FIXME: Acceleration seems suitable to player when multiplied with `dt`.
+    ---        So, now what is the error? How to account for the **missing** `dt`.
+    local accel = _DRONE_ACCELERATION * dt
+    local air_resist = Config.AIR_RESISTANCE
+    local game_freq_smooth = lume.clamp(math.sin(game_timer_t * 4) / 4, 0.0, 1.0)
+    local game_freq_lockstep = lume.clamp(math.sin(game_timer_t * 8) / 4, 0.0, 1.0)
+
+    -- Pathfind drone towards player.
+    do
+        local coords = { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
+
+        dist_btw_player_and_drone = Common.manhattan_distance(coords)
+
+        local direction_x = (coords.x1 - coords.x2)
+        local direction_y = (coords.y1 - coords.y2)
+
+        local is_wrap_angle_around_360 = true
+
+        local drone_angle_to_player = math.atan2(direction_y, direction_x)
+        if is_wrap_angle_around_360 then drone_angle_to_player = drone_angle_to_player % TWO_PI end
+        do
+            if Config.Debug.IS_ASSERT then --[[]]
+                assert(drone_angle_to_player >= -TWO_PI and drone_angle_to_player <= TWO_PI)
+            end
+            do
+                local delta_angle = ((drone_angle_to_player - drone.rot_angle) * _DRONE_ROT_TURN_SPEED * dt)
+                drone.rot_angle = (drone.rot_angle + delta_angle)
+                if is_wrap_angle_around_360 then drone.rot_angle = drone.rot_angle % TWO_PI end
+            end
+        end
+
+        dist_btw_player_and_drone = (((direction_x * direction_x) + (direction_y * direction_y)) ^ 0.5)
+
+        -- Calculate normalized directional vector.
+        if dist_btw_player_and_drone > 0 then
+            normalized_dist_x = coords.x1 / dist_btw_player_and_drone
+            normalized_dist_y = coords.y1 / dist_btw_player_and_drone
+        end
+
+        -- Apply acceleration towards the player.
+        do
+            drone.vel_x = drone.vel_x + (direction_x * accel * dt)
+            drone.vel_y = drone.vel_y + (direction_y * accel * dt)
+        end
+
+        -- Apply linear damping for smoother movement.
+        local damping = air_resist
+        do
+            drone.vel_x = drone.vel_x * damping
+            drone.vel_y = drone.vel_y * damping
+        end
+
+        if _IS_DRONE_LOCKSTEP_MOVEMENT_ENABLE then
+            drone.vel_x = smoothstep(drone.vel_x, drone.vel_x * damping, game_freq_lockstep)
+            drone.vel_y = smoothstep(drone.vel_y, drone.vel_y * damping, game_freq_lockstep)
+        end
+
+        do
+            drone.vel_x = lume.clamp(drone.vel_x, -500, 500)
+            drone.vel_y = lume.clamp(drone.vel_y, -500, 500)
+        end
+
+        -- Update drone AI position.
+        do
+            if _IS_DRONE_LOCKSTEP_MOVEMENT_ENABLE then
+                local new_vel_x = smoothstep(drone.vel_x * INV_PHI, drone.vel_x * accel * PHI, game_freq_lockstep)
+                local new_vel_y = smoothstep(drone.vel_y * INV_PHI, drone.vel_y * accel * PHI, game_freq_lockstep)
+                drone.x = smoothstep(drone.x, drone.x + new_vel_x * dt, game_freq_lockstep)
+                drone.y = smoothstep(drone.y, drone.y + new_vel_y * dt, game_freq_lockstep)
+            else
+                drone.x = (drone.x + drone.vel_x * dt) % arena_w
+                drone.y = (drone.y + drone.vel_y * dt) % arena_h
+            end
+        end
+
+        -- Stop moving when within a certain distance to the player.
+        local stop_distance = Config.PLAYER_RADIUS * INV_PHI
+        local is_overshoot_before_collision = true
+        do
+            if dist_btw_player_and_drone < stop_distance then
+                if is_overshoot_before_collision then
+                    drone.vel_x = smoothstep(drone.vel_x * 1.382, drone.vel_x * (PHI * PHI * PHI), game_freq_smooth)
+                    drone.vel_y = smoothstep(drone.vel_y * 1.382, drone.vel_y * (PHI * PHI * PHI), game_freq_smooth)
+                else
+                    drone.vel_x = 0
+                    drone.vel_y = 0
+                end
+            end
+        end
+    end
+
+    do -- Synchronize
+        prev_drone.rot_angle = drone.rot_angle
+        prev_drone.vel_x = drone.vel_x
+        prev_drone.vel_y = drone.vel_y
+        prev_drone.x = drone.x
+        prev_drone.y = drone.y
+    end
+end
+
 function update_game(dt) ---@param dt number # Fixed delta time.
     handle_player_input_this_frame(dt)
     update_background_shader(dt)
     update_player_vulnerability_timer_this_frame(dt)
+    do
+        update_drone_position_this_frame(dt)
+    end
     update_player_position_this_frame(dt)
     update_player_trails_this_frame(dt)
     update_player_fired_projectiles_this_frame(dt)
@@ -1813,87 +1927,58 @@ function update_game(dt) ---@param dt number # Fixed delta time.
         music_bgm:setEffect('on_damage_lowpass', not true)
         music_bgm:setEffect('on_damage_reverb', not true)
     end
+end
 
-    -- #1 Update drone
+function draw_drone(alpha)
+    -- #2 Draw drone
+    -- should not mutate!!!!! interpolate
+    local drone_vel_x = smoothstep(prev_drone.vel_x, drone.vel_x, alpha)
+    local drone_vel_y = smoothstep(prev_drone.vel_y, drone.vel_y, alpha)
+    local drone_x = smoothstep(prev_drone.x, drone.x, alpha) % arena_w
+    local drone_y = smoothstep(prev_drone.y, drone.y, alpha) % arena_h
+    local drone_rot_angle = (smoothstep(prev_drone.rot_angle, drone.rot_angle, alpha) % TWO_PI)
+
     do
-        local DRONE_ACCELERATION = Config.PLAYER_ACCELERATION
-        local air_resist = Config.AIR_RESISTANCE
-        --- FIXME: Acceleration seems suitable to player when multiplied with `dt`.
-        ---        So, now what is the error? How to account for the **missing** `dt`.
-        local accel = DRONE_ACCELERATION * dt
-        local game_freq_smooth = lume.clamp(math.sin(game_timer_t * 4) / 4, 0.0, 1.0)
-        local game_freq_lockstep = lume.clamp(math.sin(game_timer_t * 8) / 4, 0.0, 1.0)
-        local is_lockstep_movement = not true
-
-        -- Pathfind drone towards player.
-        do
-            local coords = { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
-
-            dist_btw_player_and_drone = Common.manhattan_distance(coords)
-
-            local direction_x = (coords.x1 - coords.x2)
-            local direction_y = (coords.y1 - coords.y2)
-            dist_btw_player_and_drone = (((direction_x * direction_x) + (direction_y * direction_y)) ^ 0.5)
-
-            -- Calculate normalized directional vector.
-            if dist_btw_player_and_drone > 0 then
-                normalized_dist_x = coords.x1 / dist_btw_player_and_drone
-                normalized_dist_y = coords.y1 / dist_btw_player_and_drone
-            end
-
-            -- Apply acceleration towards the player.
-            drone.vel_x = drone.vel_x + (direction_x * accel * dt)
-            drone.vel_y = drone.vel_y + (direction_y * accel * dt)
-
-            -- Apply linear damping for smoother movement.
-            local damping = air_resist
-            drone.vel_x = drone.vel_x * damping
-            drone.vel_y = drone.vel_y * damping
-
-            if is_lockstep_movement then
-                drone.vel_x = smoothstep(drone.vel_x, drone.vel_x * damping, game_freq_lockstep)
-                drone.vel_y = smoothstep(drone.vel_y, drone.vel_y * damping, game_freq_lockstep)
-            end
-
-            drone.vel_x = lume.clamp(drone.vel_x, -500, 500)
-            drone.vel_y = lume.clamp(drone.vel_y, -500, 500)
-
-            -- Update drone AI position.
-            if is_lockstep_movement then
-                local new_vel_x = smoothstep(drone.vel_x * INV_PHI, drone.vel_x * accel * PHI, game_freq_lockstep)
-                local new_vel_y = smoothstep(drone.vel_y * INV_PHI, drone.vel_y * accel * PHI, game_freq_lockstep)
-                drone.x = smoothstep(drone.x, drone.x + new_vel_x * dt, game_freq_lockstep)
-                drone.y = smoothstep(drone.y, drone.y + new_vel_y * dt, game_freq_lockstep)
-            else
-                drone.x = (drone.x + drone.vel_x * dt) % arena_w
-                drone.y = (drone.y + drone.vel_y * dt) % arena_h
-            end
-
-            -- Stop moving when within a certain distance to the player.
-            local stop_distance = Config.PLAYER_RADIUS * INV_PHI_SQ
-            local is_overshoot_smash = true
-            if dist_btw_player_and_drone < stop_distance then
-                if is_overshoot_smash then
-                    drone.vel_x = smoothstep(drone.vel_x * 1.125, drone.vel_x * (PHI * PHI), game_freq_smooth)
-                    drone.vel_y = smoothstep(drone.vel_y * 1.125, drone.vel_y * (PHI * PHI), game_freq_smooth)
-                else
-                    drone.vel_x = 0
-                    drone.vel_y = 0
-                end
-            end
-        end
-
-        -- -- Update drone AI input.
-        -- drone.rot_angle = PI + curr_state.player_rot_angle
-
-        do -- Synchronize
-            prev_drone.rot_angle = drone.rot_angle
-            prev_drone.vel_x = drone.vel_x
-            prev_drone.vel_y = drone.vel_y
-            prev_drone.x = drone.x
-            prev_drone.y = drone.y
-        end
+        LG.setColor(1.0, 0.5, 0.5, 0.5)
+        LG.circle('fill', drone_x, drone_y, drone.radius)
     end
+    LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[Config.CREATURE_STAGES_COUNT])
+    -- LG.circle('fill', drone_x, drone_y, drone.radius)
+
+    LG.circle('fill', drone_x, drone_y, drone.radius, 7)
+
+    local poly_size = 1 + drone.radius * INV_PHI_SQ
+
+    local x1 = drone_x + math.cos(drone_rot_angle) * poly_size
+    local y1 = drone_y + math.sin(drone_rot_angle) * poly_size
+    local x2 = drone_x + math.cos(drone_rot_angle + math.pi * 0.75) * poly_size
+    local y2 = drone_y + math.sin(drone_rot_angle + math.pi * 0.75) * poly_size
+    local x3 = drone_x + math.cos(drone_rot_angle - math.pi * 0.75) * poly_size
+    local y3 = drone_y + math.sin(drone_rot_angle - math.pi * 0.75) * poly_size
+
+    local __is_override__ = not true
+    if __is_override__ or Config.Debug.IS_DEVELOPMENT and Config.Debug.IS_TRACE_ENTITIES then
+        if not true then
+            LG.setColor(0.85, 0.3, 0.2)
+            LG.circle('line', drone_x, drone_y, drone.radius * INV_PHI + 2)
+            LG.circle('line', drone_x, drone_y, drone.radius * INV_PHI_SQ)
+        end
+
+        LG.setColor(0, 1, 1, 0.8)
+        LG.rectangle('line', drone_x - poly_size, drone_y - poly_size, poly_size * 2, poly_size * 2)
+        LG.setColor(0, 1, 1)
+        LG.polygon('line', x1, y1, x2, y2, x3, y3)
+    else
+        LG.setColor(0.9, 0.4, 0.3)
+        LG.polygon('fill', x1, y1, x2, y2, x3, y3)
+
+        LG.setColor(0.9, 0.4, 0.6)
+        LG.polygon('line', x1, y1, x2, y2, x3, y3)
+    end
+    -- if dist_btw_player_and_drone ~= nil then
+    --     --
+    --     LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
+    -- end
 end
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
@@ -1901,44 +1986,18 @@ end
 --- fluctute super fast
 function draw_game(alpha)
     draw_screenshake_fx(alpha)
+
     draw_creatures(alpha)
+    draw_drone(alpha)
+
     draw_keybindings_text()
+
     draw_player_fired_projectiles(alpha)
     draw_player_trail(alpha)
-    if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then --[[]]
-        draw_player_direction_ray(alpha)
-    end
+    if Config.Debug.IS_TRACE_HUD or is_debug_hud_enable then draw_player_direction_ray(alpha) end
     draw_player_shield_collectible(alpha)
-    draw_player(alpha)
     curr_state:draw_player_collectible_indicators(alpha)
-
-    -- WIP: DRONE
-    do
-        -- #2 Draw drone
-        do
-            do --interpolate
-                drone.vel_x = lerp(prev_drone.vel_x, drone.vel_x, alpha)
-                drone.vel_y = lerp(prev_drone.vel_y, drone.vel_y, alpha)
-                drone.x = lerp(prev_drone.x, drone.x, alpha) % arena_w
-                drone.y = lerp(prev_drone.y, drone.y, alpha) % arena_h
-            end
-            LG.setColor(0.75, 0.2, 0.1)
-            LG.circle('fill', drone.x, drone.y, drone.radius,16*alpha)
-            LG.setColor(0.85, 0.3, 0.2)
-            LG.circle(
-                'line',
-                drone.x,
-                drone.y,
-                drone.radius * INV_PHI+2,
-                4 + 8 * smoothstep(alpha * INV_PHI, alpha * PHI * PHI, lume.clamp(math.sin(8 * game_timer_t) * alpha, 0.0, 1.0))
-            )
-            LG.circle('line', drone.x, drone.y, drone.radius * INV_PHI_SQ)
-        end
-        -- if dist_btw_player_and_drone ~= nil then
-        --     --
-        --     LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
-        -- end
-    end
+    draw_player(alpha)
 end
 
 local COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR = 1.75
@@ -2115,10 +2174,10 @@ function load_audio()
         --- @alias Waveform 'sine' | 'square' | 'sawtooth'
         local waveform = 'sine'--[[@type Waveform]]
         local on_damage_effect_opts =
-            { type = 'ringmodulator', frequency = 100, highcut = lume.clamp(450, 0, 24000), waveform = waveform, volume = INV_PHI ^ 4 }
+            { type = 'ringmodulator', frequency = 100, highcut = lume.clamp(450, 0, 24000), waveform = waveform, volume = INV_PHI ^ 8 }
         love.audio.setEffect('on_damage_reverb', on_damage_effect_opts)
 
-        local master_effect_opts = { type = 'reverb' } --[[decaytime = lume.clamp(1.49 * (PHI * 1), 0.1, 20), roomrolloff = lume.clamp(PHI, 0, 10), gain = 0.32 * PHI_INV, volume = PHI_INV, ]]
+        local master_effect_opts = { type = 'reverb', volume = 0.5 } --[[decaytime = lume.clamp(1.49 * (PHI * 1), 0.1, 20), roomrolloff = lume.clamp(PHI, 0, 10), gain = 0.32 * PHI_INV, volume = PHI_INV, ]]
         love.audio.setEffect('master_reverb', master_effect_opts)
     end
 
@@ -2282,7 +2341,7 @@ function reset_game()
         laser_intersect_final_creature_counter = 0 -- count tiniest creature to save─collision with laser
 
         player_fire_cooldown_timer = 0
-        player_turn_speed = Config.PLAYER_TURN_SPEED
+        player_turn_speed = Config.PLAYER_ROT_TURN_SPEED
 
         player_shield_collectible_pos_x = nil --- @type number|nil
         player_shield_collectible_pos_y = nil --- @type number|nil
@@ -2362,7 +2421,7 @@ function love.load()
             player_fire_cooldown_timer = 0
             player_shield_collectible_pos_x = nil --- @type number|nil
             player_shield_collectible_pos_y = nil --- @type number|nil
-            player_turn_speed = Config.PLAYER_TURN_SPEED
+            player_turn_speed = Config.PLAYER_ROT_TURN_SPEED
         end
     end
 
