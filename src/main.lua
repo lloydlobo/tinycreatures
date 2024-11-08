@@ -577,14 +577,6 @@ function update_screenshake(dt)
     end
 end
 
-function update_player_vulnerability_timer_this_frame(dt)
-    local cs = curr_state
-    if cs.player_invulnerability_timer > 0 then
-        cs.player_invulnerability_timer = cs.player_invulnerability_timer - dt
-        if cs.player_invulnerability_timer <= 0 then cs.player_invulnerability_timer = 0 end
-    end
-end
-
 -- Use dt for position updates, because movement is time-dependent
 function update_player_position_this_frame(dt)
     local cs = curr_state
@@ -592,6 +584,14 @@ function update_player_position_this_frame(dt)
     cs.player_vel_y = cs.player_vel_y * Config.AIR_RESISTANCE
     cs.player_x = (cs.player_x + cs.player_vel_x * dt) % arena_w
     cs.player_y = (cs.player_y + cs.player_vel_y * dt) % arena_h
+end
+
+function update_player_vulnerability_timer_this_frame(dt)
+    local cs = curr_state
+    if cs.player_invulnerability_timer > 0 then
+        cs.player_invulnerability_timer = cs.player_invulnerability_timer - dt
+        if cs.player_invulnerability_timer <= 0 then cs.player_invulnerability_timer = 0 end
+    end
 end
 
 function update_player_trails_this_frame(dt)
@@ -1817,29 +1817,74 @@ function update_game(dt) ---@param dt number # Fixed delta time.
     -- #1 Update drone
     do
         local DRONE_ACCELERATION = Config.PLAYER_ACCELERATION
-        local accel = DRONE_ACCELERATION
         local air_resist = Config.AIR_RESISTANCE
+        --- FIXME: Acceleration seems suitable to player when multiplied with `dt`.
+        ---        So, now what is the error? How to account for the **missing** `dt`.
+        local accel = DRONE_ACCELERATION * dt
+        local game_freq_smooth = lume.clamp(math.sin(game_timer_t * 4) / 4, 0.0, 1.0)
+        local game_freq_lockstep = lume.clamp(math.sin(game_timer_t * 8) / 4, 0.0, 1.0)
+        local is_lockstep_movement = not true
 
-        -- Pathfind to player.
+        -- Pathfind drone towards player.
         do
-            dist_btw_player_and_drone = Common.manhattan_distance { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
+            local coords = { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
 
-            do -- NAIVE closing sddistance [[follow the player without touching]]
-                drone.x = smoothstep(drone.x, curr_state.player_x, 0.1)
-                drone.y = smoothstep(drone.y, curr_state.player_y, 0.1)
+            dist_btw_player_and_drone = Common.manhattan_distance(coords)
+
+            local direction_x = (coords.x1 - coords.x2)
+            local direction_y = (coords.y1 - coords.y2)
+            dist_btw_player_and_drone = (((direction_x * direction_x) + (direction_y * direction_y)) ^ 0.5)
+
+            -- Calculate normalized directional vector.
+            if dist_btw_player_and_drone > 0 then
+                normalized_dist_x = coords.x1 / dist_btw_player_and_drone
+                normalized_dist_y = coords.y1 / dist_btw_player_and_drone
+            end
+
+            -- Apply acceleration towards the player.
+            drone.vel_x = drone.vel_x + (direction_x * accel * dt)
+            drone.vel_y = drone.vel_y + (direction_y * accel * dt)
+
+            -- Apply linear damping for smoother movement.
+            local damping = air_resist
+            drone.vel_x = drone.vel_x * damping
+            drone.vel_y = drone.vel_y * damping
+
+            if is_lockstep_movement then
+                drone.vel_x = smoothstep(drone.vel_x, drone.vel_x * damping, game_freq_lockstep)
+                drone.vel_y = smoothstep(drone.vel_y, drone.vel_y * damping, game_freq_lockstep)
+            end
+
+            drone.vel_x = lume.clamp(drone.vel_x, -500, 500)
+            drone.vel_y = lume.clamp(drone.vel_y, -500, 500)
+
+            -- Update drone AI position.
+            if is_lockstep_movement then
+                local new_vel_x = smoothstep(drone.vel_x * INV_PHI, drone.vel_x * accel * PHI, game_freq_lockstep)
+                local new_vel_y = smoothstep(drone.vel_y * INV_PHI, drone.vel_y * accel * PHI, game_freq_lockstep)
+                drone.x = smoothstep(drone.x, drone.x + new_vel_x * dt, game_freq_lockstep)
+                drone.y = smoothstep(drone.y, drone.y + new_vel_y * dt, game_freq_lockstep)
+            else
+                drone.x = (drone.x + drone.vel_x * dt) % arena_w
+                drone.y = (drone.y + drone.vel_y * dt) % arena_h
+            end
+
+            -- Stop moving when within a certain distance to the player.
+            local stop_distance = Config.PLAYER_RADIUS * INV_PHI_SQ
+            local is_overshoot_smash = true
+            if dist_btw_player_and_drone < stop_distance then
+                if is_overshoot_smash then
+                    drone.vel_x = smoothstep(drone.vel_x * 1.125, drone.vel_x * (PHI * PHI), game_freq_smooth)
+                    drone.vel_y = smoothstep(drone.vel_y * 1.125, drone.vel_y * (PHI * PHI), game_freq_smooth)
+                else
+                    drone.vel_x = 0
+                    drone.vel_y = 0
+                end
             end
         end
 
-        -- Update drone AI input.
-        drone.rot_angle = PI + curr_state.player_rot_angle
-        drone.vel_x = drone.vel_x + math.cos(drone.rot_angle) * accel * dt
-        drone.vel_y = drone.vel_y + math.sin(drone.rot_angle) * accel * dt
-
-        -- Update position.
-        drone.vel_x = drone.vel_x * air_resist
-        drone.vel_y = drone.vel_y * air_resist
-        drone.x = (drone.x + drone.vel_x * dt) % arena_w
-        drone.y = (drone.y + drone.vel_y * dt) % arena_h
+        -- -- Update drone AI input.
+        -- drone.rot_angle = PI + curr_state.player_rot_angle
 
         do -- Synchronize
             prev_drone.rot_angle = drone.rot_angle
@@ -1877,13 +1922,22 @@ function draw_game(alpha)
                 drone.x = lerp(prev_drone.x, drone.x, alpha) % arena_w
                 drone.y = lerp(prev_drone.y, drone.y, alpha) % arena_h
             end
-            LG.setColor(1.0, 0.3, 0.4)
-            LG.circle('fill', drone.x, drone.y, drone.radius)
+            LG.setColor(0.75, 0.2, 0.1)
+            LG.circle('fill', drone.x, drone.y, drone.radius,16*alpha)
+            LG.setColor(0.85, 0.3, 0.2)
+            LG.circle(
+                'line',
+                drone.x,
+                drone.y,
+                drone.radius * INV_PHI+2,
+                4 + 8 * smoothstep(alpha * INV_PHI, alpha * PHI * PHI, lume.clamp(math.sin(8 * game_timer_t) * alpha, 0.0, 1.0))
+            )
+            LG.circle('line', drone.x, drone.y, drone.radius * INV_PHI_SQ)
         end
-        if dist_btw_player_and_drone ~= nil then
-            --
-            LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
-        end
+        -- if dist_btw_player_and_drone ~= nil then
+        --     --
+        --     LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
+        -- end
     end
 end
 
