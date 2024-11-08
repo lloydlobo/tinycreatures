@@ -389,7 +389,7 @@ function boost_player_entity_speed(dt)
     local cs = curr_state
     local prev_vel_x = cs.player_vel_x
     local prev_vel_y = cs.player_vel_y
-    local game_freq = lume.clamp(math.sin(4 * game_timer_t) / 2, 0., 1.)
+    local game_freq = lume.clamp(game_freq_t.sin4 * 0.5, 0., 1.)
     local ease = smoothstep(game_freq ^ 0.8, game_freq ^ 1.2, game_freq) --* PHI
 
     -- can use lerp here for smooth speed easing
@@ -545,7 +545,7 @@ function update_background_shader(dt)
 
     local speed_y = (arena_h / 32) * 0.001
 
-    local game_freq_x = math.sin(2 * game_timer_t) / 2
+    local game_freq_x = game_freq_t.sin2 * 0.5
     local game_freq_y = math.sin((4 + love.math.random()) * game_timer_t * 0.0625) / 4
 
     local vel_x = 0.25 * 0.001 * lume.clamp(game_freq_x, -1, 1)
@@ -1009,8 +1009,8 @@ function update_drone_this_frame(dt)
     local turn_speed = Config.PLAYER_ROT_TURN_SPEED * _temp_g_curr_drone_kind_opts.f_turn_speed
     local accel = (Config.PLAYER_ACCELERATION * _temp_g_curr_drone_kind_opts.f_acceleration)
     local air_resist = Config.AIR_RESISTANCE
-    local game_freq_smooth = lume.clamp(math.sin(game_timer_t * 4) / 4, 0.0, 1.0)
-    local game_freq_lockstep = lume.clamp(math.sin(game_timer_t * 8) / 4, 0.0, 1.0)
+    local game_freq_smooth = lume.clamp(game_freq_t.sin4 * 0.25, 0.0, 1.0)
+    local game_freq_lockstep = lume.clamp(game_freq_t.sin8 * 0.25, 0.0, 1.0)
 
     -- Pathfind drone towards player.
     local coords = { x1 = curr_state.player_x, y1 = curr_state.player_y, x2 = drone.x, y2 = drone.y }
@@ -1198,7 +1198,7 @@ function draw_player_trail(alpha)
     local wiggle_rate = 1.0
     local wiggle_freq = alpha
     -- local game_freq = math.sin(game_timer_t * 8) / 8
-    local game_freq = lume.clamp(math.sin(8 * game_timer_t) / 8, 0., 1.)
+    local game_freq = lume.clamp(game_freq_t.sin8 * 0.125, 0., 1.)
     wiggle_freq = smoothstep(wiggle_freq, game_freq, game_freq)
 
     local last_f = 0.
@@ -1293,7 +1293,7 @@ function draw_player(alpha)
 
     -- Frequency-based visual effect
     -- local juice_frequency = 1 + math.sin(Config.FIXED_FPS * game_timer_dt)
-    local game_freq = lume.clamp(math.sin(4 * game_timer_t) / 4, 0., 1.)
+    local game_freq = lume.clamp(game_freq_t.sin4 * 0.25, 0., 1.)
     local juice_frequency = 1 + game_freq
     local juice_frequency_damper = lerp(0.0625, 0.125, alpha)
 
@@ -1524,7 +1524,7 @@ end
 function _draw_not_active_creature(i, alpha)
     local cs = curr_state
 
-    local game_freq = math.sin(game_timer_t * 8) / 8
+    local game_freq = game_freq_t.sin8 * 0.125
 
     local curr_x = cs.creatures_x[i]
     local curr_y = cs.creatures_y[i]
@@ -1610,8 +1610,7 @@ local _IS_CREATURES_BLINK_ENABLE = not true
 function draw_creatures_eye(alpha)
     local cs = curr_state
 
-    local game_freq = math.sin(2 * game_timer_t)
-    game_freq = lume.clamp(game_freq, 0., 1.)
+    local game_freq = lume.clamp(game_freq_t.sin2 * 0.5, 0., 1.)
 
     for i = 1, #cs.creatures_x do
         if cs.creatures_is_active[i] == Common.STATUS.ACTIVE then
@@ -1848,7 +1847,7 @@ function draw_timer_text()
 
     if Config.IS_GRUG_BRAIN then
         -- Draw rounded rectangle button like backdrop.
-        local game_freq = math.sin(game_timer_t * 4) / 4
+        local game_freq = game_freq_t.sin4 * 0.25
         local f = lume.clamp((1 + game_freq), INV_PHI, PHI)
         f = smoothstep(f, 1 + f * INV_PHI_SQ, f ^ 1.2)
         -- Save state.
@@ -2370,6 +2369,13 @@ function reset_game()
     do
         game_timer_dt = 0.0
         game_timer_t = 0.0
+        --- @type GameFreqTValues
+        game_freq_t = {
+            sin8 = 0.0, --- bounciest (balance ampl with *0.125)
+            sin4 = 0.0, --- (balance ampl with *0.25)
+            sin2 = 0.0, --- (balance ampl with *0.5)
+            sin1 = 0.0, --- smoothest (balance ampl with *1)
+        }
 
         laser_fire_timer = 0
         laser_index = 1 -- circular buffer index (duplicated below!)
@@ -2450,6 +2456,19 @@ function love.load()
         do
             game_timer_dt = 0.0
             game_timer_t = 0.0
+
+            --- 'Smooth frequency sine calculation once each frame'
+            --- @class (exact) GameFreqTValues
+            --- @field sin8 number
+            --- @field sin4 number
+            --- @field sin2 number
+            --- @field sin1 number
+            game_freq_t = {
+                sin8 = 0.0,
+                sin4 = 0.0,
+                sin2 = 0.0,
+                sin1 = 0.0,
+            }
             laser_fire_timer = 0
             laser_index = 1 -- circular buffer index (duplicated below!)
             laser_intersect_creature_counter = 0 -- count creatures collision with laser... coin like
@@ -2508,6 +2527,11 @@ function love.update(dt)
     -- #2 Update game timer.
     game_timer_t = game_timer_t + dt
     game_timer_dt = dt -- note: for easy global reference
+
+    game_freq_t.sin8 = math.sin(8 * game_timer_t)
+    game_freq_t.sin4 = math.sin(4 * game_timer_t)
+    game_freq_t.sin2 = math.sin(2 * game_timer_t)
+    game_freq_t.sin1 = math.sin(game_timer_t)
 
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
