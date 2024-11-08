@@ -69,16 +69,16 @@ float noise(vec2 p)
 {
     vec2 ip=floor(p);
     vec2 u=fract(p);
-    
+
     // Polynomial smoothstep
     u=u*u*(3.-2.*u);
-    
+
     // Seems to feather each sector (with vec2)
     float res=mix(
         mix(rand(ip),rand(ip+vec2(1.,0.)),u.x),
         mix(rand(ip+vec2(0.,1.)),rand(ip+vec2(1.,1.)),u.x),u.y
     );
-    
+
     return res*res;
 }
 
@@ -89,17 +89,17 @@ Fractal Brownian Motion
 */
 float fbm(vec2 p)
 {
-    float t=time*.0625; t*=8.;
-    
+    float t=time*.0625; t*=2.;
+
     float f=0.;
-    
+
     f+=.500000*noise(p+t); p=MTX*p*2.02;
     f+=.031250*noise(p);   p=MTX*p*2.01;
     f+=.250000*noise(p);   p=MTX*p*2.03;
     f+=.125000*noise(p);   p=MTX*p*2.01;
     f+=.062500*noise(p);   p=MTX*p*2.04;
     f+=.015625*noise(p+sin(t));
-    
+
     return f/.968750;
 }
 
@@ -112,16 +112,16 @@ float pattern(in vec2 p)
 vec4 effect(vec4 color,Image image,vec2 uvs,vec2 screen_coords)
 {
     vec4 pixel=Texel(image,uvs);
-    
+
     float f_aspect=screen.x/screen.y;
-    
+
     // Normalize coordinates
     vec2 uv=screen_coords/screen;
     vec2 uv0=uv;
     uv.x*=f_aspect;
-    
+
     float f_shade=pattern(uv);
-    
+
     return pixel*vec4(F_BRIGHTNESS*palette(f_shade),1.);
 }
 

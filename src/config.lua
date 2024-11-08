@@ -127,7 +127,7 @@ return {
         IS_DEVELOPMENT = not true,
         IS_TEST = true,
         IS_TRACE_ENTITIES = not true,
-        IS_TRACE_HUD = not true,
+        IS_TRACE_HUD = not true, -- Heads Up Displaye
     },
     Mode = Mode,
     MoonshineShaderSettings = _MoonshineShaderSettings,
@@ -142,7 +142,7 @@ return {
     IS_CREATURE_SWARM_ENABLED = not true,
     IS_GAME_SLOW = not true,
     IS_GRUG_BRAIN = not true, --- Whether to complicate life and the codebase.
-    IS_PLAYER_INVULNERABLE = true,
+    IS_PLAYER_INVULNERABLE = not true,
     IS_PLAYER_PROJECTILE_WRAP_AROUND_ARENA = not true, --- Flags if fired projectile should wrap around arena.
 
     --
