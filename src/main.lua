@@ -1898,6 +1898,29 @@ function update_drone_position_this_frame(dt)
         end
     end
 
+    -- Update collisiion with player
+    do
+        if drone.x and drone.y then
+            local player_circle = {
+                x = curr_state.player_x,
+                y = curr_state.player_y,
+                radius = Config.PLAYER_RADIUS,
+            } --- @class Circle
+            local drone_circle = {
+                x = drone.x,
+                y = drone.y,
+                radius = drone.radius,
+            } --- @class Circle
+            local is_intersect_drone_player =
+                Collision.is_intersect_circles_tolerant { a = drone_circle, b = player_circle, tolerance_factor = Collision.COLLISION_TOLERANCE.INNER_50 }
+            if is_intersect_drone_player then
+                screenshake.duration = SCREENSHAKE_DURATION.ON_DAMAGE * PHI
+                sound_player_took_damage:play()
+                sound_player_took_damage_interference:play()
+            end
+        end
+    end
+
     do -- Synchronize
         prev_drone.rot_angle = drone.rot_angle
         prev_drone.vel_x = drone.vel_x
