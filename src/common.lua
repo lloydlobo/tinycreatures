@@ -54,25 +54,6 @@ M.SCREEN_FLASH_ALPHA_LEVEL = {
     LOW = 0.045,
 }
 
---- @enum CreatureStageEyeColors
---- Should follow ­­──»──VIBGYOR──»──
---- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
-M.CREATURE_STAGE_EYE_COLORS = {
-    { 0.98, 0.3, 0.7 }, -- red-pink
-    -- { 0.92, 0.90, 0.50 }, -- yellow
-    { 0.50, 0.85, 0.65 }, -- emerald-green
-    { 0.45, 0.3, 0.85 }, -- navy-violet
-    { 0.09, 0.08, 0.1 }, -- badland gray
-}
-
---- @enum CreatureStageColors
-M.CREATURE_STAGE_COLORS = {
-    { 0.75, 0.1, 0.3 },
-    { 0.70, 0.2, 0.3 },
-    { 0.70, 0.3, 0.4 },
-    { 0.52, 0.45, 0.45 },
-}
-
 -- local ordia_blue = { 0.06, 0.16, 0.38 }
 
 --- @enum COLOR
@@ -99,9 +80,11 @@ M.COLOR = {
     creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
     creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
-    player_companion_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
+    -- player_companion_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
+    player_companion_modifier = { 0.5, 0.9, 1.0 }, --- Chaos when shift + x are down. (luminiscent blue)
     player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
-    player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
+    -- player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
+    player_boost_dash_modifier = { 0.95, 0.95, 0.55 }, --- bubbles (luminiscent yellow)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
     player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
     player_entity_firing_edge_dark = { 0.95, 0.95, 0.95 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
@@ -111,6 +94,26 @@ M.COLOR = {
     TEXT_DARKER = { 0.4, 0.4, 0.4 },
     TEXT_DARKEST = { 0.3, 0.3, 0.3 },
     TEXT_DEBUG_HUD = { 0.8, 0.7, 0.0 },
+}
+
+--- @enum CreatureStageEyeColors
+--- Should follow ­­──»──VIBGYOR──»──
+--- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
+M.CREATURE_STAGE_EYE_COLORS = {
+    { 0.98, 0.3, 0.7 }, -- red-pink
+    { 0.50, 0.85, 0.65 }, -- emerald-green
+    { 0.45, 0.3, 0.85 }, -- navy-purple-violet
+    -- { 0.92, 0.90, 0.50 }, -- yellow
+    -- { 0.09, 0.08, 0.1 }, -- badland gray
+    { 0.05, 0.06, 0.07 }, -- badland violet gray
+}
+
+--- @enum CreatureStageColors
+M.CREATURE_STAGE_COLORS = {
+    { 0.75, 0.1, 0.3 },
+    { 0.70, 0.2, 0.3 },
+    { 0.70, 0.3, 0.4 },
+    { 0.52, 0.45, 0.45 },
 }
 
 --- Desaturate an RGB color by averaging it with grayscale.

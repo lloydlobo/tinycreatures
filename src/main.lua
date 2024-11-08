@@ -1450,17 +1450,22 @@ function draw_creatures_eye(alpha)
             end
 
             if evolution_stage_id == Config.CREATURE_STAGES_COUNT then
-                local poly_size = (INV_PHI ^ 0) * radius / evolution_stage_id
-                local x1 = x + math.cos(angle) * poly_size -- pointy x
-                local y1 = y + math.sin(angle) * poly_size -- pointy y
-                local x2 = x + math.cos(angle + math.pi * 0.75) * poly_size
-                local y2 = y + math.sin(angle + math.pi * 0.75) * poly_size
-                local x3 = x + math.cos(angle - math.pi * 0.75) * poly_size
-                local y3 = y + math.sin(angle - math.pi * 0.75) * poly_size
-                LG.setColor(0.1, 0.1, 0.1)
+                local poly_size = PHI * radius / evolution_stage_id
+
+                game_freq = game_freq * 0.9 / i
+
+                local x1 = x + math.cos(angle + game_freq) * poly_size -- pointy x
+                local y1 = y + math.sin(angle + game_freq) * poly_size -- pointy y
+                local x2 = x + math.cos(angle + math.pi * 0.75 + game_freq) * poly_size
+                local y2 = y + math.sin(angle + math.pi * 0.75 + game_freq) * poly_size
+                local x3 = x + math.cos(angle - math.pi * 0.75 + game_freq) * poly_size
+                local y3 = y + math.sin(angle - math.pi * 0.75 + game_freq) * poly_size
+
+                LG.setColor(0.2, 0.3, 0.4)
                 LG.polygon('line', x1, y1, x2, y2, x3, y3) -- star like glitter edge
+
                 LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])
-                LG.circle('fill', x, y, radius * INV_PHI_SQ * INV_PHI)
+                LG.circle('fill', x, y, PHI * radius * INV_PHI_SQ * INV_PHI)
             else
                 local radius_ = radius * INV_PHI_SQ * INV_PHI
                 LG.setColor(Common.CREATURE_STAGE_EYE_COLORS[evolution_stage_id])

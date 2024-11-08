@@ -182,7 +182,7 @@ return {
     LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 2.0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 8, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = (_inv_phi ^ 0.25) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
+    LASER_RADIUS = (_inv_phi ^ 1) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
     PARALLAX_ENTITY_IMG_RADIUS = 48,
     PARALLAX_ENTITY_MAX_COUNT = (2 ^ 6),
     PARALLAX_ENTITY_MAX_DEPTH = 3, --- @type integer
