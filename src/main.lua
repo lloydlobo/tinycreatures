@@ -3,8 +3,8 @@
 
 Ludum Dare 56: Tiny Creatures
     See https://ldjam.com/events/ludum-dare/56/$403597
-
-Starter setup ported initially from https://berbasoft.com/simplegametutorials/love/asteroids/
+kk
+k
 
 Development
     $ find -name '*.lua' | entr -crs 'date; love .; echo exit status $?'
@@ -839,7 +839,13 @@ function update_creatures_this_frame(dt)
         creature_circle.x = x
         creature_circle.y = y
         creature_circle.radius = stage.radius
-        if Collision.is_intersect_circles_tolerant { a = player_circle, b = creature_circle, tolerance_factor = Collision.COLLISION_TOLERANCE.INNER_50 } then
+        if
+            Collision.is_intersect_circles_tolerant {
+                a = player_circle,
+                b = creature_circle,
+                tolerance_factor = Collision.COLLISION_TOLERANCE.INNER_50,
+            }
+        then
             player_damage_status_actions(damage_player_fetch_status())
         end
 
@@ -1172,6 +1178,69 @@ function draw_drone(alpha)
     if dist_btw_player_and_drone ~= nil then
         --
         LG.print(string.format('[%.2f] dist_btw_player_and_drone', dist_btw_player_and_drone), 100, 100)
+    end
+end
+
+local COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR = 1.75
+local COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER = 16
+
+local _t_points_player_and_collectible = { x1 = 0, y1 = 0, x2 = 0, y2 = 0 }
+local __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ = not true
+function draw_player_collectible_indicators(alpha)
+    --[[  UPDATE  ]]
+
+    local cs = curr_state
+    local src_x = cs.player_x
+    local src_y = cs.player_y
+    local dest_x = player_shield_collectible_pos_x
+    local dest_y = player_shield_collectible_pos_y
+
+    local is_spawn = dest_x ~= nil and dest_y ~= nil
+    if is_spawn then
+        --- @cast dest_x number
+        --- @cast dest_y number
+
+        -- Get distance, angle between player and collectible.
+        local _t = _t_points_player_and_collectible
+        do
+            -- Does this help with caching?
+            _t.x1 = src_x
+            _t.y1 = src_y
+            _t.x2 = dest_x
+            _t.y2 = dest_y
+        end
+
+        local dist = Common.manhattan_distance(_t_points_player_and_collectible)
+        local dx = _t.x2 - _t.x1
+        local dy = _t.y2 - _t.y1
+        --[[@diagnostic disable-next-line: deprecated # WARN: math.atan leads to weird behavior]]
+        local angle = math.atan2(dy, dx)
+
+        --[[  DRAW  ]]
+
+        -- Draw indicator.
+        local game_freq = lume.clamp(game_freq_t.sin8 * 0.125, 0., 1.)
+        local f_scale = COLLECTIBLE_INDICATOR_FONT_SCALE_FACTOR
+        local scale0 = smoothstep(f_scale - game_freq, f_scale + game_freq, game_freq)
+
+        -- Just enough to avoid overlapping with player trail
+        local ox = -COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
+        local oy = COLLECTIBLE_INDICATOR_OFFSET_FROM_PLAYER
+
+        LG.setColor(0.1, 1., 0.4, 1)
+        LG.print('»', src_x, src_y, angle, scale0, scale0, ox, oy)
+
+        -- Debug coordinates.
+        if __TEMP_OVERRIDE_DEBUG_POLAR_COORDS__ or (Config.Debug.IS_TRACE_ENTITIES and Config.Debug.IS_DEVELOPMENT) then
+            LG.setColor(1, 1, 0, 0.8)
+            LG.line(src_x, src_y, _t.x2, _t.y2)
+            LG.setColor(0, 1, 1, 1.0)
+            LG.print(('%.2f dist'):format(dist), _t.x2, _t.y2, (PI * 0.5) + angle, PHI, PHI, -8, -8)
+            LG.setColor(0.2, 1.0, 0.8)
+            LG.print(('%.2f rad'):format(angle), _t.x2, _t.y2, angle, 2, 2, -4, 4)
+            LG.setColor(0.5, 0.5, 0.8, 1.0)
+            LG.print(('%.2f deg'):format(math.deg(angle)), _t.x2, _t.y2, (0.25 * PI) + angle, 2.5, 2.5)
+        end
     end
 end
 
