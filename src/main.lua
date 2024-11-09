@@ -2335,13 +2335,13 @@ function load_shaders()
     }
 
     -- Load moonshine shaders
-    local moonshine = require 'lib.moonshine'
-    local fx = moonshine.effects
+    moonshine = require 'lib.moonshine'
+    moonshine_fx = moonshine.effects
 
     --- @class (exact) MoonshineShaders
     --- @field fog table
     moonshine_shaders = {
-        fog = moonshine(arena_w, arena_h, fx.fog).chain(fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]],
+        fog = moonshine(arena_w, arena_h, moonshine_fx.fog).chain(moonshine_fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]],
     }
 
     -- Setup moonshine shaders
@@ -2595,6 +2595,12 @@ function love.load()
     end
 end --< love.load()
 
+---@diagnostic disable-next-line: unused-local
+function update_send_shaders(dt, t, w, h)
+    glsl_shaders.warp:send('screen', { w, h })
+    glsl_shaders.warp:send('time', t)
+    moonshine_shaders.fog.fog.time = t
+end
 
 -- #region: bullet time (global)
 -- vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -2685,6 +2691,21 @@ function update_slowed_game_time_this_frame(dt)
     end)
 end
 
+function love.resize(w, h)
+    -- Called when the window is resized, for example if the user resizes the
+    -- window, or if love.window.setMode is called with an unsupported width or
+    -- height in fullscreen and the window chooses the closest appropriate size.
+    gw = w
+    gh = h
+    arena_w = w
+    arena_h = h
+
+    -- EXPENSIVE OPERATION (SHOULD MANUALLY SET UP GLSL)
+    moonshine_shaders.fog = moonshine(w, h, moonshine_fx.fog).chain(moonshine_fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]]
+
+    update_send_shaders(game_timer_dt, game_timer_t, w, h)
+end
+
 function love.update(dt)
     if Config.Debug.IS_DEVELOPMENT then -- FIXME: Maybe make stuff global that are not hot-reloading?
         require('lurker').update()
@@ -2708,14 +2729,7 @@ function love.update(dt)
 
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
-    do
-        local screen_w, screen_h = LG.getDimensions()
-        -- glsl_shaders.gradient_timemod:send('screen', { screen_w, screen_h })
-        -- glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
-        glsl_shaders.warp:send('screen', { screen_w, screen_h })
-        glsl_shaders.warp:send('time', love.timer.getTime())
-        moonshine_shaders.fog.fog.time = love.timer.getTime()
-    end
+    update_send_shaders(dt, game_timer_t, arena_w, arena_h)
 
     -- #4 Frame Rate Independence: Fixed timestep loop.
 
