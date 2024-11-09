@@ -2357,7 +2357,8 @@ function reset_game()
     -- Reset game states.
     do
         curr_state.player_invulnerability_timer = 0
-        curr_state.player_health = Config.PLAYER_MAX_HEALTH
+        -- Allow continuity from previous level
+        if curr_state.player_health <= 0 then curr_state.player_health = Config.PLAYER_MAX_HEALTH end
         curr_state.player_rot_angle = 0
         curr_state.player_vel_x = 0
         curr_state.player_vel_y = 0
