@@ -33,7 +33,7 @@ local _cret_max_speed = 100 -- 32..120
 local _cret_min_radius = 8
 local _cret_min_speed = 32
 local _f_cret_scale = 1. -- factor
-local _f_cret_speed = 1. -- factor
+local _f_cret_speed = 1.4 -- factor
 
 --- @type CreatureStage[] Size decreases as stage progresses.
 local _CREATURE_STAGES = {
@@ -178,8 +178,8 @@ return {
     FIXED_DT = 1 / _fixed_fps, --- Consistent update frame rate fluctuations.
     FIXED_DT_INV = 1 / (1 / _fixed_fps), --- Helper constant to avoid dividing on each frame. (same as FIXED_FPS)
     FIXED_FPS = _fixed_fps,
-    GAME_MAX_LEVEL = 2 ^ 6, -- > 64
-    LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 2.0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
+    GAME_MAX_LEVEL = 2 ^ 4, -- > 16
+    LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 1.0) * ({ 0.2, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
     LASER_MAX_CAPACITY = 2 ^ 8, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
     LASER_RADIUS = (_inv_phi ^ 1) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
@@ -193,7 +193,7 @@ return {
     PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
     PLAYER_ROT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
-    PLAYER_TURN_SPEED_BESERK_MULTIPLIER = _phi * _phi,
+    PLAYER_TURN_SPEED_BESERK_MULTIPLIER = _phi * 1.0,
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[_speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
     PLAYER_FIRING_EDGE_MAX_RADIUS = (0.6 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
     PLAYER_FIRING_EDGE_RADIUS = (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.

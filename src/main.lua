@@ -591,9 +591,10 @@ function update_player_position_this_frame(dt)
 end
 
 function update_player_vulnerability_timer_this_frame(dt)
+    local f_dt = 0.5 -- 0..1
     local cs = curr_state
     if cs.player_invulnerability_timer > 0 then
-        cs.player_invulnerability_timer = cs.player_invulnerability_timer - dt
+        cs.player_invulnerability_timer = cs.player_invulnerability_timer - f_dt * dt
         if cs.player_invulnerability_timer <= 0 then cs.player_invulnerability_timer = 0 end
     end
 end
@@ -999,7 +1000,8 @@ function handle_player_input_this_frame(dt)
         -- Enhance attributes while spinning like a top.
         --[[TODO: On init, emit a burst of lasers automatically. Give player some respite]]
         player_turn_speed = Config.PLAYER_ROT_TURN_SPEED * Config.PLAYER_TURN_SPEED_BESERK_MULTIPLIER
-        laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
+        -- laser_fire_timer = (love.math.random() < 0.05) and 0 or game_timer_dt
+        laser_fire_timer = game_timer_dt
     elseif has_companions then
         player_turn_speed = Config.PLAYER_ROT_TURN_SPEED * INV_PHI_SQ
     else
@@ -2119,6 +2121,14 @@ function update_game(dt) ---@param dt number # Fixed delta time.
         music_bgm:setEffect('on_damage_lowpass', not true)
         music_bgm:setEffect('on_damage_reverb', not true)
     end
+
+    if is_slowed_game_time then
+        music_bgm:setEffect('on_bullet_time_lofi', true)
+        music_bgm:setEffect('on_damage_lowpass', true)
+        music_bgm:setEffect('on_damage_reverb', true)
+    else
+        music_bgm:setEffect('on_bullet_time_lofi', not true)
+    end
 end
 
 --- FIXME: When I set a refresh rate of 75.00 Hz on a 800 x 600 (4:3)
@@ -2137,6 +2147,7 @@ function draw_game(alpha)
     draw_player_shield_collectible(alpha)
     draw_player_collectible_indicators(alpha)
     draw_player(alpha)
+    LG.print(string.format('bullet_time: %s | dt: %.4f | alpha: %.4f', tostring(is_slowed_game_time), game_timer_dt, alpha), 100, 100)
 end
 
 --
@@ -2241,21 +2252,42 @@ function load_audio()
     end
 
     -- Effects
+    -- Create a low-pass filter effect -- see https://love2d.org/wiki/EffectType
     do
-        local on_damage_lowpass_effect_opts =
-            { type = 'equalizer', highcut = 4000, highgain = 0.126, highmidgain = 0.126, lowgain = 2, lowmidfrequency = 500, lowmidgain = 0.126, volume = 2.0 }
-        love.audio.setEffect('on_damage_lowpass', on_damage_lowpass_effect_opts) -- Create a low-pass filter effect -- see https://love2d.org/wiki/EffectType
+        local on_damage_lowpass_effect_opts = {
+            type = 'equalizer',
+            highcut = 4000,
+            highgain = 0.126,
+            highmidgain = 0.126,
+            lowgain = 2,
+            lowmidfrequency = 500,
+            lowmidgain = 0.126,
+            volume = 2.0,
+        }
+        love.audio.setEffect('on_damage_lowpass', on_damage_lowpass_effect_opts)
 
         -- frequency: `default: 800` ─ I want a hollow eerie effect (100 is great for ross_bugden_chime_chase)
         -- highcut: ... use a freq which is consistently playing (1000Hz)
         --- @alias Waveform 'sine' | 'square' | 'sawtooth'
         local waveform = 'sine'--[[@type Waveform]]
-        local on_damage_effect_opts =
-            { type = 'ringmodulator', frequency = 100, highcut = lume.clamp(450, 0, 24000), waveform = waveform, volume = INV_PHI ^ 8 }
+        local on_damage_effect_opts = {
+            type = 'ringmodulator',
+            frequency = 100,
+            highcut = lume.clamp(450, 0, 24000),
+            waveform = waveform,
+            volume = INV_PHI ^ 8,
+        }
         love.audio.setEffect('on_damage_reverb', on_damage_effect_opts)
 
-        local master_effect_opts = { type = 'reverb', volume = 0.5 } --[[decaytime = lume.clamp(1.49 * (PHI * 1), 0.1, 20), roomrolloff = lume.clamp(PHI, 0, 10), gain = 0.32 * PHI_INV, volume = PHI_INV, ]]
+        --[[decaytime = lume.clamp(1.49 * (PHI * 1), 0.1, 20), roomrolloff = lume.clamp(PHI, 0, 10), gain = 0.32 * PHI_INV, volume = PHI_INV, ]]
+        local master_effect_opts = { type = 'reverb', volume = 0.5 }
         love.audio.setEffect('master_reverb', master_effect_opts)
+
+        love.audio.setEffect('on_bullet_time_lofi', {
+            type = 'flanger',
+            rate = 0.27 * PHI ^ 4, -- [0, 10]
+            -- volume = 1,
+        })
     end
 
     do
@@ -2303,13 +2335,13 @@ function load_shaders()
     }
 
     -- Load moonshine shaders
-    local moonshine = require 'lib.moonshine'
-    local fx = moonshine.effects
+    moonshine = require 'lib.moonshine'
+    moonshine_fx = moonshine.effects
 
     --- @class (exact) MoonshineShaders
     --- @field fog table
     moonshine_shaders = {
-        fog = moonshine(arena_w, arena_h, fx.fog).chain(fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]],
+        fog = moonshine(arena_w, arena_h, moonshine_fx.fog).chain(moonshine_fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]],
     }
 
     -- Setup moonshine shaders
@@ -2325,7 +2357,8 @@ function reset_game()
     -- Reset game states.
     do
         curr_state.player_invulnerability_timer = 0
-        curr_state.player_health = Config.PLAYER_MAX_HEALTH
+        -- Allow continuity from previous level
+        if curr_state.player_health <= 0 then curr_state.player_health = Config.PLAYER_MAX_HEALTH end
         curr_state.player_rot_angle = 0
         curr_state.player_vel_x = 0
         curr_state.player_vel_y = 0
@@ -2562,6 +2595,117 @@ function love.load()
     end
 end --< love.load()
 
+---@diagnostic disable-next-line: unused-local
+function update_send_shaders(dt, t, w, h)
+    glsl_shaders.warp:send('screen', { w, h })
+    glsl_shaders.warp:send('time', t)
+    moonshine_shaders.fog.fog.time = t
+end
+
+-- #region: bullet time (global)
+-- vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+is_slowed_game_time = not true
+was_b_key_slowed_game_time_pressed = not true
+
+-- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-- #endregion
+
+local slowed_game_time_timestamp = 0.0
+local slowed_game_time_sustain_duration_seconds = 3.0
+local slowed_game_time_target_dt = 0.001
+
+-- #region love.update variables
+-- vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+local fixed_dt = Config.FIXED_DT
+
+-- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-- #endregion
+
+--- Rationale: Instead of leaving hands from controls─for quick pause, we use
+--- bullet time to slow things down and allow player to turn quickly / avoid
+--- faster drone creatures.
+function update_slowed_game_time_this_frame(dt)
+    if not is_slowed_game_time then
+        fixed_dt = Config.FIXED_DT
+        slowed_game_time_timestamp = 0.0
+        return
+    end
+
+    if slowed_game_time_timestamp == 0.0 then --[[]]
+        slowed_game_time_timestamp = love.timer.getTime()
+    end
+
+    if Config.Debug.IS_ASSERT then assert(love.timer.getTime() > slowed_game_time_timestamp) end
+
+    local f_rate = dt * 0.01
+
+    Timer.after(f_rate, function()
+        if not is_slowed_game_time then
+            error 'unreachable'
+            return
+        end
+
+        if Config.Debug.IS_ASSERT then assert(slowed_game_time_timestamp ~= 0) end
+
+        -- Wind rate down.
+        if fixed_dt - f_rate > slowed_game_time_target_dt then
+            fixed_dt = fixed_dt - f_rate
+        else
+            -- Now we are at desired time rate.
+            if Config.Debug.IS_ASSERT then--[[]]
+                assert(fixed_dt >= slowed_game_time_target_dt and fixed_dt + f_rate <= 0.01)
+            end
+
+            -- Un-wind rate up.
+            Timer.after(slowed_game_time_sustain_duration_seconds, function()
+                if Config.Debug.IS_ASSERT then
+                    if is_slowed_game_time then assert(slowed_game_time_timestamp ~= 0) end
+                end
+
+                if not is_slowed_game_time then return end
+
+                Timer.after(dt, function()
+                    if not is_slowed_game_time then
+                        if Config.Debug.IS_ASSERT then assert(pcall(assert, fixed_dt == Config.FIXED_DT)) end -- assume
+                        return
+                    end
+                    if Config.Debug.IS_ASSERT then
+                        assert(slowed_game_time_timestamp ~= 0)
+                        assert(dt > slowed_game_time_target_dt)
+                        assert(fixed_dt > slowed_game_time_target_dt)
+                    end
+                    if fixed_dt < Config.FIXED_DT then
+                        fixed_dt = fixed_dt + dt
+                    else
+                        if Config.Debug.IS_ASSERT then assert(is_slowed_game_time) end
+
+                        -- Finally toggle it off.
+                        is_slowed_game_time = not true
+                        fixed_dt = Config.FIXED_DT
+                    end
+                end)
+            end)
+        end
+    end)
+end
+
+function love.resize(w, h)
+    -- Called when the window is resized, for example if the user resizes the
+    -- window, or if love.window.setMode is called with an unsupported width or
+    -- height in fullscreen and the window chooses the closest appropriate size.
+    gw = w
+    gh = h
+    arena_w = w
+    arena_h = h
+
+    -- EXPENSIVE OPERATION (SHOULD MANUALLY SET UP GLSL)
+    moonshine_shaders.fog = moonshine(w, h, moonshine_fx.fog).chain(moonshine_fx.desaturate) --[[ desaturate removes ocataves(frequency) lines ]]
+
+    update_send_shaders(game_timer_dt, game_timer_t, w, h)
+end
+
 function love.update(dt)
     if Config.Debug.IS_DEVELOPMENT then -- FIXME: Maybe make stuff global that are not hot-reloading?
         require('lurker').update()
@@ -2585,17 +2729,20 @@ function love.update(dt)
 
     -- #3 Update all timers based on real dt.
     Timer.update(dt) -- call this every frame to update timers
-    do
-        local screen_w, screen_h = LG.getDimensions()
-        -- glsl_shaders.gradient_timemod:send('screen', { screen_w, screen_h })
-        -- glsl_shaders.gradient_timemod:send('time', love.timer.getTime())
-        glsl_shaders.warp:send('screen', { screen_w, screen_h })
-        glsl_shaders.warp:send('time', love.timer.getTime())
-        moonshine_shaders.fog.fog.time = love.timer.getTime()
-    end
+    update_send_shaders(dt, game_timer_t, arena_w, arena_h)
 
     -- #4 Frame Rate Independence: Fixed timestep loop.
-    local fixed_dt = Config.FIXED_DT
+
+    -- Distort fixed time step `fixed_dt`.
+    if love.keyboard.isDown 'b' and not was_b_key_slowed_game_time_pressed then
+        is_slowed_game_time = not is_slowed_game_time
+        was_b_key_slowed_game_time_pressed = true
+    elseif not love.keyboard.isDown 'b' then
+        was_b_key_slowed_game_time_pressed = not true
+    end
+    update_slowed_game_time_this_frame(dt)
+
+    -- Run main game loop.
     dt_accum = dt_accum + dt
     while dt_accum >= fixed_dt do
         sync_prev_state()
@@ -2661,7 +2808,7 @@ function love.draw()
 
     -- #4 Draw debugging tools.
     --
-    -- • Toggled on `h` `keyDown` event.
+    -- • Toggled on `h` `isDown` event.
     if is_debug_hud_enable then
         draw_debug_general_hud()
         draw_debug_stats_hud()
