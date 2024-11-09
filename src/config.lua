@@ -27,7 +27,7 @@ local _inv_phi_sq = 1 / (_phi ^ 2)
 --- @field speed number
 
 local _creature_initial_large_count = (2 ^ 1) --[[NOTE: Increase this for more challenging levels that are not trivial]]
-local _creatures_initial_constant_large_count = (2 ^ 3)
+local _creatures_initial_constant_large_count = (2 ^ 4)
 local _cret_max_radius = 92
 local _cret_max_speed = 100 -- 32..120
 local _cret_min_radius = 8
@@ -57,7 +57,7 @@ local _CREATURE_STAGES = {
 
 local _player_accel = ({ 150, 200, 300 })[_speed_mode]
 local _player_radius = math.min(_CREATURE_STAGES[1].radius * _phi, (32 * 0.61) - 4)
-local _companion_size = (_player_radius / (_phi ^ 4))
+local _companion_size = (_player_radius / (_phi ^ 1))
 
 --- @class (exact) MoonshineShaderSettings
 --- @field bloom_intensity { enable: boolean, amount: number }
@@ -127,7 +127,7 @@ return {
         IS_DEVELOPMENT = not true,
         IS_TEST = true,
         IS_TRACE_ENTITIES = not true,
-        IS_TRACE_HUD = not true,
+        IS_TRACE_HUD = not true, -- Heads Up Displaye
     },
     Mode = Mode,
     MoonshineShaderSettings = _MoonshineShaderSettings,
@@ -162,12 +162,8 @@ return {
     --
 
     AIR_RESISTANCE = 0.95, --- Resistance factor between 0 and 1.
-
-    --[[ KEEP IN SYNC ]]
+    COMPANION_DIST_FROM_PLAYER = (_phi ^ 4) * _companion_size, -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
     COMPANION_SIZE = _companion_size,
-    COMPANION_DIST_FROM_PLAYER = (_phi ^ 5) * _companion_size, -- FIXME: THIS SHOULD INCLUDE LASER RADIUS TOO (FOR PRECISE CENTERING)
-    --[[ KEEP IN SYNC ]]
-
     CREATURE_EXPECTED_FINAL_HEALED_COUNT = ((_creature_initial_large_count ^ 2) - _creature_initial_large_count), --- @type integer # Double buffer size possible creatures count `initial count ^ 2`
     CREATURE_INITIAL_CONSTANT_LARGE_STAGE_COUNT = _creatures_initial_constant_large_count, -- WARN: Any more than this, and levels above 50 lag
     CREATURE_INTIAL_LARGE_STAGE_COUNT = _creature_initial_large_count, --- @type integer # This count excludes the initial ancestor count.k
@@ -183,20 +179,21 @@ return {
     FIXED_DT_INV = 1 / (1 / _fixed_fps), --- Helper constant to avoid dividing on each frame. (same as FIXED_FPS)
     FIXED_FPS = _fixed_fps,
     GAME_MAX_LEVEL = 2 ^ 6, -- > 64
-    LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
-    LASER_MAX_CAPACITY = 2 ^ 6, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
+    LASER_FIRE_TIMER_LIMIT = (_inv_phi ^ 2.0) * ({ 0.21, 0.16, 0.14 })[_speed_mode], --- Reduce this to increase fire rate.
+    LASER_MAX_CAPACITY = 2 ^ 8, -- Choices: 2^4(balanced [nerfs fast fire rate]) | 2^5 (long range)
     LASER_PROJECTILE_SPEED = ({ 2 ^ 7, 2 ^ 8, 2 ^ 8 + 256 })[_speed_mode], --- 256|512|768
-    LASER_RADIUS = (_inv_phi ^ 0.5) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
-    PARALLAX_ENTITY_IMG_RADIUS = 16,
-    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 5),
-    PARALLAX_ENTITY_MAX_DEPTH = 4, --- @type integer
+    LASER_RADIUS = (_inv_phi ^ 1) * math.max(_inv_phi * _player_radius, math.floor(_player_radius * (_inv_phi ^ (1 * _phi)))),
+    PARALLAX_ENTITY_IMG_RADIUS = 48,
+    PARALLAX_ENTITY_MAX_COUNT = (2 ^ 6),
+    PARALLAX_ENTITY_MAX_DEPTH = 3, --- @type integer
     PARALLAX_ENTITY_MIN_DEPTH = 1, --- @type integer
-    PARALLAX_ENTITY_RADIUS_FACTOR = 0.25 * 0.125 * 16, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
+    PARALLAX_ENTITY_RADIUS_FACTOR = _inv_phi_sq, --- QUESTION: Are we scaling up by this factor? (should ensure resulting radius is similar to `PARALLAX_ENTITY_IMG_RADIUS`)
     PARALLAX_OFFSET_FACTOR_X = 0.00, -- NOTE: Should be lower to avoid puking
     PARALLAX_OFFSET_FACTOR_Y = 0.00,
     PLAYER_ACCELERATION = math.floor(3 * (true and 1 or 1.25) * ({ 150, 200, 300 })[_speed_mode]),
     PLAYER_CIRCLE_IRIS_TO_EYE_RATIO = _inv_phi,
-    PLAYER_DEFAULT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
+    PLAYER_ROT_TURN_SPEED = ({ (10 * _inv_phi), 10, -2 + (30 / 2) / 4 + (_player_accel / _fixed_fps) })[_speed_mode],
+    PLAYER_TURN_SPEED_BESERK_MULTIPLIER = _phi * _phi,
     PLAYER_FIRE_COOLDOWN_TIMER_LIMIT = ({ 4, 6, 12 })[_speed_mode], --- FIXME: Implement this (6 is rough guess, but intend for alpha lifecycle from 0.0 to 1.0.) -- see if this is in love.load()
     PLAYER_FIRING_EDGE_MAX_RADIUS = (0.6 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
     PLAYER_FIRING_EDGE_RADIUS = (0.9 * math.ceil(_player_radius * (true and 0.328 or (_inv_phi * _inv_phi)))), --- Trigger distance from center of player.
