@@ -2,7 +2,7 @@ local M = {}
 
 local Config = require 'config'
 
---- @enum STATUS
+--- @enum Status
 M.STATUS = {
     NOT_ACTIVE = 0,
     ACTIVE = 1,
@@ -10,14 +10,14 @@ M.STATUS = {
 
 -- curr_state.creatures_is_spawn[] ???
 
---- @enum HEALTH_TRANSITIONS
+--- @enum HealthTransitions
 M.HEALTH_TRANSITIONS = {
     NONE = -1,
     HEALING = 0, --- Creature did spawn, and saved and now inactive but healing.
     HEALTHY = 1,
 }
 
---- @enum CONTROL_KEY
+--- @enum ControlKey
 M.CONTROL_KEY = {
     BESERK = 'z',
     BOOST = 'x', --- `x`─Boost player
@@ -31,7 +31,7 @@ M.CONTROL_KEY = {
     TOGGLE_HUD = 'h',
 }
 
---- @enum PLAYER_ACTION
+--- @enum PlayerAction
 M.PLAYER_ACTION = {
     BESERK = 'BESERK',
     BOOST = 'BOOST',
@@ -40,27 +40,18 @@ M.PLAYER_ACTION = {
     IDLE = 'IDLE',
 }
 
---- @enum PLAYER_DAMAGE_STATUS
+--- @enum PlayerDamageStatus
 M.PLAYER_DAMAGE_STATUS = {
     DAMAGED = 'DAMAGED',
     DEAD = 'DEAD',
     INVULNERABLE = 'INVULNERABLE',
 }
 
---- @enum SCREEN_FLASH_ALPHA_LEVEL
+--- @enum ScreenFlashAlphaLevel
 M.SCREEN_FLASH_ALPHA_LEVEL = {
     HIGH = 0.25, --- note: high level needs a fade out timer
     MEDIUM = 0.1,
     LOW = 0.045,
-}
-
---- @enum CREATURE_STAGE_COLORS
---- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
-M.CREATURE_STAGE_COLORS = {
-    { 0.75, 0.1, 0.3 },
-    { 0.70, 0.2, 0.3 },
-    { 0.70, 0.3, 0.4 },
-    { 0.52, 0.45, 0.45 },
 }
 
 -- local ordia_blue = { 0.06, 0.16, 0.38 }
@@ -89,18 +80,40 @@ M.COLOR = {
     creature_healing = { 0.85, 0.3, 0.5 }, --- (pink)
     creature_infected_rgba = { 0.65, 0.1, 0.2, 0.5 },
 
-    player_companion_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
+    -- player_companion_modifier = { 0.4, 1.0, 1. }, --- Chaos when shift + x are down. (luminiscent blue)
+    player_companion_modifier = { 0.5, 0.9, 1.0 }, --- Chaos when shift + x are down. (luminiscent blue)
     player_beserker_modifier = { 135 / 255, 280 / 255, 138 / 255 }, --- buttercup Enhanced abilities, when either of shift key is pressed. (green)
-    player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
+    -- player_boost_dash_modifier = { 0.85, 0.85, 0.35 }, --- bubbles (luminiscent yellow)
+    player_boost_dash_modifier = { 0.95, 0.95, 0.55 }, --- bubbles (luminiscent yellow)
     player_dash_pink_modifier = { 0.95, 0.4, 0.6 }, --- blossom The idle tail and projectile color. (purple)
     player_entity = ({ { 0.05 * 1, 0.05 * 1, 0.05 * 1 }, { 0.05 * 2, 0.05 * 2, 0.05 * 2 }, { 0.05 * 4, 0.05 * 4, 0.05 * 4 } })[Config.CURRENT_THEME],
-    player_entity_firing_edge_dark = { 0.8, 0.8, 0.8 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
+    player_entity_firing_edge_dark = { 0.95, 0.95, 0.95 }, --- The "scanner|trigger|glint" of the eye ^_^. (offwhite)
     player_entity_firing_edge_darker = { 0.8, 0.8, 0.8 }, --- The lighter outer edge of the eye. (offwhite)
     player_entity_firing_projectile = { 1., 1., 1. }, --- The idle tail and projectile color. (white)
 
     TEXT_DARKER = { 0.4, 0.4, 0.4 },
     TEXT_DARKEST = { 0.3, 0.3, 0.3 },
     TEXT_DEBUG_HUD = { 0.8, 0.7, 0.0 },
+}
+
+--- @enum CreatureStageEyeColors
+--- Should follow ­­──»──VIBGYOR──»──
+--- Based on creature_evolution_stages `Stage[]` where the size decreases as stage progresses.
+M.CREATURE_STAGE_EYE_COLORS = {
+    { 0.98, 0.3, 0.7 }, -- red-pink
+    { 0.50, 0.85, 0.65 }, -- emerald-green
+    { 0.45, 0.3, 0.85 }, -- navy-purple-violet
+    -- { 0.92, 0.90, 0.50 }, -- yellow
+    -- { 0.09, 0.08, 0.1 }, -- badland gray
+    { 0.05, 0.06, 0.07 }, -- badland violet gray
+}
+
+--- @enum CreatureStageColors
+M.CREATURE_STAGE_COLORS = {
+    { 0.75, 0.1, 0.3 },
+    { 0.70, 0.2, 0.3 },
+    { 0.70, 0.3, 0.4 },
+    { 0.52, 0.45, 0.45 },
 }
 
 --- Desaturate an RGB color by averaging it with grayscale.
@@ -115,7 +128,7 @@ function M.desaturate(color)
     }
 end
 
---- @type table<PLAYER_ACTION, [number, number, number]>
+--- @type table<PlayerAction, [number, number, number]>
 M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.COMPANION] = M.COLOR.player_companion_modifier,
     [M.PLAYER_ACTION.BESERK] = M.COLOR.player_beserker_modifier,
@@ -124,7 +137,7 @@ M.PLAYER_ACTION_TO_COLOR = {
     [M.PLAYER_ACTION.IDLE] = M.COLOR.player_entity_firing_edge_dark, -- for laser
 }
 
---- @type table<PLAYER_ACTION, [number, number, number]>
+--- @type table<PlayerAction, [number, number, number]>
 M.PLAYER_ACTION_TO_DESATURATED_COLOR = {
     [M.PLAYER_ACTION.COMPANION] = M.desaturate(M.COLOR.player_companion_modifier),
     [M.PLAYER_ACTION.BESERK] = M.desaturate(M.COLOR.player_beserker_modifier),
